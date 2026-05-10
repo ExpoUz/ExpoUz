@@ -1,0 +1,329 @@
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
+import { SendOtpDto } from './dto/send-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { RegisterDto } from './dto/register.dto';
+import { RefreshDto } from './dto/refresh.dto';
+import axios from 'axios';
+import * as crypto from 'crypto';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+    private config: ConfigService,
+  ) {}
+
+  async sendOtp(dto: SendOtpDto): Promise<{ maskedPhone: string; expiresIn: number }> {
+    const { phone } = dto;
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 2 * 60 * 1000);
+
+    await this.prisma.otpCode.updateMany({
+      where: { phone, used: false },
+      data: { used: true },
+    });
+
+    await this.prisma.otpCode.create({
+      data: { phone, code, expiresAt },
+    });
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[DEV OTP] Phone: ${phone}, Code: ${code}`);
+    } else {
+      await this.sendEskizSms(phone, `Your Fubles Uz code: ${code}. Valid 2 minutes.`);
+    }
+
+    const maskedPhone = phone.replace(/(\+998)(\d{2})(\d{3})(\d{4})/, '$1$2***$4');
+    return { maskedPhone, expiresIn: 120 };
+  }
+
+  async verifyOtp(dto: VerifyOtpDto): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    isNewUser: boolean;
+    user: any;
+  }> {
+    const { phone, otp } = dto;
+    const now = new Date();
+
+    const otpRecord = await this.prisma.otpCode.findFirst({
+      where: {
+        phone,
+        code: otp,
+        used: false,
+        expiresAt: { gt: now },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!otpRecord) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    await this.prisma.otpCode.update({
+      where: { id: otpRecord.id },
+      data: { used: true },
+    });
+
+    let user = await this.prisma.user.findUnique({ where: { phone } });
+    let isNewUser = false;
+
+    if (!user) {
+      isNewUser = true;
+      user = await this.prisma.user.create({
+        data: {
+          phone,
+          firstName: 'User',
+          lastName: phone.slice(-4),
+          role: 'PLAYER',
+          skillLevel: 'AMATEUR',
+          eloRating: 1000,
+          reliabilityScore: 100.0,
+        },
+      });
+    }
+
+    if (user.isBanned) {
+      throw new UnauthorizedException('Your account has been banned');
+    }
+
+    const tokens = await this.generateTokens(user.id, user.role);
+
+    const refreshExpiry = new Date();
+    refreshExpiry.setDate(refreshExpiry.getDate() + 30);
+
+    await this.prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        token: tokens.refreshToken,
+        expiresAt: refreshExpiry,
+      },
+    });
+
+    return { ...tokens, isNewUser, user };
+  }
+
+  async register(userId: string, dto: RegisterDto): Promise<any> {
+    const updateData: any = {};
+    if (dto.firstName) updateData.firstName = dto.firstName;
+    if (dto.lastName) updateData.lastName = dto.lastName;
+    if (dto.dateOfBirth) updateData.dateOfBirth = new Date(dto.dateOfBirth);
+    if (dto.gender) updateData.gender = dto.gender;
+    if (dto.city) updateData.city = dto.city;
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
+
+    if (dto.referralCode) {
+      try {
+        const referrer = await this.prisma.user.findFirst({
+          where: { referralCode: dto.referralCode },
+        });
+        if (referrer && referrer.id !== userId) {
+          const currentUser = await this.prisma.user.findUnique({ where: { id: userId } });
+          if (!currentUser.referredBy) {
+            await this.prisma.$transaction([
+              this.prisma.user.update({
+                where: { id: userId },
+                data: {
+                  referredBy: referrer.id,
+                  credit: { increment: 50000 },
+                },
+              }),
+              this.prisma.user.update({
+                where: { id: referrer.id },
+                data: { credit: { increment: 50000 } },
+              }),
+            ]);
+          }
+        }
+      } catch {
+        // Referral bonus failure is non-critical
+      }
+    }
+
+    return user;
+  }
+
+  async refreshToken(dto: RefreshDto): Promise<{ accessToken: string; refreshToken: string }> {
+    const { refreshToken } = dto;
+
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { token: refreshToken },
+      include: { user: true },
+    });
+
+    if (!stored || stored.expiresAt < new Date()) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    await this.prisma.refreshToken.delete({ where: { id: stored.id } });
+
+    const tokens = await this.generateTokens(stored.user.id, stored.user.role);
+
+    const refreshExpiry = new Date();
+    refreshExpiry.setDate(refreshExpiry.getDate() + 30);
+
+    await this.prisma.refreshToken.create({
+      data: {
+        userId: stored.user.id,
+        token: tokens.refreshToken,
+        expiresAt: refreshExpiry,
+      },
+    });
+
+    return tokens;
+  }
+
+  async logout(userId: string, token: string): Promise<void> {
+    await this.prisma.refreshToken.deleteMany({
+      where: { userId, token },
+    });
+  }
+
+  async telegramAuth(initData: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    isNewUser: boolean;
+    user: any;
+  }> {
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash');
+    if (!hash) throw new UnauthorizedException('Missing hash');
+
+    params.delete('hash');
+
+    const dataCheckString = Array.from(params.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n');
+
+    const botToken = this.config.get<string>('TELEGRAM_BOT_TOKEN');
+    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+    const checkHash = crypto
+      .createHmac('sha256', secretKey)
+      .update(dataCheckString)
+      .digest('hex');
+
+    if (checkHash !== hash) {
+      throw new UnauthorizedException('Invalid Telegram initData');
+    }
+
+    const userParam = params.get('user');
+    if (!userParam) throw new UnauthorizedException('Missing user data');
+
+    const tgUser = JSON.parse(userParam);
+
+    let user = await this.prisma.user.findUnique({
+      where: { telegramId: String(tgUser.id) },
+    });
+    let isNewUser = false;
+
+    if (!user) {
+      isNewUser = true;
+      const phone = `+998000${String(tgUser.id).slice(-7).padStart(7, '0')}`;
+      user = await this.prisma.user.create({
+        data: {
+          phone,
+          firstName: tgUser.first_name || 'User',
+          lastName: tgUser.last_name || '',
+          telegramId: String(tgUser.id),
+          telegramUsername: tgUser.username,
+          avatarUrl: tgUser.photo_url,
+          role: 'PLAYER',
+          skillLevel: 'AMATEUR',
+          eloRating: 1000,
+          reliabilityScore: 100.0,
+        },
+      });
+    } else {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          telegramUsername: tgUser.username,
+          avatarUrl: tgUser.photo_url,
+        },
+      });
+    }
+
+    if (user.isBanned) {
+      throw new UnauthorizedException('Your account has been banned');
+    }
+
+    const tokens = await this.generateTokens(user.id, user.role);
+
+    const refreshExpiry = new Date();
+    refreshExpiry.setDate(refreshExpiry.getDate() + 30);
+
+    await this.prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        token: tokens.refreshToken,
+        expiresAt: refreshExpiry,
+      },
+    });
+
+    return { ...tokens, isNewUser, user };
+  }
+
+  private async generateTokens(
+    userId: string,
+    role: string,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(
+        { sub: userId, role },
+        {
+          secret: this.config.get<string>('JWT_SECRET'),
+          expiresIn: this.config.get<string>('JWT_EXPIRES_IN') || '15m',
+        },
+      ),
+      this.jwtService.signAsync(
+        { sub: userId, role },
+        {
+          secret: this.config.get<string>('JWT_REFRESH_SECRET'),
+          expiresIn: this.config.get<string>('JWT_REFRESH_EXPIRES_IN') || '30d',
+        },
+      ),
+    ]);
+
+    return { accessToken, refreshToken };
+  }
+
+  private async sendEskizSms(phone: string, message: string): Promise<void> {
+    try {
+      const tokenResponse = await axios.post('https://notify.eskiz.uz/api/auth/login', {
+        email: this.config.get<string>('ESKIZ_EMAIL'),
+        password: this.config.get<string>('ESKIZ_PASSWORD'),
+      });
+
+      const token = tokenResponse.data?.data?.token;
+      if (!token) return;
+
+      await axios.post(
+        'https://notify.eskiz.uz/api/message/sms/send',
+        {
+          mobile_phone: phone.replace('+', ''),
+          message,
+          from: '4546',
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+    } catch (error) {
+      console.error('Eskiz SMS failed:', error.message);
+    }
+  }
+}
