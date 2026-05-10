@@ -28,18 +28,22 @@ export function perspectiveProject(
   const vpX = screenW * 0.5;
   const vpY = screenH * 0.4;
 
+  // Normalise input coordinates relative to field dimensions
+  const nx = x / fieldW;
+  const ny = y / fieldH;
+
   // Bottom of pitch maps to full screen height
   const bottomY = screenH;
 
   // Interpolation factor: 0 at top (far), 1 at bottom (near)
-  const t = y;
+  const t = ny;
 
   // Horizontal spread increases as we move toward the viewer
   const nearSpread = screenW;
   const farSpread = screenW * 0.45;
   const currentSpread = farSpread + (nearSpread - farSpread) * t;
 
-  const projX = vpX + (x - 0.5) * currentSpread;
+  const projX = vpX + (nx - 0.5) * currentSpread;
   const projY = vpY + (bottomY - vpY) * t;
 
   // Scale objects relative to their depth
@@ -48,9 +52,6 @@ export function perspectiveProject(
   // Clamp to output bounds
   const clampedX = Math.max(0, Math.min(screenW, projX));
   const clampedY = Math.max(0, Math.min(screenH, projY));
-
-  void fieldW;
-  void fieldH;
 
   return { x: clampedX, y: clampedY, scale };
 }
