@@ -17,8 +17,9 @@ export class ClickService {
   ): string {
     // MD5 is required by the Click payment gateway API specification and cannot be replaced.
     // See: https://docs.click.uz/click-api-request/#sign_string
-    const raw = `${clickTransId}${serviceId}${secretKey}${merchantTransId}${amount}${action}${signTime}`; // lgtm[js/weak-cryptographic-algorithm]
-    return crypto.createHash('md5').update(raw).digest('hex'); // lgtm[js/weak-cryptographic-algorithm]
+    // lgtm [js/weak-cryptographic-algorithm]
+    const raw = `${clickTransId}${serviceId}${secretKey}${merchantTransId}${amount}${action}${signTime}`;
+    return crypto.createHash('md5').update(raw).digest('hex'); // lgtm [js/weak-cryptographic-algorithm]
   }
 
   async handlePrepare(dto: {

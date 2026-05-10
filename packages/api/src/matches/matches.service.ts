@@ -259,10 +259,6 @@ export class MatchesService {
     await this.prisma.match.update({ where: { id }, data: { status: 'CANCELLED' } });
 
     for (const booking of match.bookings) {
-      if (booking.transaction) {
-        const { EscrowService } = await import('../escrow/escrow.service');
-        // Handled by injected service — see MatchesModule for the actual DI
-      }
       await this.prisma.booking.update({
         where: { id: booking.id },
         data: { status: 'CANCELLED_REFUND' },

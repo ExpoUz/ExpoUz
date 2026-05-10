@@ -19,12 +19,15 @@ export class EscrowService {
       include: { match: true },
     });
 
+    const settings = await this.prisma.appSettings.findUnique({ where: { id: 'singleton' } });
+    const platformFeeRate = settings?.platformFeeRate ?? 0.05;
+
     const transaction = await this.prisma.transaction.create({
       data: {
         userId: booking.userId,
         bookingId,
         amount: booking.match.pricePerPlayer,
-        platformFee: new Decimal(booking.match.pricePerPlayer).mul(0.05),
+        platformFee: new Decimal(booking.match.pricePerPlayer).mul(platformFeeRate),
         gateway: gateway as any,
         status: 'HELD',
         heldAt: new Date(),
