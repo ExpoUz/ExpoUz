@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Fubles Uz",
+    "slug": "fubles-uz",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1A3A2E"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fublesuz.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1A3A2E"
+      },
+      "package": "com.fublesuz.app"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      "expo-image-picker",
+      "expo-notifications",
+      [
+        "expo-secure-store",
+        { "faceIDPermission": "Allow Fubles Uz to use Face ID." }
+      ]
+    ],
+    "scheme": "fubles-uz",
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

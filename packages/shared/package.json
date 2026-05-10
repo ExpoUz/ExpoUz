@@ -1,0 +1,14 @@
+{
+  "name": "@fubles-uz/shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "lint": "eslint src --ext .ts,.tsx"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
