@@ -70,10 +70,7 @@ export class PaymeService {
       },
     });
 
-    await this.prisma.booking.update({
-      where: { id: transaction.bookingId },
-      data: { status: 'CONFIRMED' },
-    });
+    await this.confirmBooking(transaction, 'CONFIRMED');
 
     return {
       result: {
@@ -125,10 +122,7 @@ export class PaymeService {
       data: { status: 'REFUNDED', refundedAt: new Date() },
     });
 
-    await this.prisma.booking.update({
-      where: { id: transaction.bookingId },
-      data: { status: 'CANCELLED_REFUND' },
-    });
+    await this.confirmBooking(transaction, 'CANCELLED_REFUND');
 
     await this.prisma.user.update({
       where: { id: transaction.userId },
@@ -173,5 +167,20 @@ export class PaymeService {
         reason: null,
       },
     };
+  }
+
+  // ─── Shared helper: update whichever booking type this transaction links to ─
+  private async confirmBooking(transaction: any, bookingStatus: string) {
+    if (transaction.bookingId) {
+      await this.prisma.booking.update({
+        where: { id: transaction.bookingId },
+        data: { status: bookingStatus },
+      });
+    } else if (transaction.pitchBookingId) {
+      await this.prisma.pitchBooking.update({
+        where: { id: transaction.pitchBookingId },
+        data: { status: bookingStatus },
+      });
+    }
   }
 }

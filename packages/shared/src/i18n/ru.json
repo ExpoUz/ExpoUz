@@ -24,7 +24,8 @@
     "noResults": "Ничего не найдено",
     "seeAll": "Смотреть всё",
     "viewMore": "Показать больше",
-    "required": "Обязательное поле"
+    "required": "Обязательное поле",
+    "continue": "Продолжить"
   },
   "auth": {
     "login": "Войти",
@@ -89,7 +90,27 @@
     "gameStartsSoon": "Игра начинается через {{time}}",
     "gameInProgress": "Игра в процессе",
     "rateOpponents": "Оценить соперников",
-    "matchSummary": "Итоги матча"
+    "matchSummary": "Итоги матча",
+    "whoIsPlaying": "Кто играет",
+    "available": "Свободно",
+    "whereYouPlay": "Место проведения",
+    "yourHost": "Организатор",
+    "contactHost": "Написать",
+    "join": "Присоединиться",
+    "leftGame": "Вы покинули игру",
+    "gameCancelled": "Игра отменена",
+    "youreIn": "Вы участвуете",
+    "leave": "Выйти",
+    "joinWaitlist": "В очередь",
+    "indoor": "Крытый",
+    "allLevels": "Все уровни",
+    "noMetalStuds": "Металлические шипы запрещены",
+    "cancellationPolicy": "Бесплатная отмена за {{hours}}ч",
+    "leftGames": "Вы покинули игру",
+    "chooseTeam": "Выберите команду",
+    "noPreference": "Без предпочтений",
+    "choosePosition": "Выберите позицию",
+    "skipPosition": "Пропустить"
   },
   "formation": {
     "title": "Расстановка",
@@ -114,7 +135,8 @@
     "CF": "ЦН",
     "ST": "НАП",
     "emptySlot": "Свободно",
-    "pickPosition": "Выберите позицию"
+    "pickPosition": "Выберите позицию",
+    "viewFormation": "Просмотр расстановки"
   },
   "profile": {
     "title": "Профиль",
@@ -178,7 +200,16 @@
     "transactionHistory": "История транзакций",
     "noTransactions": "Транзакций пока нет",
     "invoiceId": "Номер счёта",
-    "paidOn": "Оплачено {{date}}"
+    "paidOn": "Оплачено {{date}}",
+    "base": "Стоимость входа",
+    "total": "Итого",
+    "pay": "Оплатить",
+    "failed": "Оплата не прошла. Попробуйте снова."
+  },
+  "booking": {
+    "confirmed": "Вы в игре!",
+    "viewBooking": "Просмотр брони",
+    "backToGames": "К играм"
   },
   "pitch": {
     "title": "Площадки",

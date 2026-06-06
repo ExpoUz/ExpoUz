@@ -16,10 +16,10 @@ export class WalletService {
   async topUp(userId: string, amount: number, gateway: string) {
     if (amount <= 0) throw new BadRequestException('Amount must be positive');
 
+    // Wallet top-ups are not linked to any booking — bookingId omitted (nullable)
     const transaction = await this.prisma.transaction.create({
       data: {
         userId,
-        bookingId: `wallet_topup_${userId}_${Date.now()}`,
         amount,
         platformFee: 0,
         gateway: gateway as any,
@@ -27,7 +27,21 @@ export class WalletService {
       },
     });
 
-    const paymentUrl = this.generatePaymentUrl(transaction.id, amount, gateway);
+    // Build payment URL inline (no booking context, just fund the wallet)
+    let paymentUrl: string;
+    switch (gateway) {
+      case 'PAYME':
+        paymentUrl = `https://checkout.paycom.uz/${Buffer.from(
+          JSON.stringify({ id: transaction.id, amount: Math.round(amount * 100) }),
+        ).toString('base64')}`;
+        break;
+      case 'CLICK':
+        paymentUrl = `https://my.click.uz/services/pay?service_id=${process.env.CLICK_SERVICE_ID}&merchant_id=${process.env.CLICK_MERCHANT_ID}&amount=${amount}&transaction_param=${transaction.id}`;
+        break;
+      default:
+        paymentUrl = `https://uzum.uz/pay?merchant_id=${process.env.UZUM_MERCHANT_ID || ''}&order_id=${transaction.id}&amount=${amount}`;
+    }
+
     return { transaction, paymentUrl };
   }
 
@@ -52,18 +66,5 @@ export class WalletService {
       data: { credit: { increment: amount } },
       select: { credit: true },
     });
-  }
-
-  private generatePaymentUrl(transactionId: string, amount: number, gateway: string): string {
-    switch (gateway) {
-      case 'PAYME':
-        return `https://checkout.paycom.uz/${Buffer.from(
-          JSON.stringify({ id: transactionId, amount: amount * 100 }),
-        ).toString('base64')}`;
-      case 'CLICK':
-        return `https://my.click.uz/services/pay?service_id=${process.env.CLICK_SERVICE_ID}&merchant_id=${process.env.CLICK_MERCHANT_ID}&amount=${amount}&transaction_param=${transactionId}`;
-      default:
-        return `https://uzum.uz/pay?merchant_id=${process.env.UZUM_MERCHANT_ID}&order_id=${transactionId}&amount=${amount}`;
-    }
   }
 }

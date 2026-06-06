@@ -8,8 +8,8 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { IMatch, MatchStatus } from '@fubles-uz/shared';
-import { formatUZS } from '@fubles-uz/shared';
+import { IMatch, MatchStatus } from '@playwithus/shared';
+import { formatUZS } from '@playwithus/shared';
 import { Badge } from './Badge';
 
 interface MatchCardProps {
@@ -37,7 +37,7 @@ export const MatchCard: React.FC<MatchCardProps> = ({ match, onPress, onLongPres
     return () => pulse.stop();
   }, [isHot, pulseAnim]);
 
-  const scheduledDate = new Date(match.scheduledAt);
+  const scheduledDate = new Date((match as any).startTime ?? match.scheduledAt);
   const timeStr = scheduledDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
   const dateStr = scheduledDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 

@@ -39,7 +39,7 @@ export class AuthService {
     if (process.env.NODE_ENV !== 'production') {
       console.log(`[DEV OTP] Phone: ${phone}, Code: ${code}`);
     } else {
-      await this.sendEskizSms(phone, `Your Fubles Uz code: ${code}. Valid 2 minutes.`);
+      await this.sendEskizSms(phone, `Your PlayWithUs code: ${code}. Valid 2 minutes.`);
     }
 
     const maskedPhone = phone.replace(/(\+998)(\d{2})(\d{3})(\d{4})/, '$1$2***$4');
@@ -55,24 +55,32 @@ export class AuthService {
     const { phone, otp } = dto;
     const now = new Date();
 
-    const otpRecord = await this.prisma.otpCode.findFirst({
-      where: {
-        phone,
-        code: otp,
-        used: false,
-        expiresAt: { gt: now },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    // Dev bypass: phone +998900000000 always accepts code 000000
+    const isDevBypass =
+      process.env.NODE_ENV !== 'production' &&
+      phone === '+998900000000' &&
+      otp === '000000';
 
-    if (!otpRecord) {
-      throw new UnauthorizedException('Invalid or expired OTP');
+    if (!isDevBypass) {
+      const otpRecord = await this.prisma.otpCode.findFirst({
+        where: {
+          phone,
+          code: otp,
+          used: false,
+          expiresAt: { gt: now },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!otpRecord) {
+        throw new UnauthorizedException('Invalid or expired OTP');
+      }
+
+      await this.prisma.otpCode.update({
+        where: { id: otpRecord.id },
+        data: { used: true },
+      });
     }
-
-    await this.prisma.otpCode.update({
-      where: { id: otpRecord.id },
-      data: { used: true },
-    });
 
     let user = await this.prisma.user.findUnique({ where: { phone } });
     let isNewUser = false;
@@ -272,6 +280,63 @@ export class AuthService {
         token: tokens.refreshToken,
         expiresAt: refreshExpiry,
       },
+    });
+
+    return { ...tokens, isNewUser, user };
+  }
+
+  async googleAuth(credential: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    isNewUser: boolean;
+    user: any;
+  }> {
+    let googleUser: any;
+    try {
+      const { data } = await axios.get(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`,
+      );
+      googleUser = data;
+    } catch {
+      throw new UnauthorizedException('Invalid Google token');
+    }
+
+    const { email, given_name, family_name, name, sub: googleId } = googleUser;
+    if (!googleId || !email) throw new UnauthorizedException('Incomplete Google profile');
+
+    let user = await this.prisma.user.findFirst({
+      where: { OR: [{ googleId }, { email }] },
+    });
+    let isNewUser = false;
+
+    if (!user) {
+      isNewUser = true;
+      user = await this.prisma.user.create({
+        data: {
+          googleId,
+          email,
+          firstName: given_name || (name ? name.split(' ')[0] : 'User'),
+          lastName: family_name || (name ? name.split(' ').slice(1).join(' ') : googleId.slice(-4)),
+          role: 'PLAYER',
+          skillLevel: 'AMATEUR',
+          eloRating: 1000,
+          reliabilityScore: 100.0,
+        },
+      });
+    } else if (!user.googleId) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { googleId },
+      });
+    }
+
+    if (user.isBanned) throw new UnauthorizedException('Your account has been banned');
+
+    const tokens = await this.generateTokens(user.id, user.role);
+    const refreshExpiry = new Date();
+    refreshExpiry.setDate(refreshExpiry.getDate() + 30);
+    await this.prisma.refreshToken.create({
+      data: { userId: user.id, token: tokens.refreshToken, expiresAt: refreshExpiry },
     });
 
     return { ...tokens, isNewUser, user };

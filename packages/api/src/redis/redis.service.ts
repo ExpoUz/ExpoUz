@@ -26,7 +26,7 @@ export class RedisService {
   }
 
   async setNX(key: string, value: string, ttl: number): Promise<boolean> {
-    const result = await this.client.set(key, value, 'NX', 'EX', ttl);
+    const result = await this.client.set(key, value, 'EX', ttl, 'NX');
     return result === 'OK';
   }
 

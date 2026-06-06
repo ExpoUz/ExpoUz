@@ -140,10 +140,7 @@ export class ClickService {
       },
     });
 
-    await this.prisma.booking.update({
-      where: { id: transaction.bookingId },
-      data: { status: 'CONFIRMED' },
-    });
+    await this.confirmBooking(transaction, 'CONFIRMED');
 
     return {
       click_trans_id: dto.click_trans_id,
@@ -152,5 +149,20 @@ export class ClickService {
       error: 0,
       error_note: 'Success',
     };
+  }
+
+  // ─── Shared helper ──────────────────────────────────────────────────────────
+  private async confirmBooking(transaction: any, bookingStatus: string) {
+    if (transaction.bookingId) {
+      await this.prisma.booking.update({
+        where: { id: transaction.bookingId },
+        data: { status: bookingStatus },
+      });
+    } else if (transaction.pitchBookingId) {
+      await this.prisma.pitchBooking.update({
+        where: { id: transaction.pitchBookingId },
+        data: { status: bookingStatus },
+      });
+    }
   }
 }

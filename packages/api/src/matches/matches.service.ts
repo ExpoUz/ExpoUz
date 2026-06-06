@@ -11,6 +11,7 @@ import { CreateMatchDto } from './dto/create-match.dto';
 import { QueryMatchesDto, TimeOfDay, SortBy } from './dto/query-matches.dto';
 import { RatePlayerDto } from './dto/rate-player.dto';
 import { FormationService } from '../formation/formation.service';
+import { TelegramService } from '../telegram/telegram.service';
 
 @Injectable()
 export class MatchesService {
@@ -18,6 +19,7 @@ export class MatchesService {
     private prisma: PrismaService,
     private redis: RedisService,
     private formationService: FormationService,
+    private telegramService: TelegramService,
   ) {}
 
   async findAll(query: QueryMatchesDto) {
@@ -216,12 +218,26 @@ export class MatchesService {
         skillFilter: dto.skillFilter,
         description: dto.description,
         formation: dto.formation,
-        cancellationDeadlineHours: dto.cancellationDeadlineHours || 2,
+        cancellationDeadlineHours: dto.cancellationDeadlineHours || 5,
       },
     });
 
     if (dto.formation) {
       await this.formationService.generatePositions(match.id, dto.formation, dto.format);
+    }
+
+    // Create group conversation for this match
+    await this.prisma.conversation.create({
+      data: {
+        type: 'MATCH_GROUP',
+        matchId: match.id,
+        members: { create: { userId: hostId, isAdmin: true } },
+      },
+    });
+
+    // Create Telegram forum topic (non-blocking, fails gracefully)
+    if (this.telegramService.isEnabled) {
+      this.telegramService.createMatchTopic(match.id, autoTitle).catch(() => {});
     }
 
     return match;
@@ -273,6 +289,15 @@ export class MatchesService {
           data: { credit: { increment: booking.transaction.amount } },
         });
       }
+    }
+
+    // Close the Telegram topic
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { matchId: id, type: 'MATCH_GROUP' },
+      select: { telegramTopicId: true },
+    });
+    if (conversation?.telegramTopicId) {
+      this.telegramService.closeTopic(conversation.telegramTopicId, 'Match cancelled').catch(() => {});
     }
 
     return { message: 'Match cancelled, refunds processed' };
@@ -395,6 +420,21 @@ export class MatchesService {
       await this.redis.releasePosition(positionId);
     }
 
+    // Add player to the match group conversation
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { matchId, type: 'MATCH_GROUP' },
+    });
+    if (conversation) {
+      const alreadyMember = await this.prisma.conversationMember.findFirst({
+        where: { conversationId: conversation.id, userId },
+      });
+      if (!alreadyMember) {
+        await this.prisma.conversationMember.create({
+          data: { conversationId: conversation.id, userId },
+        });
+      }
+    }
+
     return {
       booking,
       paymentInstructions: {
@@ -412,7 +452,7 @@ export class MatchesService {
         userId,
         status: { in: ['CONFIRMED', 'PENDING_PAYMENT'] },
       },
-      include: { match: true, transaction: true },
+      include: { match: true, transaction: true, positionTaken: true },
     });
 
     if (!booking) throw new NotFoundException('Active booking not found');
@@ -421,7 +461,7 @@ export class MatchesService {
       (new Date(booking.match.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
 
     let newStatus: any = 'CANCELLED_REFUND';
-    let refundAmount = booking.transaction?.amount;
+    let refundAmount: number | null | undefined = booking.transaction?.amount?.toNumber();
 
     if (hoursBeforeMatch <= 0) {
       newStatus = 'NO_SHOW';

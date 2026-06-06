@@ -50,10 +50,7 @@ export class UzumService {
       },
     });
 
-    await this.prisma.booking.update({
-      where: { id: transaction.bookingId },
-      data: { status: 'CONFIRMED' },
-    });
+    await this.confirmBooking(transaction, 'CONFIRMED');
 
     return { result: 0, transactionId: dto.transactionId };
   }
@@ -75,12 +72,24 @@ export class UzumService {
       },
     });
 
-    await this.prisma.booking.update({
-      where: { id: transaction.bookingId },
-      data: { status: 'COMPLETED' },
-    });
+    await this.confirmBooking(transaction, 'COMPLETED');
 
     return { result: 0, transactionId: dto.transactionId };
+  }
+
+  // ─── Shared helper ──────────────────────────────────────────────────────────
+  private async confirmBooking(transaction: any, bookingStatus: string) {
+    if (transaction.bookingId) {
+      await this.prisma.booking.update({
+        where: { id: transaction.bookingId },
+        data: { status: bookingStatus },
+      });
+    } else if (transaction.pitchBookingId) {
+      await this.prisma.pitchBooking.update({
+        where: { id: transaction.pitchBookingId },
+        data: { status: bookingStatus },
+      });
+    }
   }
 
   generatePaymentUrl(transactionId: string, amount: number): string {

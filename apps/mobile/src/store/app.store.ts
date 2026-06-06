@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Sport } from '@fubles-uz/shared';
+import { Sport } from '@playwithus/shared';
 
 type Language = 'en' | 'uz' | 'ru';
 

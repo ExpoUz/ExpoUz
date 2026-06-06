@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/storage';
 import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/Button';
@@ -41,13 +41,13 @@ export default function OtpScreen() {
   const verify = useMutation({
     mutationFn: () => authApi.verifyOtp(phone ?? '', otp.join('')),
     onSuccess: async ({ data }) => {
-      if (data.isNewUser) { router.replace('/auth/register'); return; }
-      if (data.user && data.accessToken && data.refreshToken) {
+      if (data.accessToken && data.refreshToken) {
         await SecureStore.setItemAsync('accessToken', data.accessToken);
         await SecureStore.setItemAsync('refreshToken', data.refreshToken);
         setAuth(data.user, data.accessToken, data.refreshToken);
-        router.replace('/(tabs)/games');
       }
+      if (data.isNewUser) { router.replace('/auth/register'); return; }
+      router.replace('/(tabs)/games');
     },
     onError: () => { setError(t('auth.invalidOtp')); shake(); setOtp(Array(OTP_LENGTH).fill('')); inputs.current[0]?.focus(); },
   });

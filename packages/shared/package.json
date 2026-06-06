@@ -1,5 +1,5 @@
 {
-  "name": "@fubles-uz/shared",
+  "name": "@playwithus/shared",
   "version": "1.0.0",
   "private": true,
   "main": "./src/index.ts",

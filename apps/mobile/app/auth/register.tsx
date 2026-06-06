@@ -5,12 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/storage';
 import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/Button';
-import { Gender, MatchPosition } from '@fubles-uz/shared';
-import { UZBEKISTAN_CITIES } from '@fubles-uz/shared';
+import { Gender, MatchPosition } from '@playwithus/shared';
+import { UZBEKISTAN_CITIES } from '@playwithus/shared';
 
 const POSITIONS = ['GK','LB','CB','RB','CM','CDM','CAM','LW','RW','ST'];
 
@@ -35,7 +35,12 @@ export default function RegisterScreen() {
   const canSubmit = name.trim() && username.trim() && ageValid();
 
   const mutation = useMutation({
-    mutationFn: () => authApi.register({ phone: '', name, username, dateOfBirth: dob, gender, city, preferredPositions: positions, referralCode: referral || undefined }),
+    mutationFn: () => {
+      const parts = name.trim().split(' ');
+      const firstName = parts[0];
+      const lastName = parts.slice(1).join(' ') || parts[0];
+      return authApi.register({ firstName, lastName, dateOfBirth: dob || undefined, gender, city, referralCode: referral || undefined });
+    },
     onSuccess: async ({ data }) => {
       await SecureStore.setItemAsync('accessToken', data.accessToken);
       await SecureStore.setItemAsync('refreshToken', data.refreshToken);

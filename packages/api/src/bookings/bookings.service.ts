@@ -100,6 +100,32 @@ export class BookingsService {
     return { booking: result.booking, transaction: result.transaction, paymentUrl };
   }
 
+  async findMine(userId: string, params?: { status?: string; page?: number; limit?: number }) {
+    const { status, page = 1, limit = 20 } = params ?? {};
+    const where: any = { userId };
+    if (status) where.status = status;
+
+    const [data, total] = await Promise.all([
+      this.prisma.booking.findMany({
+        where,
+        include: {
+          match: {
+            include: {
+              pitch: { select: { name: true, addressLine: true } },
+            },
+          },
+          transaction: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.booking.count({ where }),
+    ]);
+
+    return { data, total };
+  }
+
   async findOne(id: string, userId: string) {
     const booking = await this.prisma.booking.findFirst({
       where: { id, userId },

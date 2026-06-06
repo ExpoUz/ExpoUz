@@ -20,9 +20,7 @@ export enum SkillLevel {
 
 export enum Sport {
   FOOTBALL = 'FOOTBALL',
-  FUTSAL = 'FUTSAL',
-  BASKETBALL = 'BASKETBALL',
-  VOLLEYBALL = 'VOLLEYBALL',
+  PADEL = 'PADEL',
   TENNIS = 'TENNIS',
 }
 
@@ -129,7 +127,24 @@ export enum PitchSize {
 export enum ConvType {
   DIRECT = 'DIRECT',
   MATCH = 'MATCH',
+  MATCH_GROUP = 'MATCH_GROUP',
   GROUP = 'GROUP',
+  PITCH_HIRE = 'PITCH_HIRE',
+}
+
+export enum PitchBookingType {
+  GROUP_HIRE = 'GROUP_HIRE',
+  OPEN_JOIN = 'OPEN_JOIN',
+}
+
+export enum PitchBookingStatus {
+  PENDING_PAYMENT = 'PENDING_PAYMENT',
+  CONFIRMED = 'CONFIRMED',
+  CANCELLED_REFUND = 'CANCELLED_REFUND',
+  CANCELLED_PENALTY = 'CANCELLED_PENALTY',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  NO_SHOW = 'NO_SHOW',
 }
 
 // ─── User Types ───────────────────────────────────────────────────────────────
@@ -161,19 +176,21 @@ export interface IUser {
 
 export interface IUserPublic {
   id: string;
-  name: string;
-  username: string;
+  firstName: string;
+  lastName: string;
+  name?: string;
+  username?: string;
   avatarUrl: string | null;
   bio: string | null;
-  gender: Gender;
-  city: string;
-  country: string;
-  skillLevel: SkillLevel;
+  gender?: Gender;
+  city?: string;
+  country?: string;
+  skillLevel?: SkillLevel;
   eloRating: number;
-  preferredSport: Sport;
-  preferredPositions: MatchPosition[];
-  isVerified: boolean;
-  lastActiveAt: Date | null;
+  preferredSport?: Sport;
+  preferredPositions?: MatchPosition[];
+  isVerified?: boolean;
+  lastActiveAt?: Date | null;
 }
 
 // ─── Pitch Types ──────────────────────────────────────────────────────────────
@@ -229,20 +246,26 @@ export interface IMatch {
   id: string;
   organizerId: string;
   pitchId: string;
+  hostId?: string;
   title: string;
   description: string | null;
   sport: Sport;
   status: MatchStatus;
   formation: string;
+  format?: string;
   maxPlayers: number;
+  minPlayers?: number;
   currentPlayers: number;
-  scheduledAt: Date;
+  startTime: Date;
+  scheduledAt?: Date;
   durationMinutes: number;
   pricePerPlayer: number;
-  currency: string;
-  isPublic: boolean;
-  allowWatchers: boolean;
-  city: string;
+  currency?: string;
+  isCoEd?: boolean;
+  skillFilter?: string | null;
+  isPublic?: boolean;
+  allowWatchers?: boolean;
+  city?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -386,4 +409,39 @@ export interface IMessage {
   deletedAt: Date | null;
   createdAt: Date;
   sender?: IUserPublic;
+}
+
+// ─── Pitch Booking Types ──────────────────────────────────────────────────────
+
+export interface IPitchBookingParticipant {
+  id: string;
+  pitchBookingId: string;
+  userId: string;
+  status: string;
+  paidAt: Date | null;
+  createdAt: Date;
+  user?: IUserPublic;
+}
+
+export interface IPitchBooking {
+  id: string;
+  pitchId: string;
+  hostId: string;
+  title: string;
+  type: PitchBookingType;
+  status: PitchBookingStatus;
+  startTime: Date;
+  endTime: Date;
+  durationHours: number;
+  totalPrice: number;
+  maxParticipants: number | null;
+  currentParticipants: number;
+  notes: string | null;
+  conversationId: string | null;
+  cancellationDeadlineHours: number;
+  createdAt: Date;
+  updatedAt: Date;
+  pitch?: IPitch;
+  host?: IUserPublic;
+  participants?: IPitchBookingParticipant[];
 }

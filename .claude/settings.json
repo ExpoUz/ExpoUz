@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -H \"bypass-tunnel-reminder: 1\" \"https://cuddly-spoons-leave.loca.lt/v1/pitches\" -o /dev/null -w \"HTTP=%{http_code} time=%{time_total}s\\\\n\" --max-time 15)"
+    ]
+  }
+}

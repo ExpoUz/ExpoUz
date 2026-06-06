@@ -10,8 +10,9 @@ datasource db {
 // ============ USER & AUTH ============
 model User {
   id               String     @id @default(cuid())
-  phone            String     @unique
+  phone            String?    @unique
   email            String?    @unique
+  googleId         String?    @unique
   firstName        String
   lastName         String
   avatarUrl        String?
@@ -51,11 +52,31 @@ model User {
   preferredPositions UserPosition[]
   conversationMemberships ConversationMember[]
   refreshTokens      RefreshToken[]
+  pitchBookings      PitchBooking[]       @relation("PitchBookingHost")
+  pitchBookingParticipations PitchBookingParticipant[]
+  activityLogs       ActivityLog[]
+  session            UserSession?
 }
 
-enum Gender     { MALE FEMALE OTHER PREFER_NOT_TO_SAY }
-enum UserRole   { PLAYER PITCH_OWNER ADMIN SUPER_ADMIN }
-enum SkillLevel { BEGINNER AMATEUR PRO }
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum UserRole {
+  PLAYER
+  PITCH_OWNER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum SkillLevel {
+  BEGINNER
+  AMATEUR
+  PRO
+}
 
 model RefreshToken {
   id        String   @id @default(cuid())
@@ -99,13 +120,26 @@ model Pitch {
   noMetalStuds Boolean     @default(false)
   commission   Float       @default(0.10)
   rejectionReason String?
+  locationId   String?
+  location     Location?   @relation(fields: [locationId], references: [id])
   createdAt    DateTime    @default(now())
   matches      Match[]
   followers    PitchFollower[]
+  pitchBookings PitchBooking[]
 }
 
-enum SurfaceType { NATURAL ARTIFICIAL FUTSAL INDOOR_TURF }
-enum PitchSize   { FIVE_A_SIDE SEVEN_A_SIDE ELEVEN_A_SIDE }
+enum SurfaceType {
+  NATURAL
+  ARTIFICIAL
+  FUTSAL
+  INDOOR_TURF
+}
+
+enum PitchSize {
+  FIVE_A_SIDE
+  SEVEN_A_SIDE
+  ELEVEN_A_SIDE
+}
 
 model Amenity {
   id      String      @id @default(cuid())
@@ -113,7 +147,15 @@ model Amenity {
   pitch   Pitch       @relation(fields: [pitchId], references: [id], onDelete: Cascade)
   type    AmenityType
 }
-enum AmenityType { BATHROOM PARKING WATER_FOUNTAIN CHANGING_ROOM CAFE SECURITY LIGHTS }
+enum AmenityType {
+  BATHROOM
+  PARKING
+  WATER_FOUNTAIN
+  CHANGING_ROOM
+  CAFE
+  SECURITY
+  LIGHTS
+}
 
 // ============ MATCH ============
 model Match {
@@ -135,7 +177,8 @@ model Match {
   isCoEd                    Boolean     @default(true)
   skillFilter               SkillLevel?
   description               String?
-  cancellationDeadlineHours Int         @default(2)
+  cancellationDeadlineHours Int         @default(5)
+  telegramTopicId           String?
   formation                 String?
   createdAt                 DateTime    @default(now())
   updatedAt                 DateTime    @updatedAt
@@ -146,8 +189,20 @@ model Match {
   notifications Notification[]
 }
 
-enum Sport       { FOOTBALL BASKETBALL VOLLEYBALL TENNIS BADMINTON }
-enum MatchStatus { OPEN FULL CONFIRMED IN_PROGRESS COMPLETED CANCELLED }
+enum Sport {
+  FOOTBALL
+  PADEL
+  TENNIS
+}
+
+enum MatchStatus {
+  OPEN
+  FULL
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
 
 // ============ POSITION-BASED BOOKING ============
 model MatchPosition {
@@ -162,8 +217,28 @@ model MatchPosition {
   isLocked     Boolean  @default(false)
 }
 
-enum TeamSide { HOME AWAY }
-enum Position { GK CB LB RB CDM CM CAM LM RM LW RW ST CF SS ANY }
+enum TeamSide {
+  HOME
+  AWAY
+}
+
+enum Position {
+  GK
+  CB
+  LB
+  RB
+  CDM
+  CM
+  CAM
+  LM
+  RM
+  LW
+  RW
+  ST
+  CF
+  SS
+  ANY
+}
 
 model UserPosition {
   id        String   @id @default(cuid())
@@ -201,24 +276,39 @@ enum BookingStatus {
 
 // ============ TRANSACTION (Escrow) ============
 model Transaction {
-  id          String            @id @default(cuid())
-  userId      String
-  user        User              @relation(fields: [userId], references: [id])
-  bookingId   String            @unique
-  booking     Booking           @relation(fields: [bookingId], references: [id])
-  amount      Decimal           @db.Decimal(12, 2)
-  platformFee Decimal           @db.Decimal(12, 2)
-  gateway     PaymentGateway    @default(UZUM_PAY)
-  gatewayTxId String?
-  status      TransactionStatus @default(PENDING)
-  heldAt      DateTime?
-  releasedAt  DateTime?
-  refundedAt  DateTime?
-  createdAt   DateTime          @default(now())
+  id             String            @id @default(cuid())
+  userId         String
+  user           User              @relation(fields: [userId], references: [id])
+  bookingId      String?           @unique
+  booking        Booking?          @relation(fields: [bookingId], references: [id])
+  pitchBookingId String?           @unique
+  pitchBooking   PitchBooking?     @relation(fields: [pitchBookingId], references: [id])
+  amount         Decimal           @db.Decimal(12, 2)
+  platformFee    Decimal           @db.Decimal(12, 2)
+  gateway        PaymentGateway    @default(UZUM_PAY)
+  gatewayTxId    String?
+  status         TransactionStatus @default(PENDING)
+  heldAt         DateTime?
+  releasedAt     DateTime?
+  refundedAt     DateTime?
+  createdAt      DateTime          @default(now())
 }
 
-enum PaymentGateway    { UZUM_PAY PAYME CLICK WALLET }
-enum TransactionStatus { PENDING HELD RELEASED REFUNDED FAILED PARTIALLY_REFUNDED }
+enum PaymentGateway {
+  UZUM_PAY
+  PAYME
+  CLICK
+  WALLET
+}
+
+enum TransactionStatus {
+  PENDING
+  HELD
+  RELEASED
+  REFUNDED
+  FAILED
+  PARTIALLY_REFUNDED
+}
 
 // ============ RATINGS ============
 model PlayerRating {
@@ -237,14 +327,23 @@ model PlayerRating {
 
 // ============ MESSAGING ============
 model Conversation {
-  id        String               @id @default(cuid())
-  type      ConvType             @default(DIRECT)
-  matchId   String?
-  members   ConversationMember[]
-  messages  Message[]
-  createdAt DateTime             @default(now())
+  id              String               @id @default(cuid())
+  type            ConvType             @default(DIRECT)
+  matchId         String?
+  pitchBookingId  String?              @unique
+  telegramTopicId String?
+  telegramChatId  String?
+  members         ConversationMember[]
+  messages        Message[]
+  pitchBooking    PitchBooking?        @relation(fields: [pitchBookingId], references: [id])
+  createdAt       DateTime             @default(now())
 }
-enum ConvType { DIRECT MATCH_GROUP SUPPORT }
+enum ConvType {
+  DIRECT
+  MATCH_GROUP
+  PITCH_HIRE
+  SUPPORT
+}
 
 model ConversationMember {
   id             String       @id @default(cuid())
@@ -306,5 +405,113 @@ model AppSettings {
   id               String  @id @default("singleton")
   commissionRate   Float   @default(0.10)
   platformFeeRate  Float   @default(0.05)
+  cancellationFeeRate Float @default(0.50)
+  cancellationWindowHours Int @default(5)
   updatedAt        DateTime @updatedAt
+}
+
+// ============ DIRECT PITCH BOOKING ============
+// Allows booking a pitch for 1+ hours as a group hire or open-join session,
+// independent of a structured match with formations.
+model PitchBooking {
+  id                       String               @id @default(cuid())
+  pitchId                  String
+  pitch                    Pitch                @relation(fields: [pitchId], references: [id])
+  hostId                   String
+  host                     User                 @relation("PitchBookingHost", fields: [hostId], references: [id])
+  title                    String
+  type                     PitchBookingType     @default(GROUP_HIRE)
+  startTime                DateTime
+  durationHours            Int                  @default(1)
+  totalPrice               Decimal              @db.Decimal(12, 2)
+  pricePerParticipant      Decimal?             @db.Decimal(12, 2)
+  maxParticipants          Int?
+  status                   PitchBookingStatus   @default(PENDING_PAYMENT)
+  cancellationDeadlineHours Int                 @default(5)
+  cancellationFeeRate      Float                @default(0.50)
+  notes                    String?
+  telegramTopicId          String?
+  conversation             Conversation?
+  participants             PitchBookingParticipant[]
+  transaction              Transaction?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+}
+
+enum PitchBookingType {
+  GROUP_HIRE    // One person books the whole pitch, no individual joining
+  OPEN_JOIN     // Book a pitch, open slots for others to join and share cost
+}
+
+enum PitchBookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CANCELLED_REFUND
+  CANCELLED_PENALTY
+  IN_PROGRESS
+  COMPLETED
+  NO_SHOW
+}
+
+model PitchBookingParticipant {
+  id         String            @id @default(cuid())
+  bookingId  String
+  booking    PitchBooking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User              @relation(fields: [userId], references: [id])
+  status     ParticipantStatus @default(CONFIRMED)
+  paidAmount Decimal?          @db.Decimal(12, 2)
+  joinedAt   DateTime          @default(now())
+  @@unique([bookingId, userId])
+}
+
+enum ParticipantStatus {
+  CONFIRMED
+  CANCELLED
+  NO_SHOW
+}
+
+// ============ LOCATION ============
+// Geographic zones used to organise pitches under Super Admin hierarchy
+model Location {
+  id          String   @id @default(cuid())
+  name        String
+  city        String
+  district    String?
+  lat         Float?
+  lng         Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  pitches     Pitch[]
+}
+
+// ============ ACTIVITY LOG ============
+// Immutable audit trail: every admin/super-admin action is recorded here
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String   // e.g. "BAN_USER", "VERIFY_PITCH", "CREATE_LOCATION"
+  entityType String?  // e.g. "User", "Pitch", "Match"
+  entityId   String?
+  meta       Json?    // arbitrary payload snapshot
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ============ USER SESSION (online presence) ============
+// Updated on every authenticated API request via middleware
+model UserSession {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSeenAt DateTime @default(now())
+  deviceInfo String?
+  ipAddress  String?
+  updatedAt  DateTime @updatedAt
 }

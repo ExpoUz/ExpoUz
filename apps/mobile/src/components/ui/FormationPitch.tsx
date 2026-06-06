@@ -17,8 +17,8 @@ import Animated, {
   withTiming,
   Easing as ReEasing,
 } from 'react-native-reanimated';
-import { IMatchPosition, IUserPublic } from '@fubles-uz/shared';
-import { perspectiveProject } from '@fubles-uz/shared';
+import { IMatchPosition, IUserPublic } from '@playwithus/shared';
+import { perspectiveProject } from '@playwithus/shared';
 import { PlayerAvatar } from './PlayerAvatar';
 
 const { width: SCREEN_W } = Dimensions.get('window');

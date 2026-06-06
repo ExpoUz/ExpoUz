@@ -24,7 +24,8 @@
     "noResults": "Natija topilmadi",
     "seeAll": "Hammasini ko'rish",
     "viewMore": "Ko'proq ko'rish",
-    "required": "Majburiy"
+    "required": "Majburiy",
+    "continue": "Davom etish"
   },
   "auth": {
     "login": "Kirish",
@@ -89,7 +90,27 @@
     "gameStartsSoon": "O'yin {{time}} da boshlanadi",
     "gameInProgress": "O'yin jarayonda",
     "rateOpponents": "Raqiblarni baholash",
-    "matchSummary": "O'yin xulosasi"
+    "matchSummary": "O'yin xulosasi",
+    "whoIsPlaying": "Kim o'ynayapti",
+    "available": "Bo'sh joy",
+    "whereYouPlay": "O'yin joyi",
+    "yourHost": "Tashkilotchi",
+    "contactHost": "Murojaat qilish",
+    "join": "Qo'shilish",
+    "leftGame": "Siz o'yindan chiqdingiz",
+    "gameCancelled": "O'yin bekor qilindi",
+    "youreIn": "Siz qo'shildingiz",
+    "leave": "Chiqish",
+    "joinWaitlist": "Kutish ro'yxatiga qo'shilish",
+    "indoor": "Yopiq",
+    "allLevels": "Barcha darajalar",
+    "noMetalStuds": "Metal toshlar taqiqlangan",
+    "cancellationPolicy": "Bepul bekor qilish - {{hours}} soat oldin",
+    "leftGames": "Siz o'yindan chiqdingiz",
+    "chooseTeam": "Jamoangizni tanlang",
+    "noPreference": "Farqi yo'q",
+    "choosePosition": "Pozitsiyangizni tanlang",
+    "skipPosition": "O'tkazib yuborish"
   },
   "formation": {
     "title": "Taktik sxema",
@@ -114,7 +135,8 @@
     "CF": "MH",
     "ST": "ST",
     "emptySlot": "Bo'sh",
-    "pickPosition": "Pozitsiya tanlang"
+    "pickPosition": "Pozitsiya tanlang",
+    "viewFormation": "Taktik sxemani ko'rish"
   },
   "profile": {
     "title": "Profil",
@@ -178,7 +200,16 @@
     "transactionHistory": "Tranzaksiyalar tarixi",
     "noTransactions": "Hali tranzaksiyalar yo'q",
     "invoiceId": "Hisob-faktura raqami",
-    "paidOn": "{{date}} da to'langan"
+    "paidOn": "{{date}} da to'langan",
+    "base": "Kirish narxi",
+    "total": "Jami",
+    "pay": "To'lash",
+    "failed": "To'lov amalga oshmadi. Qayta urinib ko'ring."
+  },
+  "booking": {
+    "confirmed": "Qo'shildingiz!",
+    "viewBooking": "Bron ko'rish",
+    "backToGames": "O'yinlarga qaytish"
   },
   "pitch": {
     "title": "Maydonlar",

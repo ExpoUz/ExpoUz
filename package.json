@@ -1,8 +1,12 @@
 {
-  "name": "fubles-uz",
+  "name": "playwithus",
   "version": "1.0.0",
   "private": true,
-  "description": "Fubles Uz — Sports matchmaking and booking platform for Uzbekistan",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "description": "PlayWithUs — Sports matchmaking and booking platform for Uzbekistan",
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",

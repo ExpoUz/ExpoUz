@@ -16,6 +16,49 @@ async function main() {
     },
   });
 
+  // ============ Locations ============
+  const locYunusabad = await prisma.location.upsert({
+    where: { id: 'loc-yunusabad' },
+    update: {},
+    create: {
+      id: 'loc-yunusabad',
+      name: 'Yunusabad Sports Zone',
+      city: 'Tashkent',
+      district: 'Yunusabad',
+      lat: 41.3555,
+      lng: 69.2913,
+      isActive: true,
+    },
+  });
+
+  const locChilanzar = await prisma.location.upsert({
+    where: { id: 'loc-chilanzar' },
+    update: {},
+    create: {
+      id: 'loc-chilanzar',
+      name: 'Chilanzar Sports Hub',
+      city: 'Tashkent',
+      district: 'Chilanzar',
+      lat: 41.2995,
+      lng: 69.2143,
+      isActive: true,
+    },
+  });
+
+  const locMirzo = await prisma.location.upsert({
+    where: { id: 'loc-mirzo' },
+    update: {},
+    create: {
+      id: 'loc-mirzo',
+      name: 'Mirzo-Ulugbek Arena District',
+      city: 'Tashkent',
+      district: 'Mirzo-Ulugbek',
+      lat: 41.3300,
+      lng: 69.3450,
+      isActive: true,
+    },
+  });
+
   // ============ Super Admin ============
   const superAdmin = await prisma.user.upsert({
     where: { phone: '+998901111111' },
@@ -122,6 +165,7 @@ async function main() {
   const pitch1 = await prisma.pitch.create({
     data: {
       ownerId: pitchOwner1.id,
+      locationId: locYunusabad.id,
       name: 'Yunusabad Sport Complex',
       description: 'Professional football pitch in Yunusabad district',
       addressLine: 'Yunusabad 12-kvartal, 5-uy',
@@ -150,6 +194,7 @@ async function main() {
   const pitch2 = await prisma.pitch.create({
     data: {
       ownerId: pitchOwner1.id,
+      locationId: locYunusabad.id,
       name: 'Yunusabad Indoor Arena',
       description: 'Indoor futsal pitch with modern facilities',
       addressLine: 'Yunusabad 17-kvartal, 8-uy',
@@ -178,6 +223,7 @@ async function main() {
   const pitch3 = await prisma.pitch.create({
     data: {
       ownerId: pitchOwner2.id,
+      locationId: locChilanzar.id,
       name: 'Chilanzar Football Club',
       description: 'Community football pitch in Chilanzar',
       addressLine: 'Chilanzar 9-kvartal, 15-uy',
@@ -205,6 +251,7 @@ async function main() {
   const pitch4 = await prisma.pitch.create({
     data: {
       ownerId: pitchOwner2.id,
+      locationId: locChilanzar.id,
       name: 'Chilanzar Pro Pitch',
       description: 'Professional-grade pitch with natural turf',
       addressLine: 'Chilanzar 19-kvartal, 3-uy',
@@ -233,6 +280,7 @@ async function main() {
   const pitch5 = await prisma.pitch.create({
     data: {
       ownerId: pitchOwner3.id,
+      locationId: locMirzo.id,
       name: 'Mirzo Ulugbek Sports Center',
       description: 'Modern sports complex in Mirzo Ulugbek district',
       addressLine: 'Mirzo Ulugbek, Bogʻishamol 234',
@@ -262,6 +310,7 @@ async function main() {
   const pitch6 = await prisma.pitch.create({
     data: {
       ownerId: pitchOwner3.id,
+      locationId: locMirzo.id,
       name: 'Mirzo Ulugbek Mini Arena',
       description: 'Compact futsal arena perfect for quick games',
       addressLine: 'Mirzo Ulugbek, Shayxontohur 12',
@@ -411,8 +460,8 @@ async function main() {
     data: {
       pitchId: pitch6.id,
       hostId: players[5].id,
-      title: 'Basketball Match - Mirzo Ulugbek',
-      sport: 'BASKETBALL',
+      title: 'Padel Match - Mirzo Ulugbek',
+      sport: 'PADEL',
       format: '5v5',
       startTime: matchTime(tomorrow, 20),
       durationMinutes: 60,
@@ -514,14 +563,250 @@ async function main() {
     });
   }
 
+  // ============ Pitch Bookings ============
+  const now2 = new Date();
+
+  // Completed pitch hire (2 days ago)
+  const pb1 = await prisma.pitchBooking.create({
+    data: {
+      pitchId: pitch1.id,
+      hostId: players[0].id,
+      title: 'Corporate Team Outing - Morning Hire',
+      type: 'GROUP_HIRE',
+      startTime: new Date(now2.getTime() - 2 * 24 * 60 * 60 * 1000),
+      durationHours: 2,
+      totalPrice: 300000,
+      status: 'COMPLETED',
+      notes: 'Full pitch hire for a corporate event.',
+    },
+  });
+  await prisma.transaction.create({
+    data: {
+      userId: players[0].id,
+      pitchBookingId: pb1.id,
+      amount: 300000,
+      platformFee: 15000,
+      gateway: 'PAYME',
+      status: 'RELEASED',
+      heldAt: new Date(now2.getTime() - 2 * 24 * 60 * 60 * 1000 - 60000),
+      releasedAt: new Date(now2.getTime() - 2 * 24 * 60 * 60 * 1000 + 3600000),
+    },
+  });
+  await prisma.pitchBookingParticipant.createMany({
+    data: [
+      { bookingId: pb1.id, userId: players[1].id, paidAmount: 60000 },
+      { bookingId: pb1.id, userId: players[2].id, paidAmount: 60000 },
+      { bookingId: pb1.id, userId: players[3].id, paidAmount: 60000 },
+    ],
+    skipDuplicates: true,
+  });
+
+  // Confirmed pitch hire (tomorrow)
+  const pb2 = await prisma.pitchBooking.create({
+    data: {
+      pitchId: pitch3.id,
+      hostId: players[4].id,
+      title: 'Friends Reunion Match - Chilanzar',
+      type: 'GROUP_HIRE',
+      startTime: new Date(now2.getTime() + 24 * 60 * 60 * 1000),
+      durationHours: 1,
+      totalPrice: 120000,
+      status: 'CONFIRMED',
+      notes: 'We need access to both locker rooms.',
+    },
+  });
+  await prisma.transaction.create({
+    data: {
+      userId: players[4].id,
+      pitchBookingId: pb2.id,
+      amount: 120000,
+      platformFee: 6000,
+      gateway: 'CLICK',
+      status: 'HELD',
+      heldAt: new Date(),
+    },
+  });
+
+  // Open-join pitch hire (day after tomorrow)
+  const pb3 = await prisma.pitchBooking.create({
+    data: {
+      pitchId: pitch5.id,
+      hostId: players[5].id,
+      title: 'Open Join - Mirzo Ulugbek Weekend Kick',
+      type: 'OPEN_JOIN',
+      startTime: new Date(now2.getTime() + 48 * 60 * 60 * 1000),
+      durationHours: 2,
+      totalPrice: 320000,
+      pricePerParticipant: 40000,
+      maxParticipants: 8,
+      status: 'CONFIRMED',
+    },
+  });
+  await prisma.transaction.create({
+    data: {
+      userId: players[5].id,
+      pitchBookingId: pb3.id,
+      amount: 320000,
+      platformFee: 16000,
+      gateway: 'UZUM_PAY',
+      status: 'HELD',
+      heldAt: new Date(),
+    },
+  });
+  await prisma.pitchBookingParticipant.createMany({
+    data: [
+      { bookingId: pb3.id, userId: players[6].id, paidAmount: 40000 },
+      { bookingId: pb3.id, userId: players[7].id, paidAmount: 40000 },
+    ],
+    skipDuplicates: true,
+  });
+
+  // Pending pitch hire
+  const pb4 = await prisma.pitchBooking.create({
+    data: {
+      pitchId: pitch2.id,
+      hostId: players[8].id,
+      title: 'Indoor Futsal Friday Night',
+      type: 'GROUP_HIRE',
+      startTime: new Date(now2.getTime() + 72 * 60 * 60 * 1000),
+      durationHours: 1,
+      totalPrice: 200000,
+      status: 'PENDING_PAYMENT',
+    },
+  });
+  await prisma.transaction.create({
+    data: {
+      userId: players[8].id,
+      pitchBookingId: pb4.id,
+      amount: 200000,
+      platformFee: 10000,
+      gateway: 'WALLET',
+      status: 'PENDING',
+    },
+  });
+
+  // Cancelled pitch hire
+  const pb5 = await prisma.pitchBooking.create({
+    data: {
+      pitchId: pitch6.id,
+      hostId: players[9].id,
+      title: 'Mini Arena Sunday Hire',
+      type: 'GROUP_HIRE',
+      startTime: new Date(now2.getTime() - 24 * 60 * 60 * 1000),
+      durationHours: 1,
+      totalPrice: 100000,
+      status: 'CANCELLED_REFUND',
+    },
+  });
+  await prisma.transaction.create({
+    data: {
+      userId: players[9].id,
+      pitchBookingId: pb5.id,
+      amount: 100000,
+      platformFee: 5000,
+      gateway: 'PAYME',
+      status: 'REFUNDED',
+      heldAt: new Date(now2.getTime() - 25 * 60 * 60 * 1000),
+      refundedAt: new Date(now2.getTime() - 24 * 60 * 60 * 1000),
+    },
+  });
+
+  // ============ User Sessions (online status) ============
+  const sessionUsers = [superAdmin, pitchOwner1, pitchOwner2, players[0], players[1], players[2]];
+  for (const u of sessionUsers) {
+    await prisma.userSession.upsert({
+      where: { userId: u.id },
+      update: { lastSeenAt: new Date(now2.getTime() - Math.floor(Math.random() * 4 * 60 * 1000)) },
+      create: {
+        userId: u.id,
+        lastSeenAt: new Date(now2.getTime() - Math.floor(Math.random() * 4 * 60 * 1000)),
+        deviceInfo: 'iPhone 15 Pro / iOS 17',
+        ipAddress: `10.0.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
+      },
+    });
+  }
+  // A few offline ones (last seen > 5 min ago)
+  for (const u of [players[3], players[4], pitchOwner3]) {
+    await prisma.userSession.upsert({
+      where: { userId: u.id },
+      update: { lastSeenAt: new Date(now2.getTime() - 15 * 60 * 1000) },
+      create: {
+        userId: u.id,
+        lastSeenAt: new Date(now2.getTime() - 15 * 60 * 1000),
+        deviceInfo: 'Samsung Galaxy S24 / Android 14',
+        ipAddress: `192.168.1.${Math.floor(Math.random() * 200) + 10}`,
+      },
+    });
+  }
+
+  // ============ Activity Logs ============
+  const activityData = [
+    { user: superAdmin, action: 'VERIFY_PITCH', entityType: 'Pitch', entityId: pitch1.id, meta: { pitchName: pitch1.name } },
+    { user: superAdmin, action: 'VERIFY_PITCH', entityType: 'Pitch', entityId: pitch3.id, meta: { pitchName: pitch3.name } },
+    { user: superAdmin, action: 'CREATE_LOCATION', entityType: 'Location', entityId: locYunusabad.id, meta: { name: locYunusabad.name } },
+    { user: superAdmin, action: 'CREATE_LOCATION', entityType: 'Location', entityId: locChilanzar.id, meta: { name: locChilanzar.name } },
+    { user: superAdmin, action: 'CREATE_LOCATION', entityType: 'Location', entityId: locMirzo.id, meta: { name: locMirzo.name } },
+    { user: pitchOwner1, action: 'UPDATE_PITCH_AVAILABILITY', entityType: 'Pitch', entityId: pitch1.id, meta: { isActive: true } },
+    { user: pitchOwner2, action: 'CANCEL_MATCH', entityType: 'Match', entityId: match3.id, meta: { reason: 'Pitch maintenance' } },
+    { user: superAdmin, action: 'BAN_USER', entityType: 'User', entityId: players[14].id, meta: { reason: 'Repeated no-show' } },
+    { user: superAdmin, action: 'UNBAN_USER', entityType: 'User', entityId: players[14].id, meta: { reason: 'Appeal accepted' } },
+    { user: pitchOwner3, action: 'CANCEL_PITCH_BOOKING', entityType: 'PitchBooking', entityId: pb5.id, meta: { reason: 'Host request' } },
+  ];
+
+  for (let i = 0; i < activityData.length; i++) {
+    const a = activityData[i];
+    await prisma.activityLog.create({
+      data: {
+        userId: a.user.id,
+        action: a.action,
+        entityType: a.entityType,
+        entityId: a.entityId,
+        meta: a.meta,
+        ipAddress: `10.10.0.${i + 1}`,
+        createdAt: new Date(now2.getTime() - (activityData.length - i) * 30 * 60 * 1000),
+      },
+    });
+  }
+
+  // ============ Pitch Followers ============
+  const followerPairs = [
+    { pitchId: pitch1.id, userId: players[3].id },
+    { pitchId: pitch1.id, userId: players[4].id },
+    { pitchId: pitch1.id, userId: players[5].id },
+    { pitchId: pitch2.id, userId: players[0].id },
+    { pitchId: pitch3.id, userId: players[6].id },
+    { pitchId: pitch5.id, userId: players[7].id },
+    { pitchId: pitch5.id, userId: players[8].id },
+  ];
+  for (const fp of followerPairs) {
+    await prisma.pitchFollower.upsert({
+      where: { pitchId_userId: { pitchId: fp.pitchId, userId: fp.userId } },
+      update: {},
+      create: fp,
+    });
+  }
+
+  // ============ Wallet credits for testing ============
+  const walletUsers = [players[0], players[1], players[2], players[3], players[4]];
+  for (const wu of walletUsers) {
+    await prisma.user.update({
+      where: { id: wu.id },
+      data: { credit: 500000 + Math.floor(Math.random() * 500000) },
+    });
+  }
+
   console.log('✅ Seeding complete!');
   console.log(`   - 1 super admin`);
   console.log(`   - 3 pitch owners`);
   console.log(`   - 15 players`);
+  console.log(`   - 3 locations`);
   console.log(`   - 6 pitches`);
   console.log(`   - 8 matches`);
-  console.log(`   - ${bookingPairs.length} bookings`);
+  console.log(`   - ${bookingPairs.length} match bookings`);
   console.log(`   - ${ratingPairs.length} ratings`);
+  console.log(`   - 5 pitch bookings`);
+  console.log(`   - 9 user sessions`);
+  console.log(`   - ${activityData.length} activity logs`);
 }
 
 main()

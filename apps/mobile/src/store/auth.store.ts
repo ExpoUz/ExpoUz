@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { IUser } from '@fubles-uz/shared';
+import { IUser } from '@playwithus/shared';
 
 interface AuthState {
   user: IUser | null;

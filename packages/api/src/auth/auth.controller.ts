@@ -73,4 +73,12 @@ export class AuthController {
   telegramAuth(@Body('initData') initData: string) {
     return this.authService.telegramAuth(initData);
   }
+
+  @Post('google')
+  @ApiOperation({ summary: 'Sign in or register with Google ID token' })
+  @ApiResponse({ status: 200, description: 'Tokens returned' })
+  @ApiResponse({ status: 401, description: 'Invalid Google token' })
+  googleAuth(@Body('credential') credential: string) {
+    return this.authService.googleAuth(credential);
+  }
 }

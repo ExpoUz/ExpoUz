@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Fubles Uz",
-    "slug": "fubles-uz",
+    "name": "PlayWithUs",
+    "slug": "playwithus",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,14 +14,14 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fublesuz.app"
+      "bundleIdentifier": "com.playwithus.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1A3A2E"
       },
-      "package": "com.fublesuz.app"
+      "package": "com.playwithus.app"
     },
     "plugins": [
       "expo-router",
@@ -30,10 +30,18 @@
       "expo-notifications",
       [
         "expo-secure-store",
-        { "faceIDPermission": "Allow Fubles Uz to use Face ID." }
+        { "faceIDPermission": "Allow PlayWithUs to use Face ID." }
       ]
     ],
-    "scheme": "fubles-uz",
+    "scheme": "playwithus",
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "meta": {
+        "viewport": "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+      }
+    },
     "experiments": {
       "typedRoutes": true
     }

@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Fallbacks for when Telegram theme vars are absent (browser dev) */
+  --tg-bg: var(--tg-theme-bg-color, #f5f6f8);
+  --tg-card: var(--tg-theme-secondary-bg-color, #ffffff);
+  --tg-text: var(--tg-theme-text-color, #0d1117);
+  --tg-hint: var(--tg-theme-hint-color, #8a94a6);
+  --tg-link: var(--tg-theme-link-color, #00875a);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--tg-bg);
+  color: var(--tg-text);
+  font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+  padding-bottom: env(safe-area-inset-bottom);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+.pulse-dot {
+  animation: pulse-dot 1.6s infinite;
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}

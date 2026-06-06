@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,81 +6,62 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Dimensions,
+  StyleSheet,
+  Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { api } from '@/lib/api';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { matchesApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
-import { Badge } from '@/components/ui/Badge';
 import { PlayerAvatar } from '@/components/ui/PlayerAvatar';
 import { BottomSheet } from '@/components/ui/BottomSheet';
-import { formatUZS } from '@fubles-uz/shared';
+import { formatUZS } from '@playwithus/shared';
 
-const { width } = Dimensions.get('window');
+const SPORT_ICON: Record<string, string> = { FOOTBALL: '⚽', PADEL: '🏓', TENNIS: '🎾' };
+const AMENITY_ICON: Record<string, string> = {
+  BATHROOM: '🚽', PARKING: '🚗', WATER_FOUNTAIN: '💧', SECURITY: '🔒', LIGHTS: '💡',
+};
+
+function StatPill({ icon, value, sub }: { icon: any; value: string; sub?: string }) {
+  return (
+    <View style={styles.statPill}>
+      <Ionicons name={icon} size={18} color="#00C853" />
+      <Text style={styles.statValue}>{value}</Text>
+      {sub ? <Text style={styles.statSub}>{sub}</Text> : null}
+    </View>
+  );
+}
 
 export default function MatchDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { t } = useTranslation();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
-  const [playerSheetVisible, setPlayerSheetVisible] = useState(false);
+  const [sheetVisible, setSheetVisible] = useState(false);
 
   const { data: match, isLoading } = useQuery({
     queryKey: ['match', id],
-    queryFn: () => api.matches.getOne(id!),
+    queryFn: async () => { const r = await matchesApi.getById(id!); return r.data; },
     enabled: !!id,
   });
 
-  const joinMutation = useMutation({
-    mutationFn: () => router.push(`/matches/${id}/join` as any),
-  });
-
   const leaveMutation = useMutation({
-    mutationFn: () => api.matches.leave(id!),
+    mutationFn: () => matchesApi.cancel(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['match', id] });
-      Alert.alert(t('common.success'), t('games.leftGame'));
+      Alert.alert('Done', 'You have left the game.');
     },
   });
 
-  const myBooking = match?.bookings?.find((b: any) => b.userId === user?.id);
-  const isHost = match?.hostId === user?.id;
-  const isFull = match?.status === 'FULL' || match?.currentPlayers >= match?.maxPlayers;
-  const isCancelled = match?.status === 'CANCELLED';
-  const isJoined = !!myBooking && myBooking.status === 'CONFIRMED';
-
-  const handleCTA = () => {
-    if (isJoined) {
-      Alert.alert(t('games.leaveGame'), t('games.leaveConfirm'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('games.leave'), style: 'destructive', onPress: () => leaveMutation.mutate() },
-      ]);
-    } else if (!isFull && !isCancelled) {
-      router.push(`/matches/${id}/join` as any);
-    }
-  };
-
-  const formatDateTime = (dt: string) => {
-    const d = new Date(dt);
-    return d.toLocaleString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   if (isLoading) {
     return (
-      <View className="flex-1 bg-gray-50">
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <SkeletonLoader variant="card" />
         <SkeletonLoader variant="list" />
       </View>
@@ -89,191 +70,295 @@ export default function MatchDetailScreen() {
 
   if (!match) return null;
 
+  const confirmedBookings = match.bookings?.filter((b: any) => b.status === 'CONFIRMED') ?? [];
+  const emptySlots = Math.max(0, match.maxPlayers - confirmedBookings.length);
+  const fillRatio = match.maxPlayers > 0 ? confirmedBookings.length / match.maxPlayers : 0;
+
+  const myBooking = confirmedBookings.find((b: any) => b.userId === user?.id);
+  const isJoined = !!myBooking;
+  const isFull = match.status === 'FULL' || confirmedBookings.length >= match.maxPlayers;
+  const isCancelled = match.status === 'CANCELLED';
+
+  const handleCTA = () => {
+    if (isJoined) {
+      Alert.alert('Leave Game?', 'You will lose your spot and a refund will go to your wallet.', [
+        { text: 'Keep My Spot', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: () => leaveMutation.mutate() },
+      ]);
+    } else if (!isFull && !isCancelled) {
+      router.push(`/matches/${id}/join` as any);
+    }
+  };
+
+  const d = new Date(match.startTime);
+  const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+
   return (
-    <View className="flex-1 bg-gray-50">
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        {/* Hero */}
-        <View style={{ height: 220, backgroundColor: '#1A3A2E' }}>
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.7)']}
-            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 100 }}
+    <View style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+
+        {/* ── Hero ── */}
+        <View style={styles.hero}>
+          <Image
+            source={{
+              uri:
+                match.pitch?.imageUrl ??
+                `https://placehold.co/800x560/1A3A2E/3B7A57?text=${encodeURIComponent(SPORT_ICON[match.sport] ?? '⚽')}`,
+            }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
           />
-          <View className="absolute bottom-4 left-4 right-4">
-            <Text className="text-white text-xl font-bold">{match.title}</Text>
-            <Text className="text-gray-300 text-sm mt-1">{formatDateTime(match.startTime)}</Text>
+          <LinearGradient
+            colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.65)']}
+            style={StyleSheet.absoluteFill}
+          />
+
+          {/* Back */}
+          <TouchableOpacity
+            style={[styles.heroBack, { top: insets.top + 12 }]}
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-back" size={20} color="#fff" />
+          </TouchableOpacity>
+
+          {/* Status badge */}
+          {isCancelled && (
+            <View style={[styles.heroBadge, styles.heroBadgeCancelled, { top: insets.top + 14 }]}>
+              <Text style={styles.heroBadgeText}>CANCELLED</Text>
+            </View>
+          )}
+          {isFull && !isCancelled && (
+            <View style={[styles.heroBadge, styles.heroBadgeFull, { top: insets.top + 14 }]}>
+              <Text style={styles.heroBadgeText}>FULL</Text>
+            </View>
+          )}
+
+          {/* Title overlay */}
+          <View style={styles.heroBottom}>
+            <View style={styles.sportChip}>
+              <Text style={styles.sportChipText}>
+                {SPORT_ICON[match.sport] ?? '⚽'}{'  '}{match.sport}
+              </Text>
+            </View>
+            <Text style={styles.heroTitle} numberOfLines={2}>{match.title}</Text>
+            <Text style={styles.heroDate}>{dateStr} · {timeStr}</Text>
           </View>
         </View>
 
-        {/* Info Block */}
-        <View className="bg-white mx-4 mt-4 rounded-2xl p-4 shadow-sm">
-          <View className="flex-row flex-wrap gap-2 mb-3">
-            <Badge label={match.format} variant="custom" />
-            {match.isIndoor && <Badge label={t('games.indoor')} variant="indoor" />}
-            <Badge label={match.skillFilter || t('games.allLevels')} variant="skill" />
-            {isFull && <Badge label={t('games.full')} variant="full" />}
-          </View>
-
-          <View className="flex-row items-center mb-2">
-            <Ionicons name="time-outline" size={16} color="#6B7280" />
-            <Text className="text-gray-600 ml-2">{match.durationMinutes} min</Text>
-          </View>
-          <View className="flex-row items-center mb-2">
-            <Ionicons name="cash-outline" size={16} color="#6B7280" />
-            <Text className="text-gray-600 ml-2">{formatUZS(Number(match.pricePerPlayer))} / player</Text>
-          </View>
-          <View className="flex-row items-center mb-2">
-            <Ionicons name="people-outline" size={16} color="#6B7280" />
-            <Text className="text-gray-600 ml-2">
-              {match.currentPlayers}/{match.maxPlayers} {t('games.players')}
-            </Text>
-          </View>
-
-          {match.description ? (
-            <Text className="text-gray-600 text-sm mt-2">{match.description}</Text>
-          ) : null}
-          <Text className="text-gray-400 text-xs mt-2">
-            {t('games.cancellationPolicy', { hours: match.cancellationDeadlineHours })}
-          </Text>
+        {/* ── Quick Stats ── */}
+        <View style={styles.statsCard}>
+          <StatPill icon="time-outline" value={`${match.durationMinutes} min`} />
+          <View style={styles.statsDivider} />
+          <StatPill icon="cash-outline" value={formatUZS(Number(match.pricePerPlayer))} sub="/ player" />
+          <View style={styles.statsDivider} />
+          <StatPill
+            icon="people-outline"
+            value={`${confirmedBookings.length}/${match.maxPlayers}`}
+            sub="players"
+          />
+          <View style={styles.statsDivider} />
+          <StatPill
+            icon={match.isIndoor ? 'home-outline' : 'sunny-outline'}
+            value={match.isIndoor ? 'Indoor' : 'Outdoor'}
+          />
         </View>
 
-        {/* Who's Playing */}
-        <View className="bg-white mx-4 mt-4 rounded-2xl p-4 shadow-sm">
-          <Text className="text-gray-900 font-bold text-base mb-3">
-            {t('games.whoIsPlaying')} ({match.currentPlayers}/{match.maxPlayers})
-          </Text>
-          <View className="flex-row flex-wrap gap-3">
-            {match.bookings
-              ?.filter((b: any) => b.status === 'CONFIRMED')
-              .map((b: any) => (
-                <TouchableOpacity
-                  key={b.id}
-                  className="items-center w-16"
-                  onPress={() => {
-                    setSelectedPlayer(b.user);
-                    setPlayerSheetVisible(true);
-                  }}
-                >
-                  <PlayerAvatar user={b.user} size="md" showCrown={b.userId === match.hostId} />
-                  <Text className="text-xs text-gray-700 mt-1 text-center" numberOfLines={1}>
-                    {b.user?.firstName}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            {Array.from({ length: Math.max(0, match.maxPlayers - match.currentPlayers) }).map((_, i) => (
+        {/* ── Tags ── */}
+        {(match.format || match.skillFilter) && (
+          <View style={[styles.row, { paddingHorizontal: 16, gap: 8, marginTop: 10 }]}>
+            {match.format && (
+              <View style={styles.tag}><Text style={styles.tagText}>{match.format}</Text></View>
+            )}
+            {match.skillFilter && (
+              <View style={styles.tag}><Text style={styles.tagText}>{match.skillFilter}</Text></View>
+            )}
+          </View>
+        )}
+
+        {/* ── Players ── */}
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Who's Playing</Text>
+            <View style={styles.fillPill}>
+              <Text style={styles.fillPillText}>{confirmedBookings.length}/{match.maxPlayers} joined</Text>
+            </View>
+          </View>
+
+          {/* Progress bar */}
+          <View style={styles.fillBarBg}>
+            <View
+              style={[
+                styles.fillBarFg,
+                {
+                  width: `${Math.min(fillRatio * 100, 100)}%` as any,
+                  backgroundColor: fillRatio >= 0.8 ? '#F59E0B' : '#00C853',
+                },
+              ]}
+            />
+          </View>
+
+          {/* Avatars */}
+          <View style={styles.avatarGrid}>
+            {confirmedBookings.map((b: any) => (
+              <TouchableOpacity
+                key={b.id}
+                style={styles.avatarItem}
+                onPress={() => { setSelectedPlayer(b.user); setSheetVisible(true); }}
+              >
+                <PlayerAvatar user={b.user} size="md" showCrown={b.userId === match.hostId} />
+                <Text style={styles.avatarName} numberOfLines={1}>{b.user?.firstName}</Text>
+              </TouchableOpacity>
+            ))}
+            {Array.from({ length: emptySlots }).map((_, i) => (
               <TouchableOpacity
                 key={`empty-${i}`}
-                className="items-center w-16"
-                onPress={() => router.push(`/matches/${id}/join` as any)}
+                style={styles.avatarItem}
+                onPress={() => !isFull && !isCancelled && router.push(`/matches/${id}/join` as any)}
               >
-                <View className="w-12 h-12 rounded-full border-2 border-dashed border-primary items-center justify-center">
-                  <Ionicons name="add" size={20} color="#00C853" />
+                <View style={styles.emptySlot}>
+                  <Ionicons name="add" size={18} color="#CBD5E1" />
                 </View>
-                <Text className="text-xs text-primary mt-1">{t('games.available')}</Text>
+                <Text style={styles.avatarNameEmpty}>Open</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Formation */}
+        {/* ── Formation ── */}
         {match.formation && (
           <TouchableOpacity
-            className="bg-white mx-4 mt-4 rounded-2xl p-4 shadow-sm flex-row items-center justify-between"
+            style={[styles.card, styles.row, { justifyContent: 'space-between' }]}
             onPress={() => router.push(`/matches/${id}/formation` as any)}
+            activeOpacity={0.75}
           >
-            <View>
-              <Text className="font-bold text-gray-900">{t('formation.viewFormation')}</Text>
-              <Text className="text-gray-500 text-sm">{match.formation} formation</Text>
+            <View style={[styles.row, { gap: 12 }]}>
+              <View style={styles.iconBox}>
+                <Ionicons name="grid-outline" size={18} color="#00C853" />
+              </View>
+              <View>
+                <Text style={styles.cardValue}>Formation</Text>
+                <Text style={styles.cardMeta}>{match.formation}</Text>
+              </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#00C853" />
+            <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
           </TouchableOpacity>
         )}
 
-        {/* Where */}
-        <View className="bg-white mx-4 mt-4 rounded-2xl p-4 shadow-sm">
-          <Text className="font-bold text-gray-900 mb-3">{t('games.whereYouPlay')}</Text>
-          <Text className="font-semibold text-gray-800">{match.pitch?.name}</Text>
-          <Text className="text-gray-500 text-sm">{match.pitch?.addressLine}</Text>
-          {match.pitch?.noMetalStuds && (
-            <Text className="text-error text-sm mt-2">🚫 {t('games.noMetalStuds')}</Text>
-          )}
-          <View className="flex-row mt-3 gap-4">
-            {match.pitch?.amenities?.map((a: any) => (
-              <Text key={a.id} className="text-gray-500 text-xs">
-                {a.type === 'BATHROOM' ? '🚽' : a.type === 'PARKING' ? '🚗' : a.type === 'WATER_FOUNTAIN' ? '💧' : a.type === 'SECURITY' ? '🔒' : a.type === 'LIGHTS' ? '💡' : '✓'}
-              </Text>
-            ))}
+        {/* ── Venue ── */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Where You Play</Text>
+          <View style={[styles.row, { gap: 12, marginTop: 12 }]}>
+            <View style={[styles.iconBox, { width: 44, height: 44, borderRadius: 14 }]}>
+              <Ionicons name="location" size={20} color="#00C853" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardValue}>{match.pitch?.name ?? '—'}</Text>
+              <Text style={styles.cardMeta}>{match.pitch?.addressLine ?? ''}</Text>
+            </View>
           </View>
+          {match.pitch?.amenities?.length > 0 && (
+            <View style={[styles.row, { flexWrap: 'wrap', gap: 8, marginTop: 12 }]}>
+              {match.pitch.amenities.map((a: any) => (
+                <View key={a.id} style={styles.amenityChip}>
+                  <Text style={styles.amenityText}>
+                    {AMENITY_ICON[a.type] ?? '✓'} {a.type.replace(/_/g, ' ')}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+          {match.pitch?.noMetalStuds && (
+            <View style={[styles.row, { gap: 6, marginTop: 10 }]}>
+              <Ionicons name="warning-outline" size={14} color="#EF4444" />
+              <Text style={styles.warnText}>No metal studs allowed</Text>
+            </View>
+          )}
         </View>
 
-        {/* Host */}
-        <View className="bg-white mx-4 mt-4 mb-32 rounded-2xl p-4 shadow-sm">
-          <Text className="font-bold text-gray-900 mb-3">{t('games.yourHost')}</Text>
-          <View className="flex-row items-center">
-            <PlayerAvatar user={match.host} size="lg" showCrown />
-            <View className="ml-3 flex-1">
-              <Text className="font-bold text-gray-900">
-                {match.host?.firstName} {match.host?.lastName}
-              </Text>
-              <Text className="text-gray-500 text-sm">ELO {match.host?.eloRating}</Text>
+        {/* ── Host ── */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Your Host</Text>
+          <View style={[styles.row, { marginTop: 12, justifyContent: 'space-between' }]}>
+            <View style={[styles.row, { gap: 12 }]}>
+              <PlayerAvatar user={match.host} size="lg" showCrown />
+              <View>
+                <Text style={styles.cardValue}>
+                  {match.host?.firstName} {match.host?.lastName}
+                </Text>
+                <Text style={styles.cardMeta}>
+                  ELO {match.host?.eloRating ?? '—'}
+                  {match.host?.skillLevel ? ` · ${match.host.skillLevel}` : ''}
+                </Text>
+              </View>
             </View>
             <TouchableOpacity
-              className="bg-primary px-3 py-2 rounded-xl"
+              style={styles.chatBtn}
               onPress={() => router.push(`/messages/direct/${match.hostId}` as any)}
             >
-              <Text className="text-white text-sm font-semibold">{t('games.contactHost')}</Text>
+              <Ionicons name="chatbubble-outline" size={14} color="#00C853" />
+              <Text style={styles.chatBtnText}>Chat</Text>
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* ── Policy ── */}
+        <View style={[styles.card, styles.policyCard]}>
+          <Ionicons name="information-circle-outline" size={16} color="#16A34A" />
+          <Text style={styles.policyText}>
+            Free cancellation up to {match.cancellationDeadlineHours}h before kick-off. Full refund to wallet.
+          </Text>
+        </View>
       </ScrollView>
 
-      {/* Sticky CTA */}
-      <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-border px-4 py-4">
+      {/* ── Sticky CTA ── */}
+      <View style={[styles.ctaBar, { paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity
           onPress={handleCTA}
           disabled={isCancelled || (isFull && !isJoined)}
-          className={`rounded-xl py-4 items-center ${
-            isCancelled ? 'bg-gray-300' : isJoined ? 'border-2 border-primary bg-white' : isFull ? 'bg-warning' : 'bg-accent'
-          }`}
+          activeOpacity={0.85}
+          style={[
+            styles.ctaBtn,
+            isCancelled && styles.ctaDisabled,
+            isJoined && styles.ctaLeave,
+            !isJoined && !isCancelled && !isFull && styles.ctaJoin,
+            isFull && !isJoined && styles.ctaFull,
+          ]}
         >
           {leaveMutation.isPending ? (
-            <ActivityIndicator color={isJoined ? '#00C853' : '#fff'} />
+            <ActivityIndicator color={isJoined ? '#EF4444' : '#fff'} />
           ) : (
-            <Text
-              className={`font-bold text-base ${isJoined ? 'text-primary' : 'text-white'}`}
-            >
+            <Text style={[styles.ctaBtnText, isJoined && { color: '#EF4444' }]}>
               {isCancelled
-                ? t('games.gameCancelled')
+                ? 'Game Cancelled'
                 : isJoined
-                ? `✓ ${t('games.youreIn')} — ${t('games.leave')}`
+                ? "✓ You're In — Tap to Leave"
                 : isFull
-                ? `🔔 ${t('games.joinWaitlist')}`
-                : t('games.join')}
+                ? '🔔 Join Waitlist'
+                : `Join  ·  ${formatUZS(Number(match.pricePerPlayer))}`}
             </Text>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* Player Profile Sheet */}
-      <BottomSheet
-        visible={playerSheetVisible}
-        onClose={() => setPlayerSheetVisible(false)}
-        snapPoints={['40%']}
-      >
+      {/* ── Player sheet ── */}
+      <BottomSheet visible={sheetVisible} onClose={() => setSheetVisible(false)} snapPoints={['40%']}>
         {selectedPlayer && (
-          <View className="p-6 items-center">
+          <View style={styles.sheetInner}>
             <PlayerAvatar user={selectedPlayer} size="lg" showElo />
-            <Text className="text-xl font-bold mt-3">
+            <Text style={styles.sheetName}>
               {selectedPlayer.firstName} {selectedPlayer.lastName}
             </Text>
-            <Text className="text-gray-500">ELO {selectedPlayer.eloRating}</Text>
-            <View className="flex-row mt-4 gap-6">
-              <View className="items-center">
-                <Text className="font-bold text-gray-900">{selectedPlayer.reliabilityScore?.toFixed(0)}%</Text>
-                <Text className="text-xs text-gray-500">{t('profile.reliability')}</Text>
+            <Text style={styles.sheetElo}>ELO {selectedPlayer.eloRating}</Text>
+            <View style={[styles.row, { gap: 40, marginTop: 20 }]}>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={styles.sheetStatVal}>{selectedPlayer.reliabilityScore?.toFixed(0)}%</Text>
+                <Text style={styles.sheetStatLbl}>Reliability</Text>
               </View>
-              <View className="items-center">
-                <Text className="font-bold text-gray-900">{selectedPlayer.skillLevel}</Text>
-                <Text className="text-xs text-gray-500">{t('profile.skill')}</Text>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={styles.sheetStatVal}>{selectedPlayer.skillLevel ?? '—'}</Text>
+                <Text style={styles.sheetStatLbl}>Skill Level</Text>
               </View>
             </View>
           </View>
@@ -282,3 +367,104 @@ export default function MatchDetailScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F8FAFB' },
+  row: { flexDirection: 'row', alignItems: 'center' },
+
+  hero: { height: 300, backgroundColor: '#1A3A2E' },
+  heroBack: {
+    position: 'absolute', left: 16, zIndex: 10,
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.38)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  heroBadge: { position: 'absolute', right: 16, zIndex: 10, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  heroBadgeCancelled: { backgroundColor: '#EF4444' },
+  heroBadgeFull: { backgroundColor: '#F59E0B' },
+  heroBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
+  heroBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20 },
+  sportChip: {
+    alignSelf: 'flex-start', backgroundColor: 'rgba(0,200,83,0.22)',
+    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 8,
+  },
+  sportChipText: { color: '#00C853', fontSize: 11, fontWeight: '700' },
+  heroTitle: { color: '#fff', fontSize: 22, fontWeight: '800', lineHeight: 28 },
+  heroDate: { color: 'rgba(255,255,255,0.65)', fontSize: 13, marginTop: 5 },
+
+  statsCard: {
+    flexDirection: 'row', backgroundColor: '#fff',
+    marginHorizontal: 16, marginTop: 12, borderRadius: 16,
+    paddingVertical: 14, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  },
+  statPill: { flex: 1, alignItems: 'center', gap: 3 },
+  statsDivider: { width: 1, height: 36, backgroundColor: '#F0F4F8' },
+  statValue: { fontSize: 12, fontWeight: '700', color: '#0F172A' },
+  statSub: { fontSize: 10, color: '#94A3B8' },
+
+  tag: { backgroundColor: '#F1F5F9', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  tagText: { fontSize: 11, fontWeight: '600', color: '#64748B' },
+
+  card: {
+    backgroundColor: '#fff', marginHorizontal: 16, marginTop: 12,
+    borderRadius: 16, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
+  fillPill: { backgroundColor: '#F0FDF4', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
+  fillPillText: { color: '#16A34A', fontSize: 11, fontWeight: '700' },
+  fillBarBg: { height: 5, backgroundColor: '#F1F5F9', borderRadius: 3, marginBottom: 14 },
+  fillBarFg: { height: 5, borderRadius: 3 },
+  avatarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  avatarItem: { alignItems: 'center', width: 54 },
+  avatarName: { fontSize: 10, color: '#475569', marginTop: 4, textAlign: 'center' },
+  avatarNameEmpty: { fontSize: 10, color: '#CBD5E1', marginTop: 4 },
+  emptySlot: {
+    width: 46, height: 46, borderRadius: 23,
+    borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#CBD5E1',
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  iconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center' },
+  cardValue: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
+  cardMeta: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
+
+  amenityChip: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#F8FAFB', borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 1, borderColor: '#E8ECEF',
+  },
+  amenityText: { fontSize: 11, color: '#64748B' },
+  warnText: { fontSize: 12, color: '#EF4444' },
+
+  chatBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1.5, borderColor: '#00C853', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 7,
+  },
+  chatBtnText: { fontSize: 12, fontWeight: '600', color: '#00C853' },
+
+  policyCard: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', backgroundColor: '#F0FDF4' },
+  policyText: { flex: 1, fontSize: 12, color: '#16A34A', lineHeight: 18 },
+
+  ctaBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: '#F0F4F8',
+  },
+  ctaBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  ctaJoin: { backgroundColor: '#00C853' },
+  ctaLeave: { backgroundColor: '#FFF5F5', borderWidth: 1.5, borderColor: '#EF4444' },
+  ctaFull: { backgroundColor: '#FEF3C7' },
+  ctaDisabled: { backgroundColor: '#E2E8F0' },
+  ctaBtnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+
+  sheetInner: { padding: 24, alignItems: 'center' },
+  sheetName: { fontSize: 20, fontWeight: '800', color: '#0F172A', marginTop: 12 },
+  sheetElo: { fontSize: 13, color: '#94A3B8', marginTop: 3 },
+  sheetStatVal: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
+  sheetStatLbl: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
+});

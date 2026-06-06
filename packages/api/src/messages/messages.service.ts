@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { TelegramService } from '../telegram/telegram.service';
 
 @Injectable()
 export class MessagesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private telegramService: TelegramService,
+  ) {}
 
   async getConversations(userId: string) {
     const memberships = await this.prisma.conversationMember.findMany({
@@ -53,7 +57,7 @@ export class MessagesService {
     await this.prisma.message.updateMany({
       where: {
         conversationId,
-        readBy: { not: { array_contains: userId } },
+        NOT: { readBy: { has: userId } },
       },
       data: { readBy: { push: userId } },
     });
@@ -67,17 +71,35 @@ export class MessagesService {
     });
     if (!member) throw new ForbiddenException('Not a member of this conversation');
 
-    return this.prisma.message.create({
-      data: {
-        conversationId,
-        senderId,
-        content,
-        readBy: [senderId],
-      },
-      include: {
-        sender: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
-      },
-    });
+    const [message, conversation, sender] = await Promise.all([
+      this.prisma.message.create({
+        data: {
+          conversationId,
+          senderId,
+          content,
+          readBy: [senderId],
+        },
+        include: {
+          sender: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        },
+      }),
+      this.prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { telegramTopicId: true, type: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: senderId },
+        select: { firstName: true, lastName: true },
+      }),
+    ]);
+
+    // Mirror to Telegram if this conversation has a linked topic
+    if (conversation?.telegramTopicId && sender) {
+      const name = `${sender.firstName} ${sender.lastName}`.trim();
+      this.telegramService.sendToTopic(conversation.telegramTopicId, name, content).catch(() => {});
+    }
+
+    return message;
   }
 
   async createOrGetDirect(userId1: string, userId2: string) {

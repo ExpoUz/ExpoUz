@@ -8,9 +8,11 @@ import {
   Param,
   Query,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
+import { GeminiService } from '../gemini/gemini.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -21,7 +23,10 @@ import { Roles } from '../auth/decorators/roles.decorator';
 @Roles('ADMIN', 'SUPER_ADMIN')
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly geminiService: GeminiService,
+  ) {}
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Get admin dashboard stats' })
@@ -137,5 +142,294 @@ export class AdminController {
     @Body() dto: { title: string; body: string; targetRole?: string; city?: string },
   ) {
     return this.adminService.createAnnouncement(dto);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUPER ADMIN — Pitch Admin Management
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @Get('pitch-admins')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'List all pitch admins with online status and pitch metrics' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'city', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  getPitchAdmins(
+    @Query('search') search?: string,
+    @Query('city') city?: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 20,
+  ) {
+    return this.adminService.getPitchAdmins({ search, city, page: +page, limit: +limit });
+  }
+
+  @Get('pitch-admins/:id')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Full pitch admin profile with pitches, bookings, and activity log' })
+  getPitchAdminById(@Param('id') id: string) {
+    return this.adminService.getPitchAdminById(id);
+  }
+
+  @Post('pitch-admins')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Create a new pitch admin account (or upgrade existing user)' })
+  createPitchAdmin(
+    @Body() dto: { phone: string; firstName: string; lastName: string; city: string; email?: string },
+  ) {
+    return this.adminService.createPitchAdmin(dto);
+  }
+
+  @Patch('pitch-admins/:id')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Update pitch admin profile or ban status' })
+  updatePitchAdmin(
+    @Param('id') id: string,
+    @Body()
+    dto: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      city?: string;
+      email?: string;
+      isBanned?: boolean;
+      bannedReason?: string;
+    },
+  ) {
+    return this.adminService.updatePitchAdmin(id, dto);
+  }
+
+  @Delete('pitch-admins/:id')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Remove pitch admin (soft-delete, demotes to PLAYER)' })
+  deletePitchAdmin(@Param('id') id: string) {
+    return this.adminService.deletePitchAdmin(id);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUPER ADMIN — Enhanced User Management
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @Get('users/:id')
+  @ApiOperation({ summary: 'Full user profile: bookings, transactions, activity log, online status' })
+  getUserById(@Param('id') id: string) {
+    return this.adminService.getUserById(id);
+  }
+
+  @Patch('users/:id')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Edit user attributes (name, phone, role, credit, skill)' })
+  updateUser(
+    @Param('id') id: string,
+    @Body()
+    dto: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      city?: string;
+      email?: string;
+      role?: string;
+      credit?: number;
+      skillLevel?: string;
+    },
+  ) {
+    return this.adminService.updateUser(id, dto);
+  }
+
+  @Delete('users/:id')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Soft-delete user account' })
+  deleteUser(@Param('id') id: string) {
+    return this.adminService.deleteUser(id);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUPER ADMIN — Location Management
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @Get('locations')
+  @ApiOperation({ summary: 'List all geographic locations' })
+  @ApiQuery({ name: 'city', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  getLocations(@Query('city') city?: string, @Query('search') search?: string) {
+    return this.adminService.getLocations({ city, search });
+  }
+
+  @Post('locations')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Create a location zone' })
+  createLocation(
+    @Body() dto: { name: string; city: string; district?: string; lat?: number; lng?: number },
+  ) {
+    return this.adminService.createLocation(dto);
+  }
+
+  @Patch('locations/:id')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Update a location zone' })
+  updateLocation(
+    @Param('id') id: string,
+    @Body()
+    dto: { name?: string; city?: string; district?: string; lat?: number; lng?: number; isActive?: boolean },
+  ) {
+    return this.adminService.updateLocation(id, dto);
+  }
+
+  @Delete('locations/:id')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Delete a location (unlinks its pitches)' })
+  deleteLocation(@Param('id') id: string) {
+    return this.adminService.deleteLocation(id);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUPER ADMIN — Full Pitch Management
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @Get('pitches')
+  @ApiOperation({ summary: 'Get all pitches with owner, location, and booking counts' })
+  @ApiQuery({ name: 'city', required: false })
+  @ApiQuery({ name: 'ownerId', required: false })
+  @ApiQuery({ name: 'locationId', required: false })
+  @ApiQuery({ name: 'isVerified', required: false, type: Boolean })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  getAllPitches(
+    @Query('city') city?: string,
+    @Query('ownerId') ownerId?: string,
+    @Query('locationId') locationId?: string,
+    @Query('isVerified') isVerified?: string,
+    @Query('search') search?: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 20,
+  ) {
+    return this.adminService.getAllPitches({
+      city,
+      ownerId,
+      locationId,
+      isVerified: isVerified !== undefined ? isVerified === 'true' : undefined,
+      search,
+      page: +page,
+      limit: +limit,
+    });
+  }
+
+  @Post('pitches')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Create and pre-verify a pitch, assign to a pitch admin' })
+  createPitch(
+    @Body()
+    dto: {
+      ownerId: string;
+      name: string;
+      addressLine: string;
+      district: string;
+      city: string;
+      lat: number;
+      lng: number;
+      hourlyRate: number;
+      surfaceType?: string;
+      pitchSize?: string;
+      isIndoor?: boolean;
+      locationId?: string;
+      commission?: number;
+      description?: string;
+      photos?: string[];
+    },
+  ) {
+    return this.adminService.createPitch(dto);
+  }
+
+  @Patch('pitches/:id')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Update any pitch attribute including owner reassignment' })
+  updatePitch(
+    @Param('id') id: string,
+    @Body()
+    dto: {
+      name?: string;
+      addressLine?: string;
+      district?: string;
+      city?: string;
+      lat?: number;
+      lng?: number;
+      hourlyRate?: number;
+      isActive?: boolean;
+      isVerified?: boolean;
+      locationId?: string;
+      ownerId?: string;
+      commission?: number;
+      description?: string;
+    },
+  ) {
+    return this.adminService.updatePitch(id, dto);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SUPER ADMIN — Activity Log & Online Status
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  @Get('activity-log')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Paginated platform activity log' })
+  @ApiQuery({ name: 'userId', required: false })
+  @ApiQuery({ name: 'entityType', required: false })
+  @ApiQuery({ name: 'action', required: false })
+  @ApiQuery({ name: 'from', required: false })
+  @ApiQuery({ name: 'to', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  getActivityLog(
+    @Query('userId') userId?: string,
+    @Query('entityType') entityType?: string,
+    @Query('action') action?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 30,
+  ) {
+    return this.adminService.getActivityLog({
+      userId, entityType, action, from, to, page: +page, limit: +limit,
+    });
+  }
+
+  @Get('online-status')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Real-time online status snapshot (active in last 5 min)' })
+  getOnlineStatus() {
+    return this.adminService.getOnlineStatus();
+  }
+
+  // ─── AI / Gemini Endpoints ────────────────────────────────────────────────
+
+  @Get('ai/snapshot')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Get raw system data snapshot for AI context' })
+  getAiSnapshot() {
+    return this.geminiService.getSystemSnapshot();
+  }
+
+  @Post('ai/analyze')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Get AI analysis of the platform (one-shot)' })
+  analyze(@Body() body: { prompt?: string }) {
+    return this.geminiService.analyze(body.prompt);
+  }
+
+  @Post('ai/chat')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Chat with Gemini AI about system data (stateful per user)' })
+  chat(@Req() req: any, @Body() body: { message: string }) {
+    const sessionId = `admin:${req.user.id}`;
+    return this.geminiService.chat(sessionId, body.message);
+  }
+
+  @Post('ai/reset')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Reset AI chat session' })
+  resetChat(@Req() req: any) {
+    this.geminiService.clearSession(`admin:${req.user.id}`);
+    return { message: 'Chat session reset' };
   }
 }

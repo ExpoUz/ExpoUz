@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, StyleSheet, ScrollView, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -7,7 +7,13 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay } fro
 import { useAuthStore } from '@/store/auth.store';
 import { useAppStore } from '@/store/app.store';
 import { Button } from '@/components/ui/Button';
+import { useMutation } from '@tanstack/react-query';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+import * as SecureStore from '@/lib/storage';
+import { authApi } from '@/lib/api';
 
+WebBrowser.maybeCompleteAuthSession();
 const { width } = Dimensions.get('window');
 
 const ONBOARDING = [
@@ -19,10 +25,34 @@ const ONBOARDING = [
 export default function IndexScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, isLoading, setAuth } = useAuthStore();
   const { language, setLanguage } = useAppStore();
   const [slide, setSlide] = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(false);
+
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '',
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? '',
+  });
+
+  const googleMutation = useMutation({
+    mutationFn: (credential: string) => authApi.googleAuth(credential),
+    onSuccess: async ({ data }) => {
+      await SecureStore.setItemAsync('accessToken', data.accessToken);
+      await SecureStore.setItemAsync('refreshToken', data.refreshToken);
+      setAuth(data.user, data.accessToken, data.refreshToken);
+      if (data.isNewUser) router.replace('/auth/register');
+      else router.replace('/(tabs)/games');
+    },
+    onError: () => Alert.alert('Error', 'Google sign-in failed. Please try again.'),
+  });
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.params;
+      googleMutation.mutate(id_token);
+    }
+  }, [response]);
 
   const titleOpacity = useSharedValue(0);
   const taglineOpacity = useSharedValue(0);
@@ -77,7 +107,7 @@ export default function IndexScreen() {
 
       <View style={styles.hero}>
         <Animated.View style={titleStyle}>
-          <Text style={styles.logo}>FUBLES UZ</Text>
+          <Text style={styles.logo}>PLAYWITHUS</Text>
           <View style={styles.divider} />
         </Animated.View>
         <Animated.Text style={[styles.tagline, taglineStyle]}>
@@ -87,7 +117,17 @@ export default function IndexScreen() {
 
       <Animated.View style={[styles.buttons, buttonsStyle]}>
         <Button title="Sign In with Phone 📱" onPress={() => router.push('/auth/phone')} variant="primary" />
-        <View style={{ height: 12 }} />
+        <View style={{ height: 10 }} />
+        <TouchableOpacity
+          style={[styles.googleBtn, (!request || googleMutation.isPending) && { opacity: 0.6 }]}
+          onPress={() => promptAsync()}
+          disabled={!request || googleMutation.isPending}
+        >
+          <Text style={styles.googleBtnText}>
+            {googleMutation.isPending ? '...' : '🔵  Continue with Google'}
+          </Text>
+        </TouchableOpacity>
+        <View style={{ height: 10 }} />
         <Button title="Browse as Guest" onPress={() => router.replace('/(tabs)/games')} variant="ghost" />
         <TouchableOpacity onPress={() => setShowOnboarding(true)} style={styles.howLink}>
           <Text style={styles.howText}>How does it work?</Text>
@@ -111,6 +151,8 @@ const styles = StyleSheet.create({
   buttons: { padding: 24, paddingBottom: 48 },
   howLink: { alignItems: 'center', marginTop: 16 },
   howText: { color: '#6B7280', fontSize: 13 },
+  googleBtn: { backgroundColor: '#FFFFFF', borderRadius: 12, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB' },
+  googleBtnText: { color: '#111827', fontWeight: '700', fontSize: 15 },
   onboardingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   onboardEmoji: { fontSize: 80, marginBottom: 24 },
   onboardTitle: { color: '#FFF', fontSize: 28, fontWeight: '800', textAlign: 'center', marginBottom: 12 },

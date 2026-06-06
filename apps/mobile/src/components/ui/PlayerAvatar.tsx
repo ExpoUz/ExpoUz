@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
-import { IUserPublic } from '@fubles-uz/shared';
+import { IUserPublic } from '@playwithus/shared';
 
 export type AvatarSize = 'sm' | 'md' | 'lg';
 
@@ -20,7 +20,8 @@ function reliabilityColor(elo: number): string {
   return '#EF4444';
 }
 
-function initials(name: string): string {
+function initials(name: string | null | undefined): string {
+  if (!name) return '?';
   return name
     .split(' ')
     .slice(0, 2)
@@ -35,7 +36,7 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
   showCrown = false,
 }) => {
   const dim = SIZES[size];
-  const ringColor = reliabilityColor(user.eloRating);
+  const ringColor = reliabilityColor(user.eloRating ?? 0);
 
   return (
     <View style={[styles.wrapper, { width: dim, height: dim }]}>
@@ -67,7 +68,7 @@ export const PlayerAvatar: React.FC<PlayerAvatarProps> = ({
             { width: dim, height: dim, borderRadius: dim / 2, backgroundColor: '#2D5A3F' },
           ]}
         >
-          <Text style={[styles.initialsText, { fontSize: dim * 0.35 }]}>{initials(user.name)}</Text>
+          <Text style={[styles.initialsText, { fontSize: dim * 0.35 }]}>{initials(user.name ?? `${(user as any).firstName ?? ''} ${(user as any).lastName ?? ''}`.trim())}</Text>
         </View>
       )}
 

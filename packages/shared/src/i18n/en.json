@@ -24,7 +24,8 @@
     "noResults": "No results found",
     "seeAll": "See all",
     "viewMore": "View more",
-    "required": "Required"
+    "required": "Required",
+    "continue": "Continue"
   },
   "auth": {
     "login": "Log In",
@@ -89,7 +90,27 @@
     "gameStartsSoon": "Game starts in {{time}}",
     "gameInProgress": "Game is in progress",
     "rateOpponents": "Rate opponents",
-    "matchSummary": "Match Summary"
+    "matchSummary": "Match Summary",
+    "whoIsPlaying": "Who's Playing",
+    "available": "Available",
+    "whereYouPlay": "Where You Play",
+    "yourHost": "Your Host",
+    "contactHost": "Contact Host",
+    "join": "Join Game",
+    "leftGame": "You have left the game",
+    "gameCancelled": "Game Cancelled",
+    "youreIn": "You're In",
+    "leave": "Leave",
+    "joinWaitlist": "Join Waitlist",
+    "indoor": "Indoor",
+    "allLevels": "All Levels",
+    "noMetalStuds": "No metal studs",
+    "cancellationPolicy": "Free cancellation up to {{hours}}h before",
+    "leftGames": "You've left the game",
+    "chooseTeam": "Choose Your Team",
+    "noPreference": "No Preference",
+    "choosePosition": "Choose Your Position",
+    "skipPosition": "Skip Position"
   },
   "formation": {
     "title": "Formation",
@@ -114,7 +135,8 @@
     "CF": "CF",
     "ST": "ST",
     "emptySlot": "Empty",
-    "pickPosition": "Pick a position"
+    "pickPosition": "Pick a position",
+    "viewFormation": "View Formation"
   },
   "profile": {
     "title": "Profile",
@@ -178,7 +200,16 @@
     "transactionHistory": "Transaction History",
     "noTransactions": "No transactions yet",
     "invoiceId": "Invoice ID",
-    "paidOn": "Paid on {{date}}"
+    "paidOn": "Paid on {{date}}",
+    "base": "Entry Fee",
+    "total": "Total",
+    "pay": "Pay",
+    "failed": "Payment failed. Please try again."
+  },
+  "booking": {
+    "confirmed": "You're In!",
+    "viewBooking": "View Booking",
+    "backToGames": "Back to Games"
   },
   "pitch": {
     "title": "Pitches",
