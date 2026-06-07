@@ -142,7 +142,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-gray-700 text-xs mt-6">
-          For verified pitch owners. Contact ScoreWithUs to register your venue.
+          For verified pitch owners. Contact ExpoUz to register your venue.
         </p>
       </div>
     </div>

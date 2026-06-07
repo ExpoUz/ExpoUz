@@ -8,7 +8,7 @@ import dayjs from "dayjs";
 export default function UsersPage() {
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
-    queryFn: getUsers,
+    queryFn: () => getUsers(),
   });
 
   const [search, setSearch] = useState("");

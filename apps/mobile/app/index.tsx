@@ -107,7 +107,7 @@ export default function IndexScreen() {
 
       <View style={styles.hero}>
         <Animated.View style={titleStyle}>
-          <Text style={styles.logo}>PLAYWITHUS</Text>
+          <Text style={styles.logo}>EXPOUZ</Text>
           <View style={styles.divider} />
         </Animated.View>
         <Animated.Text style={[styles.tagline, taglineStyle]}>

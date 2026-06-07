@@ -12,7 +12,7 @@ import {
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pitchBookingsApi } from '@/lib/api';
-import { PitchBookingStatus, PitchBookingType } from '@playwithus/shared';
+import { PitchBookingStatus, PitchBookingType } from '@expouz/shared';
 
 function getStatusColor(status: PitchBookingStatus) {
   switch (status) {

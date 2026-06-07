@@ -4,8 +4,8 @@ import Providers from "./providers";
 import { PortalShell } from "@/components/PortalShell";
 
 export const metadata: Metadata = {
-  title: "ScoreWithUs — Pitch Owner Portal",
-  description: "Manage your pitches, matches, players and revenue on ScoreWithUs",
+  title: "ExpoUz — Pitch Owner Portal",
+  description: "Manage your pitches, matches, players and revenue on ExpoUz",
 };
 
 export default function RootLayout({

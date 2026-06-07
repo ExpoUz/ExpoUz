@@ -42,14 +42,14 @@ export default function PitchesPage() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <PageHeader title="My Pitches" subtitle="Venues you manage on ScoreWithUs" />
+      <PageHeader title="My Pitches" subtitle="Venues you manage on ExpoUz" />
 
       {isLoading ? (
         <Spinner />
       ) : (pitches ?? []).length === 0 ? (
         <EmptyState
           title="No pitches yet"
-          hint="Contact ScoreWithUs to register your venue and start hosting matches."
+          hint="Contact ExpoUz to register your venue and start hosting matches."
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

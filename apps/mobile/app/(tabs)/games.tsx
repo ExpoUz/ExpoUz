@@ -8,7 +8,7 @@ import { matchesApi } from '@/lib/api';
 import { useAppStore } from '@/store/app.store';
 import { MatchCard } from '@/components/ui/MatchCard';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
-import { Sport, MatchStatus } from '@playwithus/shared';
+import { Sport, MatchStatus } from '@expouz/shared';
 
 const SPORT_ICONS: Record<string, string> = {
   FOOTBALL: '⚽', PADEL: '🏓', TENNIS: '🎾',
@@ -36,7 +36,7 @@ export default function GamesScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.appName}>FUBLES UZ</Text>
+        <Text style={styles.appName}>EXPOUZ</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={[styles.filterToggleBtn, isFiltered && styles.filterToggleBtnActive]}

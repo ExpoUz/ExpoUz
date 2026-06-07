@@ -38,11 +38,11 @@ config.resolver.nodeModulesPaths = [
 
 // Map workspace packages to their real paths.
 // pnpm links workspace packages as NTFS junctions which Metro's file-map watcher
-// does not follow — so resolution of e.g. '@playwithus/shared' fails even though
+// does not follow — so resolution of e.g. '@expouz/shared' fails even though
 // the junction exists. Pointing extraNodeModules directly at the real directory
 // bypasses the junction lookup entirely.
 config.resolver.extraNodeModules = {
-  '@playwithus/shared': path.resolve(monorepoRoot, 'packages/shared'),
+  '@expouz/shared': path.resolve(monorepoRoot, 'packages/shared'),
 };
 
 // Intercept Node.js built-in module requests that cannot be bundled for web.

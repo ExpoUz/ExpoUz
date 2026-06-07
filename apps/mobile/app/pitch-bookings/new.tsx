@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { pitchBookingsApi, pitchesApi } from '@/lib/api';
-import { PitchBookingType, PaymentGateway } from '@playwithus/shared';
+import { PitchBookingType, PaymentGateway } from '@expouz/shared';
 import { useQuery, useMutation } from '@tanstack/react-query';
 
 const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6];

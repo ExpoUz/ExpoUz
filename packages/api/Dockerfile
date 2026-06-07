@@ -9,7 +9,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/api/package.json ./packages/api/
 
-RUN pnpm install --frozen-lockfile --filter @playwithus/api --filter @playwithus/shared
+RUN pnpm install --frozen-lockfile --filter @expouz/api --filter @expouz/shared
 
 COPY packages/shared ./packages/shared
 COPY packages/api ./packages/api
@@ -29,7 +29,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/api/package.json ./packages/api/
 
-RUN pnpm install --frozen-lockfile --prod --filter @playwithus/api --filter @playwithus/shared
+RUN pnpm install --frozen-lockfile --prod --filter @expouz/api --filter @expouz/shared
 
 COPY --from=builder /app/packages/api/dist ./packages/api/dist
 COPY --from=builder /app/packages/api/prisma ./packages/api/prisma

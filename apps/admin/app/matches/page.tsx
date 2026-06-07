@@ -25,7 +25,7 @@ const SPORT_ICONS: Record<string, string> = {
 export default function MatchesPage() {
   const { data: matches, isLoading } = useQuery({
     queryKey: ["admin-matches"],
-    queryFn: getMatches,
+    queryFn: () => getMatches(),
   });
 
   const [statusFilter, setStatusFilter] = useState("ALL");

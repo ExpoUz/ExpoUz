@@ -39,7 +39,7 @@ export class AuthService {
     if (process.env.NODE_ENV !== 'production') {
       console.log(`[DEV OTP] Phone: ${phone}, Code: ${code}`);
     } else {
-      await this.sendEskizSms(phone, `Your PlayWithUs code: ${code}. Valid 2 minutes.`);
+      await this.sendEskizSms(phone, `Your ExpoUz code: ${code}. Valid 2 minutes.`);
     }
 
     const maskedPhone = phone.replace(/(\+998)(\d{2})(\d{3})(\d{4})/, '$1$2***$4');

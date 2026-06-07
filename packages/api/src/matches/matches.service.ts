@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { CreateMatchDto } from './dto/create-match.dto';
+import { Sport } from '@prisma/client';
 import { QueryMatchesDto, TimeOfDay, SortBy } from './dto/query-matches.dto';
 import { RatePlayerDto } from './dto/rate-player.dto';
 import { FormationService } from '../formation/formation.service';
@@ -199,7 +200,7 @@ export class MatchesService {
       minute: '2-digit',
       hour12: false,
     });
-    const sport = dto.sport || 'FOOTBALL';
+    const sport: Sport = dto.sport || Sport.FOOTBALL;
     const autoTitle = `${sport.charAt(0) + sport.slice(1).toLowerCase()} at ${pitch.name} - ${dayName} ${timeStr}`;
 
     const match = await this.prisma.match.create({
@@ -207,7 +208,7 @@ export class MatchesService {
         pitchId: dto.pitchId,
         hostId,
         title: autoTitle,
-        sport: dto.sport || 'FOOTBALL',
+        sport,
         format: dto.format,
         startTime,
         durationMinutes: dto.durationMinutes || 60,

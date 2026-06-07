@@ -25,7 +25,7 @@ async function bootstrap() {
   });
 
   const config = new DocumentBuilder()
-    .setTitle('PlayWithUs API')
+    .setTitle('ExpoUz API')
     .setDescription('Sports matchmaking and booking platform for Uzbekistan')
     .setVersion('1.0')
     .addBearerAuth()
@@ -35,6 +35,6 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`🚀 PlayWithUs API running on port ${port}`);
+  console.log(`🚀 ExpoUz API running on port ${port}`);
 }
 bootstrap();

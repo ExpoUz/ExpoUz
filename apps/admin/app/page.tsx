@@ -52,12 +52,12 @@ export default function DashboardPage() {
 
   const { data: recentMatches } = useQuery({
     queryKey: ["admin-matches"],
-    queryFn: getMatches,
+    queryFn: () => getMatches(),
   });
 
   const { data: users } = useQuery({
     queryKey: ["admin-users"],
-    queryFn: getUsers,
+    queryFn: () => getUsers(),
   });
 
   const topMatches = (recentMatches ?? []).slice(0, 8);

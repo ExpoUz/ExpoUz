@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Sport } from '@playwithus/shared';
+import { Sport } from '@expouz/shared';
 
 type Language = 'en' | 'uz' | 'ru';
 

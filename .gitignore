@@ -17,6 +17,11 @@ build/
 .env.development
 .env.production
 
+# Local secrets (deployment credentials — never commit)
+credentials.local
+*.local
+.vercel/
+
 # Logs
 *.log
 npm-debug.log*

@@ -81,7 +81,7 @@ importers:
       '@expo/metro-runtime':
         specifier: ^3.2.3
         version: 3.2.3(react-native@0.74.0)
-      '@playwithus/shared':
+      '@expouz/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@tanstack/react-query':

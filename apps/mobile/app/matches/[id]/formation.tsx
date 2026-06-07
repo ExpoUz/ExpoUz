@@ -17,7 +17,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { FormationPitch } from '@/components/ui/FormationPitch';
 import { PlayerAvatar } from '@/components/ui/PlayerAvatar';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
-import { TeamSide } from '@playwithus/shared';
+import { TeamSide } from '@expouz/shared';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 

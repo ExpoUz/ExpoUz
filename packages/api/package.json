@@ -1,5 +1,5 @@
 {
-  "name": "@playwithus/api",
+  "name": "@expouz/api",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -10,7 +10,10 @@
     "test": "jest",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "ts-node prisma/seed.ts"
+    "db:seed": "ts-node --transpile-only prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "ts-node --transpile-only prisma/seed.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

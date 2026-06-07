@@ -21,10 +21,10 @@ import {
   MatchPosition,
   TeamSide,
   PitchBookingType,
-} from '@playwithus/shared';
+} from '@expouz/shared';
 
 export const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL ?? 'https://api.playwithus.uz/v1',
+  baseURL: process.env.EXPO_PUBLIC_API_URL ?? 'https://api.expouz.uz/v1',
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
 });
@@ -65,7 +65,7 @@ api.interceptors.response.use(
         if (!refreshToken) throw new Error('No refresh token');
 
         const { data } = await axios.post(
-          `${process.env.EXPO_PUBLIC_API_URL ?? 'https://api.playwithus.uz/v1'}/auth/refresh`,
+          `${process.env.EXPO_PUBLIC_API_URL ?? 'https://api.expouz.uz/v1'}/auth/refresh`,
           { refreshToken },
         );
 

@@ -4,8 +4,8 @@ import Providers from "./providers";
 import { AdminShell } from "@/components/AdminShell";
 
 export const metadata: Metadata = {
-  title: "ScoreWithUs — Admin",
-  description: "Admin panel for ScoreWithUs sports platform",
+  title: "ExpoUz — Admin",
+  description: "Admin panel for ExpoUz sports platform",
 };
 
 export default function RootLayout({

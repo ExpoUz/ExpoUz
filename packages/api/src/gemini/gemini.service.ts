@@ -121,7 +121,7 @@ export class GeminiService {
   }
 
   private buildSystemPrompt(snapshot: any): string {
-    return `You are an AI assistant for ScoreWithUs -- a sports venue booking and matchmaking platform in Uzbekistan.
+    return `You are an AI assistant for ExpoUz -- a sports venue booking and matchmaking platform in Uzbekistan.
 You have access to live system data and help administrators analyze trends, understand platform health, and make decisions.
 
 CURRENT SYSTEM DATA (as of ${new Date(snapshot.timestamp).toLocaleString('en-US', { timeZone: 'Asia/Tashkent' })} Tashkent time):
@@ -198,7 +198,7 @@ INSTRUCTIONS:
             },
             {
               role: 'model',
-              parts: [{ text: 'Understood. I have the current system data loaded and am ready to help you analyze the ScoreWithUs platform. What would you like to know?' }],
+              parts: [{ text: 'Understood. I have the current system data loaded and am ready to help you analyze the ExpoUz platform. What would you like to know?' }],
             },
           ],
         });

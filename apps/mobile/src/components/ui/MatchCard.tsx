@@ -8,8 +8,8 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { IMatch, MatchStatus } from '@playwithus/shared';
-import { formatUZS } from '@playwithus/shared';
+import { IMatch, MatchStatus } from '@expouz/shared';
+import { formatUZS } from '@expouz/shared';
 import { Badge } from './Badge';
 
 interface MatchCardProps {
