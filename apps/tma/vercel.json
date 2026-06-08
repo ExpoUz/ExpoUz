@@ -1,0 +1,15 @@
+{
+  "framework": "nextjs",
+  "installCommand": "npm install",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self' https://web.telegram.org https://telegram.org https://k.web.telegram.org https://z.web.telegram.org"
+        }
+      ]
+    }
+  ]
+}

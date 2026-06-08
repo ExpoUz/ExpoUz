@@ -43,9 +43,6 @@ Thumbs.db
 # Turbo
 .turbo/
 
-# Prisma
-packages/api/prisma/migrations/
-
 # Coverage
 coverage/
 
