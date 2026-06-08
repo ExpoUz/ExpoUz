@@ -376,6 +376,7 @@ export class AdminController {
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'entityType', required: false })
   @ApiQuery({ name: 'action', required: false })
+  @ApiQuery({ name: 'category', required: false })
   @ApiQuery({ name: 'from', required: false })
   @ApiQuery({ name: 'to', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
@@ -384,13 +385,14 @@ export class AdminController {
     @Query('userId') userId?: string,
     @Query('entityType') entityType?: string,
     @Query('action') action?: string,
+    @Query('category') category?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('page') page = 1,
     @Query('limit') limit = 30,
   ) {
     return this.adminService.getActivityLog({
-      userId, entityType, action, from, to, page: +page, limit: +limit,
+      userId, entityType, action, category, from, to, page: +page, limit: +limit,
     });
   }
 

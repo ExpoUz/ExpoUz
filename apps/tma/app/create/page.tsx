@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { getPitches, createMatch, formatUZS } from "@/lib/api";
+import { getPitches, createMatch, getPricingPreview, formatUZS } from "@/lib/api";
 import {
   showMainButton,
   hideMainButton,
@@ -19,15 +19,57 @@ import {
 const FORMATS = ["5v5", "6v6", "7v7", "8v8", "11v11"];
 const DURATIONS = [60, 90, 120];
 
+type BookingType = "OPEN_EVENT" | "GROUP_BOOKING" | "FULL_BOOKING";
+
+const BOOKING_TYPES: {
+  type: BookingType;
+  icon: string;
+  title: string;
+  description: string;
+  color: string;
+}[] = [
+  {
+    type: "OPEN_EVENT",
+    icon: "📢",
+    title: "Open Event",
+    description: "Create a public game. Anyone can join up to your limit.",
+    color: "#00C853",
+  },
+  {
+    type: "GROUP_BOOKING",
+    icon: "👥",
+    title: "Group Booking",
+    description: "Pay for your group upfront, invite others to fill remaining spots.",
+    color: "#00B0FF",
+  },
+  {
+    type: "FULL_BOOKING",
+    icon: "🏟️",
+    title: "Full Pitch",
+    description: "Book the entire pitch for your team. Private or open to others.",
+    color: "#FF5252",
+  },
+];
+
 interface Form {
+  bookingType: BookingType;
   pitchId: string;
   format: string;
-  date: string; // YYYY-MM-DD
-  time: string; // HH:mm
+  date: string;
+  time: string;
   durationMinutes: number;
+  // OPEN_EVENT
   maxPlayers: number;
   pricePerPlayer: number;
+  // GROUP_BOOKING
+  organizerPlayerCount: number;
+  extraSpotsAvailable: number;
+  // FULL_BOOKING
+  fullBookingHours: number;
+  isPrivate: boolean;
 }
+
+const STEP_TITLES = ["Booking type", "Choose a pitch", "Match details", "Review & pricing"];
 
 export default function CreateMatchPage() {
   const router = useRouter();
@@ -37,6 +79,7 @@ export default function CreateMatchPage() {
   const { data: pitches } = useQuery({ queryKey: ["tma-pitches"], queryFn: () => getPitches() });
 
   const [form, setForm] = useState<Form>({
+    bookingType: "OPEN_EVENT",
     pitchId: "",
     format: "7v7",
     date: dayjs().add(1, "day").format("YYYY-MM-DD"),
@@ -44,11 +87,19 @@ export default function CreateMatchPage() {
     durationMinutes: 60,
     maxPlayers: 14,
     pricePerPlayer: 50000,
+    organizerPlayerCount: 3,
+    extraSpotsAvailable: 4,
+    fullBookingHours: 1,
+    isPrivate: false,
   });
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
 
-  // Derive default maxPlayers from format when format changes
+  const selectedPitch = useMemo(
+    () => (pitches ?? []).find((p: any) => p.id === form.pitchId),
+    [pitches, form.pitchId],
+  );
+
   function pickFormat(fmt: string) {
     hapticImpact("light");
     const perSide = parseInt(fmt.split("v")[0], 10) || 7;
@@ -56,10 +107,38 @@ export default function CreateMatchPage() {
     set("maxPlayers", perSide * 2);
   }
 
+  // Pricing preview (review step)
+  const { data: pricing } = useQuery({
+    queryKey: [
+      "tma-pricing",
+      form.bookingType,
+      form.pitchId,
+      form.organizerPlayerCount,
+      form.extraSpotsAvailable,
+      form.fullBookingHours,
+      form.pricePerPlayer,
+    ],
+    queryFn: () =>
+      getPricingPreview({
+        pitchId: form.pitchId,
+        bookingType: form.bookingType,
+        organizerPlayerCount: form.organizerPlayerCount,
+        extraSpotsAvailable: form.extraSpotsAvailable,
+        fullBookingHours: form.fullBookingHours,
+        pricePerPlayer: form.pricePerPlayer,
+      }),
+    enabled: step === 3 && !!form.pitchId,
+  });
+
   const canProceed = useMemo(() => {
-    if (step === 0) return !!form.pitchId;
-    if (step === 1) return !!form.date && !!form.time && !!form.format;
-    if (step === 2) return form.maxPlayers > 0 && form.pricePerPlayer >= 0;
+    if (step === 0) return !!form.bookingType;
+    if (step === 1) return !!form.pitchId;
+    if (step === 2) {
+      if (!form.date || !form.time) return false;
+      if (form.bookingType === "OPEN_EVENT") return !!form.format && form.maxPlayers > 0 && form.pricePerPlayer >= 0;
+      if (form.bookingType === "GROUP_BOOKING") return !!form.format && form.organizerPlayerCount >= 1;
+      if (form.bookingType === "FULL_BOOKING") return form.fullBookingHours >= 1;
+    }
     return true;
   }, [step, form]);
 
@@ -68,16 +147,27 @@ export default function CreateMatchPage() {
     setMainButtonLoading(true);
     try {
       const startTime = dayjs(`${form.date}T${form.time}`).toISOString();
-      const match = await createMatch({
+      const base: any = {
         pitchId: form.pitchId,
+        bookingType: form.bookingType,
         format: form.format,
         startTime,
         durationMinutes: form.durationMinutes,
-        maxPlayers: form.maxPlayers,
-        pricePerPlayer: form.pricePerPlayer,
-      });
+      };
+      if (form.bookingType === "OPEN_EVENT") {
+        base.maxPlayers = form.maxPlayers;
+        base.pricePerPlayer = form.pricePerPlayer;
+      } else if (form.bookingType === "GROUP_BOOKING") {
+        base.organizerPlayerCount = form.organizerPlayerCount;
+        base.extraSpotsAvailable = form.extraSpotsAvailable;
+        base.pricePerPlayer = pricing?.perJoiningPlayer ?? form.pricePerPlayer;
+      } else if (form.bookingType === "FULL_BOOKING") {
+        base.fullBookingHours = form.fullBookingHours;
+        base.isPrivate = form.isPrivate;
+      }
+      const match = await createMatch(base);
       hapticSuccess();
-      router.replace(`/match/${match.id}`);
+      router.replace(`/match/${match.id}?created=1`);
     } catch (e: any) {
       hapticError();
       showAlert(e?.response?.data?.message ?? "Could not create the match.");
@@ -86,7 +176,6 @@ export default function CreateMatchPage() {
     }
   }
 
-  // Keep an always-fresh action handler for the Telegram Main Button.
   const actionRef = useRef<() => void>(() => {});
   actionRef.current = () => {
     if (!canProceed || submitting) return;
@@ -98,7 +187,6 @@ export default function CreateMatchPage() {
     }
   };
 
-  // Register Main Button; label depends on step.
   useEffect(() => {
     const label = step < 3 ? "Continue" : "Create Match";
     const cleanup = showMainButton(label, () => actionRef.current());
@@ -108,7 +196,6 @@ export default function CreateMatchPage() {
     };
   }, [step]);
 
-  // Back button steps backwards, or leaves on step 0.
   useEffect(() => {
     const cleanup = showBackButton(() => {
       if (step > 0) setStep((s) => s - 1);
@@ -119,7 +206,6 @@ export default function CreateMatchPage() {
 
   return (
     <div className="min-h-screen pb-28 px-4 pt-5">
-      {/* Progress */}
       <div className="flex gap-1.5 mb-5">
         {[0, 1, 2, 3].map((i) => (
           <div
@@ -130,15 +216,44 @@ export default function CreateMatchPage() {
         ))}
       </div>
 
-      <h1 className="text-xl font-bold mb-1">
-        {["Choose a pitch", "Date & format", "Players & price", "Review"][step]}
-      </h1>
+      <h1 className="text-xl font-bold mb-1">{STEP_TITLES[step]}</h1>
       <p className="text-sm mb-5" style={{ color: "var(--tg-hint)" }}>
         Step {step + 1} of 4
       </p>
 
-      {/* STEP 0 — Pitch */}
+      {/* STEP 0 — Booking type */}
       {step === 0 && (
+        <div className="space-y-3">
+          {BOOKING_TYPES.map((bt) => {
+            const active = form.bookingType === bt.type;
+            return (
+              <button
+                key={bt.type}
+                onClick={() => {
+                  hapticImpact("light");
+                  set("bookingType", bt.type);
+                }}
+                className="w-full flex items-start gap-3 rounded-2xl p-4 text-left border-2 transition-colors"
+                style={{ background: "var(--tg-card)", borderColor: active ? bt.color : "transparent" }}
+              >
+                <div className="text-3xl shrink-0">{bt.icon}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold flex items-center gap-2">
+                    {bt.title}
+                    {active && <span style={{ color: bt.color }}>✓</span>}
+                  </div>
+                  <div className="text-xs mt-0.5" style={{ color: "var(--tg-hint)" }}>
+                    {bt.description}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* STEP 1 — Pitch */}
+      {step === 1 && (
         <div className="space-y-2">
           {(pitches ?? []).length === 0 && (
             <p className="text-sm" style={{ color: "var(--tg-hint)" }}>
@@ -153,10 +268,7 @@ export default function CreateMatchPage() {
                 set("pitchId", p.id);
               }}
               className="w-full flex items-center gap-3 rounded-2xl p-3 text-left border-2 transition-colors"
-              style={{
-                background: "var(--tg-card)",
-                borderColor: form.pitchId === p.id ? "#00C853" : "transparent",
-              }}
+              style={{ background: "var(--tg-card)", borderColor: form.pitchId === p.id ? "#00C853" : "transparent" }}
             >
               <div className="w-12 h-12 rounded-xl bg-[#0D1117] overflow-hidden flex items-center justify-center text-xl shrink-0">
                 {p.photos?.[0] ? (
@@ -169,7 +281,7 @@ export default function CreateMatchPage() {
               <div className="min-w-0">
                 <div className="font-semibold text-sm truncate">{p.name}</div>
                 <div className="text-xs truncate" style={{ color: "var(--tg-hint)" }}>
-                  {p.district ?? p.city ?? "Tashkent"}
+                  {p.district ?? p.city ?? "Tashkent"} · {formatUZS(p.hourlyRate)}/hr
                 </div>
               </div>
             </button>
@@ -177,8 +289,8 @@ export default function CreateMatchPage() {
         </div>
       )}
 
-      {/* STEP 1 — Date & format */}
-      {step === 1 && (
+      {/* STEP 2 — Details (per booking type) */}
+      {step === 2 && (
         <div className="space-y-5">
           <Field label="Date">
             <input
@@ -192,59 +304,141 @@ export default function CreateMatchPage() {
           <Field label="Kick-off time">
             <input type="time" value={form.time} onChange={(e) => set("time", e.target.value)} className="input" />
           </Field>
-          <Field label="Format">
-            <div className="flex flex-wrap gap-2">
-              {FORMATS.map((f) => (
-                <Chip key={f} active={form.format === f} onClick={() => pickFormat(f)}>
-                  {f}
-                </Chip>
-              ))}
-            </div>
-          </Field>
-          <Field label="Duration">
-            <div className="flex gap-2">
-              {DURATIONS.map((d) => (
-                <Chip key={d} active={form.durationMinutes === d} onClick={() => set("durationMinutes", d)}>
-                  {d} min
-                </Chip>
-              ))}
-            </div>
-          </Field>
+
+          {form.bookingType !== "FULL_BOOKING" && (
+            <Field label="Format">
+              <div className="flex flex-wrap gap-2">
+                {FORMATS.map((f) => (
+                  <Chip key={f} active={form.format === f} onClick={() => pickFormat(f)}>
+                    {f}
+                  </Chip>
+                ))}
+              </div>
+            </Field>
+          )}
+
+          {form.bookingType === "OPEN_EVENT" && (
+            <>
+              <Field label="Duration">
+                <div className="flex gap-2">
+                  {DURATIONS.map((d) => (
+                    <Chip key={d} active={form.durationMinutes === d} onClick={() => set("durationMinutes", d)}>
+                      {d} min
+                    </Chip>
+                  ))}
+                </div>
+              </Field>
+              <Field label="Max players">
+                <Stepper value={form.maxPlayers} min={2} max={30} onChange={(v) => set("maxPlayers", v)} />
+              </Field>
+              <Field label="Price per player (UZS)">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={form.pricePerPlayer}
+                  min={0}
+                  step={5000}
+                  onChange={(e) => set("pricePerPlayer", Number(e.target.value))}
+                  className="input"
+                />
+              </Field>
+            </>
+          )}
+
+          {form.bookingType === "GROUP_BOOKING" && (
+            <>
+              <Field label="How many people are you bringing? (incl. you)">
+                <Stepper value={form.organizerPlayerCount} min={1} max={10} onChange={(v) => set("organizerPlayerCount", v)} />
+              </Field>
+              <Field label="How many more can join?">
+                <Stepper value={form.extraSpotsAvailable} min={0} max={10} onChange={(v) => set("extraSpotsAvailable", v)} />
+              </Field>
+              <div className="rounded-2xl p-3 text-sm" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
+                Total spots: <span className="font-semibold">{form.organizerPlayerCount + form.extraSpotsAvailable}</span>
+              </div>
+            </>
+          )}
+
+          {form.bookingType === "FULL_BOOKING" && (
+            <>
+              <Field label="How many hours?">
+                <Stepper value={form.fullBookingHours} min={1} max={8} onChange={(v) => set("fullBookingHours", v)} />
+              </Field>
+              <Field label="Private booking">
+                <button
+                  onClick={() => {
+                    hapticImpact("light");
+                    set("isPrivate", !form.isPrivate);
+                  }}
+                  className="w-full flex items-center justify-between rounded-2xl p-3 border-2"
+                  style={{ background: "var(--tg-card)", borderColor: form.isPrivate ? "#FF5252" : "transparent" }}
+                >
+                  <span className="text-sm">{form.isPrivate ? "Private — hidden from listings" : "Open — visible on platform"}</span>
+                  <span>{form.isPrivate ? "🔒" : "🌍"}</span>
+                </button>
+              </Field>
+              {selectedPitch && (
+                <div className="rounded-2xl p-3 text-sm" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
+                  Total pitch cost:{" "}
+                  <span className="font-semibold text-[#00C853]">
+                    {formatUZS(Number(selectedPitch.hourlyRate) * form.fullBookingHours)}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
-      {/* STEP 2 — Players & price */}
-      {step === 2 && (
-        <div className="space-y-5">
-          <Field label="Max players">
-            <Stepper value={form.maxPlayers} min={2} max={30} onChange={(v) => set("maxPlayers", v)} />
-          </Field>
-          <Field label="Price per player (UZS)">
-            <input
-              type="number"
-              inputMode="numeric"
-              value={form.pricePerPlayer}
-              min={0}
-              step={5000}
-              onChange={(e) => set("pricePerPlayer", Number(e.target.value))}
-              className="input"
-            />
-          </Field>
-          <div className="rounded-2xl p-3 text-sm" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
-            Collected if full: <span className="font-semibold text-[#00C853]">{formatUZS(form.maxPlayers * form.pricePerPlayer)}</span>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 3 — Review */}
+      {/* STEP 3 — Review & pricing */}
       {step === 3 && (
-        <div className="rounded-2xl p-4 space-y-3" style={{ background: "var(--tg-card)" }}>
-          <ReviewRow label="Pitch" value={pitches?.find((p: any) => p.id === form.pitchId)?.name ?? "—"} />
-          <ReviewRow label="When" value={dayjs(`${form.date}T${form.time}`).format("ddd, MMM D · HH:mm")} />
-          <ReviewRow label="Format" value={form.format} />
-          <ReviewRow label="Duration" value={`${form.durationMinutes} min`} />
-          <ReviewRow label="Max players" value={String(form.maxPlayers)} />
-          <ReviewRow label="Price / player" value={formatUZS(form.pricePerPlayer)} />
+        <div className="space-y-4">
+          <div className="rounded-2xl p-4 space-y-3" style={{ background: "var(--tg-card)" }}>
+            <ReviewRow label="Type" value={BOOKING_TYPES.find((b) => b.type === form.bookingType)!.title} />
+            <ReviewRow label="Pitch" value={selectedPitch?.name ?? "—"} />
+            <ReviewRow label="When" value={dayjs(`${form.date}T${form.time}`).format("ddd, MMM D · HH:mm")} />
+            {form.bookingType !== "FULL_BOOKING" && <ReviewRow label="Format" value={form.format} />}
+            {form.bookingType === "OPEN_EVENT" && <ReviewRow label="Max players" value={String(form.maxPlayers)} />}
+            {form.bookingType === "GROUP_BOOKING" && (
+              <>
+                <ReviewRow label="Your group" value={String(form.organizerPlayerCount)} />
+                <ReviewRow label="Extra spots" value={String(form.extraSpotsAvailable)} />
+              </>
+            )}
+            {form.bookingType === "FULL_BOOKING" && (
+              <>
+                <ReviewRow label="Hours" value={String(form.fullBookingHours)} />
+                <ReviewRow label="Visibility" value={form.isPrivate ? "Private" : "Open"} />
+              </>
+            )}
+          </div>
+
+          {/* Pricing breakdown */}
+          <div className="rounded-2xl p-4 space-y-2" style={{ background: "var(--tg-card)" }}>
+            <div className="text-sm font-semibold mb-1">Pricing</div>
+            {!pricing && <div className="text-sm" style={{ color: "var(--tg-hint)" }}>Calculating…</div>}
+            {pricing && form.bookingType === "OPEN_EVENT" && (
+              <>
+                <PriceRow label="Base per player" value={formatUZS(pricing.basePrice)} />
+                <PriceRow label="Platform fee (5%)" value={`+ ${formatUZS(pricing.platformFee)}`} />
+                <PriceRow label="Players pay" value={formatUZS(pricing.youPay)} strong />
+              </>
+            )}
+            {pricing && form.bookingType === "GROUP_BOOKING" && (
+              <>
+                <PriceRow label="Cost per player" value={formatUZS(pricing.costPerPlayer)} />
+                <PriceRow label="You pay now" value={formatUZS(pricing.organizerPayNow)} strong />
+                <PriceRow label="Others joining pay" value={`${formatUZS(pricing.perJoiningPlayer)} each`} />
+              </>
+            )}
+            {pricing && form.bookingType === "FULL_BOOKING" && (
+              <>
+                <PriceRow label={`Pitch rate × ${pricing.hours}h`} value={formatUZS(pricing.totalCost)} />
+                <PriceRow label="Platform commission (10%)" value={formatUZS(pricing.platformCommission)} />
+                <PriceRow label="You pay" value={formatUZS(pricing.youPay)} strong />
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -332,6 +526,15 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between text-sm">
       <span style={{ color: "var(--tg-hint)" }}>{label}</span>
       <span className="font-semibold text-right">{value}</span>
+    </div>
+  );
+}
+
+function PriceRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span style={{ color: "var(--tg-hint)" }}>{label}</span>
+      <span className={strong ? "font-bold text-[#00C853]" : "font-medium"}>{value}</span>
     </div>
   );
 }

@@ -8,12 +8,14 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { ActivityService } from '../activity/activity.service';
 
 @Injectable()
 export class BookingsService {
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
+    private activity: ActivityService,
   ) {}
 
   async create(userId: string, dto: CreateBookingDto) {
@@ -158,18 +160,24 @@ export class BookingsService {
 
     const hoursBeforeMatch =
       (new Date(booking.match.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
+    const feeHours = booking.match.cancellationDeadlineHours || 5;
+    const feePercent = booking.match.cancellationFeePercent || 50;
+    const paidAmount = booking.transaction ? Number(booking.transaction.amount) : 0;
+    const withinCancellationWindow =
+      hoursBeforeMatch > 0 && hoursBeforeMatch < feeHours;
 
     let newStatus: any = 'CANCELLED_REFUND';
-    let refundAmount: number | null = booking.transaction
-      ? Number(booking.transaction.amount)
-      : null;
+    let refundAmount: number | null = booking.transaction ? paidAmount : null;
+    let penaltyAmount = 0;
 
     if (hoursBeforeMatch <= 0) {
       newStatus = 'NO_SHOW';
       refundAmount = null;
-    } else if (hoursBeforeMatch <= booking.match.cancellationDeadlineHours) {
+      penaltyAmount = paidAmount;
+    } else if (withinCancellationWindow) {
       newStatus = 'CANCELLED_PENALTY';
-      refundAmount = refundAmount !== null ? refundAmount * 0.5 : null;
+      penaltyAmount = booking.transaction ? (paidAmount * feePercent) / 100 : 0;
+      refundAmount = booking.transaction ? paidAmount - penaltyAmount : null;
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -201,7 +209,34 @@ export class BookingsService {
       });
     });
 
-    return { message: 'Booking cancelled', refundAmount };
+    await this.activity.log(
+      userId,
+      'BOOKING_CANCELLED',
+      `Cancelled booking — refund: ${refundAmount ?? 0} UZS, penalty: ${penaltyAmount} UZS`,
+      {
+        bookingId: id,
+        matchId: booking.matchId,
+        refundAmount,
+        penaltyAmount,
+        hoursUntilMatch: Math.round(hoursBeforeMatch),
+      },
+    );
+
+    const refunded = refundAmount ?? 0;
+    return {
+      cancelled: true,
+      status: newStatus,
+      hoursUntilMatch: Math.round(hoursBeforeMatch),
+      withinCancellationWindow,
+      refundAmount: refunded,
+      penaltyAmount,
+      refundedToWallet: refunded > 0,
+      message: withinCancellationWindow
+        ? `Cancelled within ${feeHours}h window. ${refunded.toLocaleString()} UZS refunded (${penaltyAmount.toLocaleString()} UZS penalty applied).`
+        : hoursBeforeMatch <= 0
+          ? `Cancelled after start time — no refund.`
+          : `Full refund of ${refunded.toLocaleString()} UZS added to your wallet.`,
+    };
   }
 
   private generatePaymentUrl(transactionId: string, amount: number, gateway: string): string {

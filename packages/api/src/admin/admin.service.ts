@@ -721,15 +721,17 @@ export class AdminService {
     userId?: string;
     entityType?: string;
     action?: string;
+    category?: string;
     from?: string;
     to?: string;
     page?: number;
     limit?: number;
   }) {
-    const { userId, entityType, action, from, to, page = 1, limit = 30 } = filters;
+    const { userId, entityType, action, category, from, to, page = 1, limit = 30 } = filters;
     const where: any = {};
     if (userId) where.userId = userId;
     if (entityType) where.entityType = entityType;
+    if (category) where.category = category as any;
     if (action) where.action = { contains: action, mode: 'insensitive' };
     if (from || to) {
       where.createdAt = {};

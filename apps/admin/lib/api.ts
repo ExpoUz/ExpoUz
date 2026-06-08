@@ -62,6 +62,22 @@ export async function getUserById(id: string) {
   return data;
 }
 
+// ─── Activity ────────────────────────────────────────────────
+export async function getActivityLog(params?: {
+  userId?: string;
+  category?: string;
+  action?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ data: any[]; total: number; page: number; limit: number }> {
+  const { data } = await adminApi.get("/admin/activity-log", {
+    params: { limit: 50, ...params },
+  });
+  return data?.data ? data : { data: data ?? [], total: 0, page: 1, limit: 50 };
+}
+
 export async function changeUserRole(id: string, role: string) {
   const { data } = await adminApi.patch(`/admin/users/${id}/role`, { role });
   return data;

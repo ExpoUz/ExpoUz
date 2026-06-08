@@ -34,10 +34,42 @@ export class MatchesController {
     return this.matchesService.findToday();
   }
 
+  // NOTE: static/prefixed routes must precede the ':id' route so 'code'/'pricing'
+  // are not captured as an :id param.
+  @Get('code/:shareCode')
+  @ApiOperation({ summary: 'Get match by invite/share code' })
+  findByShareCode(@Param('shareCode') shareCode: string) {
+    return this.matchesService.findByShareCode(shareCode);
+  }
+
+  @Post('pricing/calculate')
+  @ApiOperation({ summary: 'Preview pricing for a booking type before creating' })
+  calculatePricing(@Body() body: any) {
+    return this.matchesService.calculatePricingPreview(body);
+  }
+
+  @Post('join/code/:shareCode')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Join a match via invite/share code' })
+  joinByShareCode(
+    @Param('shareCode') shareCode: string,
+    @CurrentUser() user: any,
+    @Body() body: any,
+  ) {
+    return this.matchesService.joinByShareCode(shareCode, user.id, body);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get match by ID' })
   findOne(@Param('id') id: string) {
     return this.matchesService.findOne(id);
+  }
+
+  @Get(':id/share')
+  @ApiOperation({ summary: 'Get share link + code for a match' })
+  getShareLink(@Param('id') id: string) {
+    return this.matchesService.getShareLink(id);
   }
 
   @Post()

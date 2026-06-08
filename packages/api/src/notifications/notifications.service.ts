@@ -14,8 +14,10 @@ type NotificationType =
   | 'REFERRAL_BONUS'
   | 'ADMIN_ANNOUNCEMENT';
 
+// Keyed by NotificationType value; typed by string so newly-added enum members
+// (which are valid at runtime/schema) don't require a client regen to compile.
 const NOTIFICATION_TEMPLATES: Record<
-  NotificationType,
+  string,
   (vars: any) => { title: string; body: string }
 > = {
   BOOKING_CONFIRMED: (v) => ({
@@ -57,6 +59,16 @@ const NOTIFICATION_TEMPLATES: Record<
   ADMIN_ANNOUNCEMENT: (v) => ({
     title: v.title,
     body: v.body,
+  }),
+  CANCELLATION_WINDOW_CLOSING: (v) => ({
+    title: '⚠️ Free cancellation closing soon',
+    body: `Free cancellation for ${v.matchTitle} closes in ~30 min. Cancel now for a full refund.`,
+  }),
+  INVITE_JOINED: (v) => ({
+    title: '🎉 Someone joined your game!',
+    body: `${v.joinerName ?? 'A player'} joined ${v.matchTitle}.${
+      v.spotsLeft != null ? ` ${v.spotsLeft} spots left.` : ''
+    }`,
   }),
 };
 

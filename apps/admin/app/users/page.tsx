@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getUsers } from "@/lib/api";
 import { useState } from "react";
+import Link from "next/link";
 import dayjs from "dayjs";
 
 export default function UsersPage() {
@@ -118,9 +119,12 @@ export default function UsersPage() {
                         {u.firstName?.[0] ?? "?"}
                       </div>
                       <div>
-                        <div className="font-medium text-gray-900">
+                        <Link
+                          href={`/users/${u.id}`}
+                          className="font-medium text-gray-900 hover:text-green-700 hover:underline"
+                        >
                           {u.firstName} {u.lastName}
-                        </div>
+                        </Link>
                         {u.email && (
                           <div className="text-xs text-gray-400">{u.email}</div>
                         )}

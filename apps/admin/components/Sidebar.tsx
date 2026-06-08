@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/pitches", label: "Pitches", icon: "🏟" },
   { href: "/matches", label: "Matches", icon: "⚽" },
   { href: "/transactions", label: "Transactions", icon: "💳" },
+  { href: "/activity", label: "Activity", icon: "📡" },
   { href: "/analytics", label: "Analytics", icon: "📈" },
 ];
 

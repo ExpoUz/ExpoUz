@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { MapPin, Users, Clock, Shield, ChevronRight, Calendar } from "lucide-react";
-import { getMatch, joinMatch, leaveMatch, formatUZS } from "@/lib/api";
+import { MapPin, Users, Clock, Shield, ChevronRight, Calendar, Share2, Copy } from "lucide-react";
+import { getMatch, joinMatch, leaveMatch, getShareLink, formatUZS } from "@/lib/api";
 import {
   showMainButton,
   hideMainButton,
@@ -14,9 +14,18 @@ import {
   setMainButtonLoading,
   hapticSuccess,
   hapticError,
+  hapticImpact,
   showAlert,
+  shareToTelegram,
+  copyToClipboard,
 } from "@/lib/telegram";
 import { useAuth } from "@/lib/auth";
+
+const BOOKING_TYPE_LABELS: Record<string, { label: string; icon: string; color: string }> = {
+  OPEN_EVENT: { label: "Open Event", icon: "📢", color: "#00C853" },
+  GROUP_BOOKING: { label: "Group Booking", icon: "👥", color: "#00B0FF" },
+  FULL_BOOKING: { label: "Full Pitch", icon: "🏟️", color: "#FF5252" },
+};
 
 export default function MatchDetailPage() {
   const router = useRouter();
@@ -24,11 +33,25 @@ export default function MatchDetailPage() {
   const id = String(params.id);
   const qc = useQueryClient();
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const justCreated = searchParams.get("created") === "1";
+  const [showCancel, setShowCancel] = useState(false);
 
   const { data: match, isLoading } = useQuery({
     queryKey: ["tma-match", id],
     queryFn: () => getMatch(id),
   });
+
+  const isHost = !!user && !!match && (match.hostId === user.id || match.organizerId === user.id);
+  const { data: share } = useQuery({
+    queryKey: ["tma-share", id],
+    queryFn: () => getShareLink(id),
+    enabled: !!match && (justCreated || isHost),
+  });
+
+  const hoursUntilMatch = match
+    ? (new Date(match.startTime).getTime() - Date.now()) / (1000 * 60 * 60)
+    : 0;
 
   const players: any[] =
     match?.positions?.filter((p: any) => p.booking?.user).map((p: any) => p.booking.user) ?? [];
@@ -75,7 +98,7 @@ export default function MatchDetailPage() {
     if (!match) return;
     let cleanup = () => {};
     if (joined) {
-      cleanup = showMainButton("Leave Game", () => leave.mutate(), "#FF5252");
+      cleanup = showMainButton("Leave Game", () => setShowCancel(true), "#FF5252");
     } else if (isFull) {
       hideMainButton();
     } else {
@@ -110,10 +133,20 @@ export default function MatchDetailPage() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
         <div className="absolute bottom-3 left-4 right-4 text-white">
-          <div className="flex gap-1.5 mb-1">
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-white/20 backdrop-blur">
-              {match.format}
-            </span>
+          <div className="flex gap-1.5 mb-1 flex-wrap">
+            {match.format && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-white/20 backdrop-blur">
+                {match.format}
+              </span>
+            )}
+            {match.bookingType && BOOKING_TYPE_LABELS[match.bookingType] && (
+              <span
+                className="px-2 py-0.5 rounded-full text-[11px] font-bold text-white"
+                style={{ background: BOOKING_TYPE_LABELS[match.bookingType].color }}
+              >
+                {BOOKING_TYPE_LABELS[match.bookingType].icon} {BOOKING_TYPE_LABELS[match.bookingType].label}
+              </span>
+            )}
             <span
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
                 isFull ? "bg-[#FF5252]" : "bg-[#00C853]"
@@ -152,6 +185,60 @@ export default function MatchDetailPage() {
             <Row icon={<Shield size={16} />} label={`Skill: ${match.skillFilter}`} />
           )}
         </div>
+
+        {/* Booking-type specifics */}
+        {match.bookingType === "GROUP_BOOKING" && (
+          <div className="rounded-2xl p-4 text-sm" style={{ background: "var(--tg-card)" }}>
+            👥 Organised by{" "}
+            <span className="font-semibold">{match.host?.firstName ?? "host"}</span>
+            {match.organizerPlayerCount != null && <> — paid for {match.organizerPlayerCount} players</>}
+            {match.extraSpotsAvailable != null && (
+              <div className="text-xs mt-1" style={{ color: "var(--tg-hint)" }}>
+                {Math.max(0, spotsLeft)} spots remaining for others
+              </div>
+            )}
+          </div>
+        )}
+        {match.bookingType === "FULL_BOOKING" && (
+          <div className="rounded-2xl p-4 text-sm" style={{ background: "var(--tg-card)" }}>
+            🏟️ Full pitch booking — {match.isPrivate ? "Private" : "Open to others"}
+          </div>
+        )}
+
+        {/* Share / invite card */}
+        {share?.telegramShareLink && (justCreated || isHost) && (
+          <div className="rounded-2xl p-4 space-y-3" style={{ background: "var(--tg-card)" }}>
+            <div className="font-semibold text-sm">
+              {justCreated ? "⚽ You created a game!" : "Invite players"}
+            </div>
+            <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
+              Share this link to invite friends. Code: <span className="font-mono font-semibold">{share.shareCode}</span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  hapticImpact("light");
+                  shareToTelegram(share.telegramShareLink, `Join my game: ${match.title}`);
+                }}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white"
+                style={{ background: "#00B0FF" }}
+              >
+                <Share2 size={16} /> Share
+              </button>
+              <button
+                onClick={async () => {
+                  hapticImpact("light");
+                  const ok = await copyToClipboard(share.telegramShareLink);
+                  showAlert(ok ? "Invite link copied!" : "Copy not supported — share instead.");
+                }}
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
+                style={{ background: "var(--tg-bg)", border: "1px solid rgba(0,0,0,0.1)" }}
+              >
+                <Copy size={16} /> Copy
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Host */}
         {match.host && (
@@ -229,6 +316,61 @@ export default function MatchDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Cancellation policy modal */}
+      {showCancel && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowCancel(false)}>
+          <div
+            className="w-full max-w-md rounded-t-3xl p-5 pb-8 space-y-4"
+            style={{ background: "var(--tg-bg)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {hoursUntilMatch < (match.cancellationDeadlineHours ?? 5) ? (
+              <div className="rounded-2xl p-4 space-y-1" style={{ background: "rgba(255,82,82,0.1)" }}>
+                <div className="font-bold text-[#FF5252]">⚠️ Cancellation Fee Applies</div>
+                <p className="text-sm">
+                  You&apos;re cancelling within {match.cancellationDeadlineHours ?? 5} hours of kick-off.
+                </p>
+                <p className="text-sm">
+                  {match.cancellationFeePercent ?? 50}% of your payment is charged as a fee.
+                </p>
+                <p className="text-sm font-semibold pt-1">
+                  You&apos;ll receive:{" "}
+                  {formatUZS(
+                    Number(match.pricePerPlayer) * (1 - (match.cancellationFeePercent ?? 50) / 100),
+                  )}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-2xl p-4 space-y-1" style={{ background: "rgba(0,200,83,0.1)" }}>
+                <div className="font-bold text-[#00875A]">✅ Free cancellation</div>
+                <p className="text-sm">Full refund of {formatUZS(match.pricePerPlayer)} added to your wallet.</p>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCancel(false)}
+                className="flex-1 rounded-xl py-3 text-sm font-semibold"
+                style={{ background: "var(--tg-card)" }}
+              >
+                Keep my spot
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCancel(false);
+                  leave.mutate();
+                }}
+                className="flex-1 rounded-xl py-3 text-sm font-semibold text-white"
+                style={{ background: "#FF5252" }}
+              >
+                Cancel booking
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -75,6 +75,56 @@ export async function createMatch(body: any) {
   return data;
 }
 
+// ─── Booking types / invites / pricing ────────────────────────
+export async function getPricingPreview(body: {
+  pitchId: string;
+  bookingType: string;
+  organizerPlayerCount?: number;
+  extraSpotsAvailable?: number;
+  fullBookingHours?: number;
+  pricePerPlayer?: number;
+}) {
+  const { data } = await api.post("/matches/pricing/calculate", body);
+  return data;
+}
+
+export async function getMatchByShareCode(shareCode: string) {
+  const { data } = await api.get(`/matches/code/${shareCode}`);
+  return data;
+}
+
+export async function joinByShareCode(
+  shareCode: string,
+  body: { positionId?: string; teamSide?: string } = {},
+) {
+  const { data } = await api.post(`/matches/join/code/${shareCode}`, body);
+  return data;
+}
+
+export async function getShareLink(id: string): Promise<{
+  id: string;
+  shareCode: string;
+  telegramShareLink: string;
+  title?: string;
+}> {
+  const { data } = await api.get(`/matches/${id}/share`);
+  return data;
+}
+
+export async function cancelBooking(bookingId: string): Promise<{
+  cancelled: boolean;
+  status: string;
+  hoursUntilMatch: number;
+  withinCancellationWindow: boolean;
+  refundAmount: number;
+  penaltyAmount: number;
+  refundedToWallet: boolean;
+  message: string;
+}> {
+  const { data } = await api.delete(`/bookings/${bookingId}`);
+  return data;
+}
+
 // ─── Pitches (for create flow) ────────────────────────────────
 export async function getPitches(params?: Record<string, any>): Promise<any[]> {
   const { data } = await api.get("/pitches", { params: { limit: 50, ...params } });

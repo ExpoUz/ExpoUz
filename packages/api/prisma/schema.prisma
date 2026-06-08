@@ -42,6 +42,7 @@ model User {
   updatedAt        DateTime   @updatedAt
 
   hostMatches        Match[]              @relation("HostMatches")
+  organizedMatches   Match[]              @relation("OrganizerMatches")
   bookings           Booking[]
   transactions       Transaction[]
   ratingsGiven       PlayerRating[]       @relation("RatingsGiven")
@@ -178,10 +179,28 @@ model Match {
   skillFilter               SkillLevel?
   description               String?
   cancellationDeadlineHours Int         @default(5)
+  cancellationFeePercent    Int         @default(50)
   telegramTopicId           String?
   formation                 String?
   createdAt                 DateTime    @default(now())
   updatedAt                 DateTime    @updatedAt
+
+  // ---- Booking type ----
+  bookingType           BookingType @default(OPEN_EVENT)
+  // Group booking (BookingType.GROUP_BOOKING)
+  organizerPlayerCount  Int?
+  organizerTotalPaid    Decimal?    @db.Decimal(12, 2)
+  extraSpotsAvailable   Int?
+  // Full booking (BookingType.FULL_BOOKING)
+  isPrivate             Boolean     @default(false)
+  fullBookingHours      Int?
+  fullBookingTotalCost  Decimal?    @db.Decimal(12, 2)
+  // Telegram sharing / invites
+  telegramShareLink     String?
+  shareCode             String?     @unique
+  // Organizer (user who created and paid upfront; may differ from host)
+  organizerId           String?
+  organizer             User?       @relation("OrganizerMatches", fields: [organizerId], references: [id])
 
   bookings      Booking[]
   positions     MatchPosition[]
@@ -196,12 +215,20 @@ enum Sport {
 }
 
 enum MatchStatus {
+  DRAFT
+  PUBLISHED
   OPEN
   FULL
   CONFIRMED
   IN_PROGRESS
   COMPLETED
   CANCELLED
+}
+
+enum BookingType {
+  OPEN_EVENT // User creates event, invites others, extra spots available
+  GROUP_BOOKING // User pays for N people upfront, invites N people to join
+  FULL_BOOKING // User books entire pitch for themselves / private group
 }
 
 // ============ POSITION-BASED BOOKING ============
@@ -391,6 +418,8 @@ enum NotificationType {
   PAYMENT_RELEASED
   REFERRAL_BONUS
   ADMIN_ANNOUNCEMENT
+  CANCELLATION_WINDOW_CLOSING
+  INVITE_JOINED
 }
 
 model PitchFollower {
@@ -489,19 +518,43 @@ model Location {
 // ============ ACTIVITY LOG ============
 // Immutable audit trail: every admin/super-admin action is recorded here
 model ActivityLog {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  action     String   // e.g. "BAN_USER", "VERIFY_PITCH", "CREATE_LOCATION"
-  entityType String?  // e.g. "User", "Pitch", "Match"
-  entityId   String?
-  meta       Json?    // arbitrary payload snapshot
-  ipAddress  String?
-  createdAt  DateTime @default(now())
+  id          String            @id @default(cuid())
+  userId      String
+  user        User              @relation(fields: [userId], references: [id])
+  action      String   // e.g. "BAN_USER", "VERIFY_PITCH", "MATCH_JOINED"
+  category    ActivityCategory? // typed classification for user-facing activity feeds
+  description String?           // human-readable summary shown in history feeds
+  entityType  String?  // e.g. "User", "Pitch", "Match"
+  entityId    String?
+  meta        Json?    // arbitrary payload snapshot
+  ipAddress   String?
+  createdAt   DateTime          @default(now())
 
   @@index([userId])
+  @@index([category])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+enum ActivityCategory {
+  REGISTERED
+  LOGIN
+  PROFILE_UPDATED
+  MATCH_CREATED
+  MATCH_JOINED
+  MATCH_LEFT
+  MATCH_CANCELLED
+  PAYMENT_INITIATED
+  PAYMENT_COMPLETED
+  PAYMENT_FAILED
+  PAYMENT_REFUNDED
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  INVITE_SENT
+  INVITE_ACCEPTED
+  RATING_GIVEN
+  RATING_RECEIVED
+  ADMIN_ACTION
 }
 
 // ============ USER SESSION (online presence) ============

@@ -13,6 +13,11 @@ import { QueryMatchesDto, TimeOfDay, SortBy } from './dto/query-matches.dto';
 import { RatePlayerDto } from './dto/rate-player.dto';
 import { FormationService } from '../formation/formation.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { ActivityService } from '../activity/activity.service';
+import { RemindersService } from '../reminders/reminders.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { BookingType } from '@prisma/client';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class MatchesService {
@@ -21,7 +26,19 @@ export class MatchesService {
     private redis: RedisService,
     private formationService: FormationService,
     private telegramService: TelegramService,
+    private activity: ActivityService,
+    private reminders: RemindersService,
+    private notifications: NotificationsService,
   ) {}
+
+  private generateShareCode(): string {
+    return randomBytes(4).toString('hex').toUpperCase().slice(0, 6);
+  }
+
+  private buildShareLink(shareCode: string): string {
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'ExpoUzBot';
+    return `https://t.me/${botUsername}?start=join_${shareCode}`;
+  }
 
   async findAll(query: QueryMatchesDto) {
     const {
@@ -200,28 +217,91 @@ export class MatchesService {
       minute: '2-digit',
       hour12: false,
     });
-    const sport: Sport = dto.sport || Sport.FOOTBALL;
-    const autoTitle = `${sport.charAt(0) + sport.slice(1).toLowerCase()} at ${pitch.name} - ${dayName} ${timeStr}`;
+    // DTO Sport enum and Prisma Sport enum diverge (pre-existing); cast the
+    // overlapping value through.
+    const sport: Sport = (dto.sport as unknown as Sport) || Sport.FOOTBALL;
+    const bookingType: BookingType = dto.bookingType || BookingType.OPEN_EVENT;
+
+    // ---- Pricing / capacity derived from booking type ----
+    let pricePerPlayer = Number(dto.pricePerPlayer ?? 0);
+    let maxPlayers = dto.maxPlayers ?? 0;
+    let organizerPlayerCount: number | null = null;
+    let organizerTotalPaid: number | null = null;
+    let extraSpotsAvailable: number | null = null;
+    let fullBookingHours: number | null = null;
+    let fullBookingTotalCost: number | null = null;
+    let currentPlayers = 1;
+
+    if (bookingType === BookingType.GROUP_BOOKING) {
+      organizerPlayerCount = dto.organizerPlayerCount || 1;
+      extraSpotsAvailable = dto.extraSpotsAvailable || 0;
+      maxPlayers = organizerPlayerCount + extraSpotsAvailable;
+      organizerTotalPaid = pricePerPlayer * organizerPlayerCount;
+      currentPlayers = organizerPlayerCount;
+    } else if (bookingType === BookingType.FULL_BOOKING) {
+      fullBookingHours = dto.fullBookingHours || 1;
+      fullBookingTotalCost = Number(pitch.hourlyRate ?? 0) * fullBookingHours;
+      pricePerPlayer = 0;
+      maxPlayers = dto.maxPlayers || 22;
+    } else {
+      // OPEN_EVENT — require explicit capacity
+      if (!maxPlayers || maxPlayers < 2) {
+        throw new BadRequestException('maxPlayers is required for an open event');
+      }
+    }
+
+    const titleSport = sport.charAt(0) + sport.slice(1).toLowerCase();
+    const autoTitle = this.generateTitle(bookingType, titleSport, dto.format, pitch.name);
+    const shareCode = this.generateShareCode();
+    const telegramShareLink = this.buildShareLink(shareCode);
 
     const match = await this.prisma.match.create({
       data: {
         pitchId: dto.pitchId,
         hostId,
+        organizerId: hostId,
         title: autoTitle,
         sport,
         format: dto.format,
         startTime,
         durationMinutes: dto.durationMinutes || 60,
-        maxPlayers: dto.maxPlayers,
-        minPlayers: dto.minPlayers || 10,
-        pricePerPlayer: dto.pricePerPlayer,
+        maxPlayers,
+        minPlayers: dto.minPlayers || Math.max(1, Math.floor(maxPlayers * 0.7)),
+        currentPlayers,
+        pricePerPlayer,
+        bookingType,
+        organizerPlayerCount,
+        organizerTotalPaid,
+        extraSpotsAvailable,
+        fullBookingHours,
+        fullBookingTotalCost,
+        isPrivate: dto.isPrivate || false,
         isCoEd: dto.isCoEd !== undefined ? dto.isCoEd : true,
         skillFilter: dto.skillFilter,
         description: dto.description,
         formation: dto.formation,
         cancellationDeadlineHours: dto.cancellationDeadlineHours || 5,
+        shareCode,
+        telegramShareLink,
+        // status left at default OPEN — the codebase treats OPEN as the live,
+        // joinable/listed state (join() and findAll() key off OPEN). DRAFT/PUBLISHED
+        // exist in the enum for future use but must not replace OPEN here.
       },
     });
+
+    await this.activity.log(
+      hostId,
+      'MATCH_CREATED',
+      `Created ${bookingType} match: ${match.title}`,
+      { matchId: match.id, bookingType },
+    );
+
+    // Schedule the "free cancellation closing soon" reminder.
+    await this.reminders.scheduleCancellationWarning(
+      match.id,
+      startTime,
+      match.cancellationDeadlineHours,
+    );
 
     if (dto.formation) {
       await this.formationService.generatePositions(match.id, dto.formation, dto.format);
@@ -242,6 +322,167 @@ export class MatchesService {
     }
 
     return match;
+  }
+
+  private generateTitle(
+    bookingType: BookingType,
+    sport: string,
+    format: string,
+    pitchName: string,
+  ): string {
+    switch (bookingType) {
+      case BookingType.GROUP_BOOKING:
+        return `${format} ${sport} Group Game at ${pitchName}`;
+      case BookingType.FULL_BOOKING:
+        return `Full Pitch Booking at ${pitchName}`;
+      default:
+        return `${format} ${sport} Pickup Game at ${pitchName}`;
+    }
+  }
+
+  // ─── INVITE / SHARE ───────────────────────────────────────────────────────
+  async findByShareCode(shareCode: string) {
+    const match = await this.prisma.match.findUnique({
+      where: { shareCode },
+      include: {
+        pitch: { include: { amenities: true } },
+        host: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true },
+        },
+        _count: { select: { bookings: true } },
+      },
+    });
+    if (!match) throw new NotFoundException('Invalid invite link');
+    return match;
+  }
+
+  async getShareLink(id: string) {
+    const match = await this.prisma.match.findUnique({
+      where: { id },
+      select: { id: true, shareCode: true, telegramShareLink: true, title: true },
+    });
+    if (!match) throw new NotFoundException('Match not found');
+
+    // Backfill a share code for matches created before this feature existed.
+    if (!match.shareCode) {
+      const shareCode = this.generateShareCode();
+      const telegramShareLink = this.buildShareLink(shareCode);
+      await this.prisma.match.update({
+        where: { id },
+        data: { shareCode, telegramShareLink },
+      });
+      return { ...match, shareCode, telegramShareLink };
+    }
+    return match;
+  }
+
+  async joinByShareCode(
+    shareCode: string,
+    userId: string,
+    body: { positionId?: string; teamSide?: string } = {},
+  ) {
+    const match = await this.prisma.match.findUnique({ where: { shareCode } });
+    if (!match) throw new NotFoundException('Invalid invite link');
+    if (match.status === 'CANCELLED') {
+      throw new BadRequestException('This event has been cancelled');
+    }
+    if (match.currentPlayers >= match.maxPlayers) {
+      throw new BadRequestException('This event is full');
+    }
+    const result = await this.join(match.id, userId, body.positionId, body.teamSide);
+    await this.activity.log(userId, 'INVITE_ACCEPTED', `Joined via invite: ${match.title}`, {
+      matchId: match.id,
+      shareCode,
+    });
+
+    // Notify the organizer that someone joined via their invite link.
+    if (match.organizerId && match.organizerId !== userId) {
+      const joiner = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true },
+      });
+      const spotsLeft = Math.max(0, match.maxPlayers - (match.currentPlayers + 1));
+      await this.notifications.send(
+        match.organizerId,
+        // Valid NotificationType at runtime/schema; cast avoids a stale local client.
+        'INVITE_JOINED' as any,
+        match.id,
+        { matchTitle: match.title, joinerName: joiner?.firstName, spotsLeft },
+      );
+    }
+    return result;
+  }
+
+  // ─── PRICING PREVIEW ──────────────────────────────────────────────────────
+  calculateGroupBookingPrice(
+    pitchHourlyRate: number,
+    organizerPlayerCount: number,
+    totalMaxPlayers: number,
+    hours: number,
+  ) {
+    const commissionRate = 0.1; // platform commission on the pitch
+    const playerFeeRate = 0.05; // platform fee charged to players
+    const totalPitchCost = pitchHourlyRate * hours;
+    const platformCommission = totalPitchCost * commissionRate;
+    const netPitchCost = totalPitchCost - platformCommission;
+    const costPerPlayer = totalMaxPlayers > 0 ? netPitchCost / totalMaxPlayers : 0;
+    const organizerTotal = costPerPlayer * organizerPlayerCount * (1 + playerFeeRate);
+
+    return {
+      totalPitchCost,
+      platformCommission: Math.ceil(platformCommission),
+      costPerPlayer: Math.ceil(costPerPlayer),
+      organizerPayNow: Math.ceil(organizerTotal),
+      perJoiningPlayer: Math.ceil(costPerPlayer * (1 + playerFeeRate)),
+    };
+  }
+
+  async calculatePricingPreview(body: {
+    pitchId: string;
+    bookingType: string;
+    organizerPlayerCount?: number;
+    extraSpotsAvailable?: number;
+    fullBookingHours?: number;
+    maxPlayers?: number;
+    pricePerPlayer?: number;
+  }) {
+    const pitch = await this.prisma.pitch.findUnique({ where: { id: body.pitchId } });
+    if (!pitch) throw new NotFoundException('Pitch not found');
+    const hourlyRate = Number(pitch.hourlyRate ?? 0);
+    const playerFeeRate = 0.05;
+
+    if (body.bookingType === 'GROUP_BOOKING') {
+      const organizerCount = body.organizerPlayerCount || 1;
+      const totalMax = organizerCount + (body.extraSpotsAvailable || 0);
+      const hours = body.fullBookingHours || 1;
+      return {
+        bookingType: 'GROUP_BOOKING',
+        ...this.calculateGroupBookingPrice(hourlyRate, organizerCount, totalMax, hours),
+      };
+    }
+
+    if (body.bookingType === 'FULL_BOOKING') {
+      const hours = body.fullBookingHours || 1;
+      const totalCost = hourlyRate * hours;
+      return {
+        bookingType: 'FULL_BOOKING',
+        hourlyRate,
+        hours,
+        totalCost,
+        platformCommission: Math.ceil(totalCost * 0.1),
+        youPay: totalCost,
+      };
+    }
+
+    // OPEN_EVENT
+    const base = Number(body.pricePerPlayer ?? 0);
+    const fee = Math.ceil(base * playerFeeRate);
+    return {
+      bookingType: 'OPEN_EVENT',
+      basePrice: base,
+      platformFee: fee,
+      youPay: base + fee,
+    };
   }
 
   async update(id: string, hostId: string, dto: Partial<CreateMatchDto>) {
