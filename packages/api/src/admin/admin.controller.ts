@@ -34,6 +34,12 @@ export class AdminController {
     return this.adminService.getDashboard();
   }
 
+  @Patch('link-telegram')
+  @ApiOperation({ summary: 'Link the current admin account to a Telegram ID (for admin Mini App)' })
+  linkTelegram(@Body('telegramId') telegramId: string, @Req() req: any) {
+    return this.adminService.linkTelegram(req.user.id, telegramId);
+  }
+
   @Get('users')
   @ApiOperation({ summary: 'Get all users with filters' })
   @ApiQuery({ name: 'role', required: false })

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -8,6 +8,15 @@ export class AdminService {
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
   ) {}
+
+  async linkTelegram(userId: string, telegramId: string) {
+    if (!telegramId) throw new BadRequestException('telegramId is required');
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { telegramId: String(telegramId) },
+    });
+    return { linked: true };
+  }
 
   async getDashboard() {
     const now = new Date();
