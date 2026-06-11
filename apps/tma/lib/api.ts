@@ -125,11 +125,52 @@ export async function cancelBooking(bookingId: string): Promise<{
   return data;
 }
 
+export async function getCities(): Promise<{ city: string; districts: string[] }[]> {
+  const { data } = await api.get("/matches/cities");
+  return Array.isArray(data) ? data : [];
+}
+
 // ─── Pitches (for create flow) ────────────────────────────────
 export async function getPitches(params?: Record<string, any>): Promise<any[]> {
   const { data } = await api.get("/pitches", { params: { limit: 50, ...params } });
   return Array.isArray(data) ? data : data?.data ?? [];
 }
+
+// ─── Players / ranking / social ───────────────────────────────
+export async function searchPlayers(q: string, city?: string): Promise<any[]> {
+  const { data } = await api.get("/users/search", { params: { q, ...(city ? { city } : {}) } });
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getPlayerProfile(id: string) {
+  const { data } = await api.get(`/users/${id}`);
+  return data;
+}
+
+export async function getPlayerRanking(id: string) {
+  const { data } = await api.get(`/users/${id}/ranking`);
+  return data;
+}
+
+export async function getLeaderboard(city?: string): Promise<any[]> {
+  const { data } = await api.get("/users/leaderboard", { params: city ? { city } : {} });
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getMatchPlayers(matchId: string): Promise<any[]> {
+  const { data } = await api.get(`/users/match/${matchId}/players`);
+  return Array.isArray(data) ? data : [];
+}
+
+// Shared level metadata (mirrors API RankingService)
+export const LEVEL_META: Record<string, { label: string; color: string; icon: string }> = {
+  NEW: { label: "New Player", color: "#9CA3AF", icon: "🌱" },
+  ROOKIE: { label: "Rookie", color: "#10B981", icon: "🎾" },
+  REGULAR: { label: "Regular", color: "#00B0FF", icon: "🔵" },
+  EXPERIENCED: { label: "Experienced", color: "#8B5CF6", icon: "🔥" },
+  VETERAN: { label: "Veteran", color: "#F59E0B", icon: "⭐" },
+  ELITE: { label: "Elite", color: "#FFD700", icon: "👑" },
+};
 
 // ─── Profile ──────────────────────────────────────────────────
 export async function getMe() {

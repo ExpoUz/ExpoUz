@@ -22,6 +22,7 @@ import { GatewayModule } from './gateway/gateway.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { ActivityModule } from './activity/activity.module';
 import { RemindersModule } from './reminders/reminders.module';
+import { RankingModule } from './ranking/ranking.module';
 import { OnlineStatusMiddleware } from './admin/online-status.middleware';
 import { HealthController } from './health.controller';
 
@@ -56,6 +57,7 @@ import { HealthController } from './health.controller';
     PrismaModule,
     RedisModule,
     ActivityModule,
+    RankingModule,
     TelegramModule,
     AuthModule,
     UsersModule,

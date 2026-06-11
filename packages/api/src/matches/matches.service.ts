@@ -16,6 +16,7 @@ import { TelegramService } from '../telegram/telegram.service';
 import { ActivityService } from '../activity/activity.service';
 import { RemindersService } from '../reminders/reminders.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RankingService } from '../ranking/ranking.service';
 import { BookingType } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
@@ -29,6 +30,7 @@ export class MatchesService {
     private activity: ActivityService,
     private reminders: RemindersService,
     private notifications: NotificationsService,
+    private ranking: RankingService,
   ) {}
 
   private generateShareCode(): string {
@@ -36,8 +38,20 @@ export class MatchesService {
   }
 
   private buildShareLink(shareCode: string): string {
-    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'ExpoUzBot';
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'ExpoScoreBot';
     return `https://t.me/${botUsername}?start=join_${shareCode}`;
+  }
+
+  // Player cap is derived from the "NvN" format string (per side × 2).
+  // Padel: 1v1 -> 2, 2v2 -> 4. Generic so future formats (5v5 -> 10) just work.
+  private getMaxPlayersForFormat(format: string): number {
+    const m = format?.match(/^(\d+)v(\d+)$/);
+    if (!m) {
+      throw new BadRequestException(
+        `Invalid format: ${format}. Use NvN (e.g. 1v1 or 2v2).`,
+      );
+    }
+    return parseInt(m[1], 10) + parseInt(m[2], 10);
   }
 
   async findAll(query: QueryMatchesDto) {
@@ -71,6 +85,9 @@ export class MatchesService {
     if (city) where.pitch = { ...where.pitch, city };
     if (district) where.pitch = { ...where.pitch, district };
     if (isIndoor !== undefined) where.pitch = { ...where.pitch, isIndoor };
+    if (query.courtType) where.pitch = { ...where.pitch, courtType: query.courtType };
+    if (query.isCovered !== undefined)
+      where.pitch = { ...where.pitch, isCovered: query.isCovered };
 
     if (date) {
       const d = new Date(date);
@@ -163,6 +180,22 @@ export class MatchesService {
     return { data: result, total, page, limit };
   }
 
+  async getAvailableCities() {
+    const pitches = await this.prisma.pitch.findMany({
+      where: { isActive: true },
+      select: { city: true, district: true },
+    });
+    const cities = new Map<string, Set<string>>();
+    for (const p of pitches) {
+      if (!cities.has(p.city)) cities.set(p.city, new Set());
+      if (p.district) cities.get(p.city)!.add(p.district);
+    }
+    return Array.from(cities.entries()).map(([city, districts]) => ({
+      city,
+      districts: Array.from(districts).sort(),
+    }));
+  }
+
   async findToday() {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
@@ -244,10 +277,14 @@ export class MatchesService {
       pricePerPlayer = 0;
       maxPlayers = dto.maxPlayers || 22;
     } else {
-      // OPEN_EVENT — require explicit capacity
-      if (!maxPlayers || maxPlayers < 2) {
-        throw new BadRequestException('maxPlayers is required for an open event');
+      // OPEN_EVENT — player cap is fixed by the format (padel: 1v1->2, 2v2->4).
+      const cap = this.getMaxPlayersForFormat(dto.format);
+      if (maxPlayers && maxPlayers > cap) {
+        throw new BadRequestException(
+          `A ${dto.format} match allows a maximum of ${cap} players. You requested ${maxPlayers}.`,
+        );
       }
+      maxPlayers = cap; // lock to the format cap
     }
 
     const titleSport = sport.charAt(0) + sport.slice(1).toLowerCase();
@@ -793,6 +830,9 @@ export class MatchesService {
         });
       }
     }
+
+    // Ranking: credit a game played to each participant and re-derive levels.
+    await this.ranking.incrementGamesAttended(match.bookings.map((b) => b.userId));
 
     return { message: 'Match completed, payments released' };
   }

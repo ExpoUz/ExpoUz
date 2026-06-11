@@ -34,6 +34,12 @@ export class MatchesController {
     return this.matchesService.findToday();
   }
 
+  @Get('cities')
+  @ApiOperation({ summary: 'Available cities + districts (for filters)' })
+  getCities() {
+    return this.matchesService.getAvailableCities();
+  }
+
   // NOTE: static/prefixed routes must precede the ':id' route so 'code'/'pricing'
   // are not captured as an :id param.
   @Get('code/:shareCode')

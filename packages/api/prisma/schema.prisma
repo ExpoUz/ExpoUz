@@ -22,6 +22,10 @@ model User {
   reliabilityScore Float      @default(100.0)
   eloRating        Int        @default(1000)
   skillLevel       SkillLevel @default(AMATEUR)
+  gamesAttended    Int        @default(0)
+  gamesThisMonth   Int        @default(0)
+  winCount         Int        @default(0)
+  playerLevel      PlayerLevel @default(NEW)
   role             UserRole   @default(PLAYER)
   city             String     @default("Tashkent")
   district         String?
@@ -79,6 +83,15 @@ enum SkillLevel {
   PRO
 }
 
+enum PlayerLevel {
+  NEW         // 0 games
+  ROOKIE      // 1-5
+  REGULAR     // 6-15
+  EXPERIENCED // 16-30
+  VETERAN     // 31-60
+  ELITE       // 61+
+}
+
 model RefreshToken {
   id        String   @id @default(cuid())
   userId    String
@@ -121,6 +134,9 @@ model Pitch {
   noMetalStuds Boolean     @default(false)
   commission   Float       @default(0.10)
   rejectionReason String?
+  // Padel court attributes
+  courtType    PadelCourtType @default(PANORAMIC)
+  isCovered    Boolean        @default(false)
   locationId   String?
   location     Location?   @relation(fields: [locationId], references: [id])
   createdAt    DateTime    @default(now())
@@ -140,6 +156,14 @@ enum PitchSize {
   FIVE_A_SIDE
   SEVEN_A_SIDE
   ELEVEN_A_SIDE
+  SINGLES
+  DOUBLES
+}
+
+enum PadelCourtType {
+  PANORAMIC // full glass walls
+  CLASSIC   // mixed glass and mesh
+  SINGLE    // narrower singles court
 }
 
 model Amenity {
@@ -166,12 +190,12 @@ model Match {
   hostId                    String
   host                      User        @relation("HostMatches", fields: [hostId], references: [id])
   title                     String
-  sport                     Sport       @default(FOOTBALL)
-  format                    String
+  sport                     Sport       @default(PADEL)
+  format                    String      @default("2v2")
   startTime                 DateTime
   durationMinutes           Int         @default(60)
-  maxPlayers                Int
-  minPlayers                Int         @default(10)
+  maxPlayers                Int         @default(4)
+  minPlayers                Int         @default(2)
   currentPlayers            Int         @default(0)
   pricePerPlayer            Decimal     @db.Decimal(12, 2)
   status                    MatchStatus @default(OPEN)

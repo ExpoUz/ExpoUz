@@ -287,12 +287,17 @@ export default function MatchDetailPage() {
           </div>
           <div className="grid grid-cols-4 gap-3">
             {players.map((p) => (
-              <div key={p.id} className="flex flex-col items-center gap-1">
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => router.push(`/players/${p.id}`)}
+                className="flex flex-col items-center gap-1 pressable"
+              >
                 <Avatar user={p} />
                 <span className="text-[11px] text-center truncate w-full" style={{ color: "var(--tg-hint)" }}>
                   {p.firstName}
                 </span>
-              </div>
+              </button>
             ))}
             {Array.from({ length: Math.min(spotsLeft, match.maxPlayers) }).map((_, i) => (
               <div key={`empty-${i}`} className="flex flex-col items-center gap-1">

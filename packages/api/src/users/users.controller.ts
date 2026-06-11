@@ -23,13 +23,35 @@ import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RankingService } from '../ranking/ranking.service';
 
 @ApiTags('users')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly ranking: RankingService,
+  ) {}
+
+  @Get('search')
+  @ApiOperation({ summary: 'Search players by name/username' })
+  searchPlayers(@Query('q') q: string, @Query('city') city?: string) {
+    return this.usersService.searchPlayers(q, city);
+  }
+
+  @Get('leaderboard')
+  @ApiOperation({ summary: 'Player leaderboard by games attended' })
+  getLeaderboard(@Query('city') city?: string) {
+    return this.ranking.getLeaderboard(city);
+  }
+
+  @Get('match/:matchId/players')
+  @ApiOperation({ summary: 'Players in a match (with level/games)' })
+  getMatchPlayers(@Param('matchId') matchId: string) {
+    return this.usersService.getMatchPlayers(matchId);
+  }
 
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })
@@ -94,6 +116,12 @@ export class UsersController {
   @ApiOperation({ summary: 'Get public user profile' })
   getPublicProfile(@Param('id') id: string) {
     return this.usersService.getPublicProfile(id);
+  }
+
+  @Get(':id/ranking')
+  @ApiOperation({ summary: 'User ranking + level progress' })
+  getUserRanking(@Param('id') id: string) {
+    return this.ranking.getUserRanking(id);
   }
 
   @Post('me/referral')

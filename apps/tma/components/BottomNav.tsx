@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, PlusCircle, User } from "lucide-react";
+import { Home, Search, Trophy, User } from "lucide-react";
 import { hapticImpact } from "@/lib/telegram";
 
 const ITEMS = [
   { href: "/", label: "Games", icon: Home },
-  { href: "/create", label: "Host", icon: PlusCircle },
+  { href: "/players", label: "Players", icon: Search },
+  { href: "/leaderboard", label: "Ranks", icon: Trophy },
   { href: "/profile", label: "Profile", icon: User },
 ];
 

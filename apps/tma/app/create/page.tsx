@@ -16,8 +16,13 @@ import {
   showAlert,
 } from "@/lib/telegram";
 
-const FORMATS = ["5v5", "6v6", "7v7", "8v8", "11v11"];
+const FORMATS = ["1v1", "2v2"]; // padel: singles / doubles
+const FORMAT_LABELS: Record<string, string> = { "1v1": "Singles (1v1)", "2v2": "Doubles (2v2)" };
 const DURATIONS = [60, 90, 120];
+const capForFormat = (f: string) => {
+  const m = f.match(/^(\d+)v(\d+)$/);
+  return m ? parseInt(m[1], 10) + parseInt(m[2], 10) : 4;
+};
 
 type BookingType = "OPEN_EVENT" | "GROUP_BOOKING" | "FULL_BOOKING";
 
@@ -81,11 +86,11 @@ export default function CreateMatchPage() {
   const [form, setForm] = useState<Form>({
     bookingType: "OPEN_EVENT",
     pitchId: "",
-    format: "7v7",
+    format: "2v2",
     date: dayjs().add(1, "day").format("YYYY-MM-DD"),
     time: "19:00",
     durationMinutes: 60,
-    maxPlayers: 14,
+    maxPlayers: 4,
     pricePerPlayer: 50000,
     organizerPlayerCount: 3,
     extraSpotsAvailable: 4,
@@ -310,10 +315,13 @@ export default function CreateMatchPage() {
               <div className="flex flex-wrap gap-2">
                 {FORMATS.map((f) => (
                   <Chip key={f} active={form.format === f} onClick={() => pickFormat(f)}>
-                    {f}
+                    {FORMAT_LABELS[f] ?? f}
                   </Chip>
                 ))}
               </div>
+              <p className="text-xs mt-2" style={{ color: "var(--tg-hint)" }}>
+                A {form.format} padel match is capped at {capForFormat(form.format)} players.
+              </p>
             </Field>
           )}
 
@@ -328,8 +336,10 @@ export default function CreateMatchPage() {
                   ))}
                 </div>
               </Field>
-              <Field label="Max players">
-                <Stepper value={form.maxPlayers} min={2} max={30} onChange={(v) => set("maxPlayers", v)} />
+              <Field label="Players">
+                <div className="rounded-2xl p-3 text-sm" style={{ background: "var(--tg-card)" }}>
+                  Fixed by format: <span className="font-bold text-[#00C853]">{form.maxPlayers} players</span>
+                </div>
               </Field>
               <Field label="Price per player (UZS)">
                 <input

@@ -89,6 +89,17 @@ export class QueryMatchesDto {
   @Type(() => Boolean)
   isIndoor?: boolean;
 
+  @ApiPropertyOptional({ description: 'Padel court type: PANORAMIC | CLASSIC | SINGLE' })
+  @IsOptional()
+  @IsString()
+  courtType?: string;
+
+  @ApiPropertyOptional({ description: 'Only covered/indoor padel courts' })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  isCovered?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber()

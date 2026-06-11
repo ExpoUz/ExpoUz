@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { RankingService } from '../ranking/ranking.service';
 import { v2 as cloudinary } from 'cloudinary';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private ranking: RankingService,
+  ) {
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
@@ -180,6 +184,10 @@ export class UsersService {
         reliabilityScore: true,
         skillLevel: true,
         city: true,
+        district: true,
+        gamesAttended: true,
+        gamesThisMonth: true,
+        playerLevel: true,
         createdAt: true,
         preferredPositions: true,
         _count: {
@@ -217,9 +225,65 @@ export class UsersService {
 
     return {
       ...user,
+      levelInfo: this.ranking.getLevelInfo(user.playerLevel),
       ratings: { thumbsUp, thumbsDown },
       recentMatches,
     };
+  }
+
+  async searchPlayers(query: string, city?: string) {
+    if (!query || query.trim().length < 2) return [];
+    return this.prisma.user.findMany({
+      where: {
+        role: 'PLAYER',
+        isBanned: false,
+        ...(city ? { city } : {}),
+        OR: [
+          { firstName: { contains: query, mode: 'insensitive' } },
+          { lastName: { contains: query, mode: 'insensitive' } },
+          { telegramUsername: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        gamesAttended: true,
+        playerLevel: true,
+        eloRating: true,
+        city: true,
+        district: true,
+      },
+      orderBy: { gamesAttended: 'desc' },
+      take: 30,
+    });
+  }
+
+  async getMatchPlayers(matchId: string) {
+    const bookings = await this.prisma.booking.findMany({
+      where: { matchId, status: { in: ['CONFIRMED', 'COMPLETED'] } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            gamesAttended: true,
+            playerLevel: true,
+            eloRating: true,
+          },
+        },
+        positionTaken: { select: { position: true } },
+      },
+    });
+    return bookings.map((b) => ({
+      ...b.user,
+      position: b.positionTaken?.position ?? null,
+      teamSide: b.teamSide,
+      checkedIn: b.checkedIn,
+    }));
   }
 
   async applyReferral(userId: string, code: string) {
