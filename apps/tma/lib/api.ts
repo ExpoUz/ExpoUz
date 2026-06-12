@@ -19,19 +19,28 @@ api.interceptors.response.use(
   (r) => r,
   async (err) => {
     const original = err.config;
-    if (err.response?.status === 401 && !original._retry) {
+    // Never try to refresh the refresh call itself — and use a bare axios
+    // instance for it. Refreshing through `api` re-enters this interceptor on
+    // failure and recurses forever (infinite "Signing you in…" spinner).
+    const isRefreshCall = original?.url?.includes("/auth/refresh");
+    if (err.response?.status === 401 && !original._retry && !isRefreshCall) {
       original._retry = true;
-      try {
-        const refresh = localStorage.getItem("tma_refresh_token");
-        if (refresh) {
-          const { data } = await api.post("/auth/refresh", { refreshToken: refresh });
+      const refresh = localStorage.getItem("tma_refresh_token");
+      if (refresh) {
+        try {
+          const { data } = await axios.post(`${API_BASE}/auth/refresh`, {
+            refreshToken: refresh,
+          });
           localStorage.setItem("tma_access_token", data.accessToken);
           if (data.refreshToken) localStorage.setItem("tma_refresh_token", data.refreshToken);
           original.headers.Authorization = `Bearer ${data.accessToken}`;
           return api(original);
+        } catch {
+          // Session is dead — clear it so the auth provider can re-login
+          // via Telegram initData instead of looping.
+          localStorage.removeItem("tma_access_token");
+          localStorage.removeItem("tma_refresh_token");
         }
-      } catch {
-        /* fall through */
       }
     }
     return Promise.reject(err);
@@ -73,6 +82,55 @@ export async function leaveMatch(id: string) {
 export async function createMatch(body: any) {
   const { data } = await api.post("/matches", body);
   return data;
+}
+
+// ─── Match results & scoring ──────────────────────────────────
+export async function getMatchResult(id: string) {
+  const { data } = await api.get(`/matches/${id}/result`);
+  return data;
+}
+
+export async function submitMatchResult(
+  id: string,
+  body: {
+    team1Set1: number; team2Set1: number;
+    team1Set2: number; team2Set2: number;
+    team1Set3?: number; team2Set3?: number;
+  },
+) {
+  const { data } = await api.post(`/matches/${id}/result`, body);
+  return data;
+}
+
+export async function confirmMatchResult(id: string) {
+  const { data } = await api.post(`/matches/${id}/result/confirm`);
+  return data;
+}
+
+export async function disputeMatchResult(id: string) {
+  const { data } = await api.post(`/matches/${id}/result/dispute`);
+  return data;
+}
+
+// ─── Skill rating: onboarding, statistics, history ────────────
+export async function submitOnboarding(answers: {
+  experience: "never" | "few_times" | "months" | "years";
+  otherRacketSports: boolean;
+  selfAssessment: number;
+  competitivePlay: boolean;
+}) {
+  const { data } = await api.post("/level/onboarding", answers);
+  return data;
+}
+
+export async function getStatistics(id: string) {
+  const { data } = await api.get(`/users/${id}/statistics`);
+  return data;
+}
+
+export async function getLevelHistory(id: string): Promise<any[]> {
+  const { data } = await api.get(`/level/${id}/history`);
+  return Array.isArray(data) ? data : [];
 }
 
 // ─── Booking types / invites / pricing ────────────────────────
@@ -160,6 +218,28 @@ export async function getLeaderboard(city?: string): Promise<any[]> {
 export async function getMatchPlayers(matchId: string): Promise<any[]> {
   const { data } = await api.get(`/users/match/${matchId}/players`);
   return Array.isArray(data) ? data : [];
+}
+
+// Skill-rating band metadata (mirrors API LevelService.getLevelBand)
+export interface SkillBand {
+  label: string;
+  color: string;
+  range: string;
+}
+
+export function getSkillBand(level: number): SkillBand {
+  if (level < 1.0) return { label: "Initiation", color: "#9CA3AF", range: "0.0–1.0" };
+  if (level < 1.5) return { label: "Beginner", color: "#34D399", range: "1.0–1.5" };
+  if (level < 2.5) return { label: "Improver", color: "#10B981", range: "1.5–2.5" };
+  if (level < 3.5) return { label: "Intermediate", color: "#00B0FF", range: "2.5–3.5" };
+  if (level < 4.5) return { label: "Advanced Intermediate", color: "#8B5CF6", range: "3.5–4.5" };
+  if (level < 5.5) return { label: "Advanced", color: "#F59E0B", range: "4.5–5.5" };
+  if (level < 6.0) return { label: "Competitive", color: "#EF4444", range: "5.5–6.0" };
+  return { label: "Pro", color: "#FFD700", range: "6.0–7.0" };
+}
+
+export function formatLevel(level: number | null | undefined): string {
+  return Number(level ?? 0).toFixed(2);
 }
 
 // Shared level metadata (mirrors API RankingService)
