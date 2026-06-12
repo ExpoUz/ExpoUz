@@ -56,8 +56,11 @@ const BOOKING_TYPES: {
   },
 ];
 
+type MatchType = "COMPETITIVE" | "CASUAL";
+
 interface Form {
   bookingType: BookingType;
+  matchType: MatchType;
   pitchId: string;
   format: string;
   date: string;
@@ -85,6 +88,7 @@ export default function CreateMatchPage() {
 
   const [form, setForm] = useState<Form>({
     bookingType: "OPEN_EVENT",
+    matchType: "COMPETITIVE",
     pitchId: "",
     format: "2v2",
     date: dayjs().add(1, "day").format("YYYY-MM-DD"),
@@ -159,6 +163,9 @@ export default function CreateMatchPage() {
         startTime,
         durationMinutes: form.durationMinutes,
       };
+      if (form.bookingType !== "FULL_BOOKING") {
+        base.matchType = form.matchType;
+      }
       if (form.bookingType === "OPEN_EVENT") {
         base.maxPlayers = form.maxPlayers;
         base.pricePerPlayer = form.pricePerPlayer;
@@ -325,6 +332,32 @@ export default function CreateMatchPage() {
             </Field>
           )}
 
+          {form.bookingType !== "FULL_BOOKING" && (
+            <Field label="Match type">
+              <div className="grid grid-cols-2 gap-2">
+                <MatchTypeButton
+                  active={form.matchType === "COMPETITIVE"}
+                  icon="⚔️"
+                  title="Competitive"
+                  color="#EF4444"
+                  onClick={() => { hapticImpact("light"); set("matchType", "COMPETITIVE"); }}
+                />
+                <MatchTypeButton
+                  active={form.matchType === "CASUAL"}
+                  icon="😎"
+                  title="Casual"
+                  color="#00B0FF"
+                  onClick={() => { hapticImpact("light"); set("matchType", "CASUAL"); }}
+                />
+              </div>
+              <p className="text-xs mt-2" style={{ color: "var(--tg-hint)" }}>
+                {form.matchType === "COMPETITIVE"
+                  ? "Results count toward everyone's level."
+                  : "Just for fun — no level changes."}
+              </p>
+            </Field>
+          )}
+
           {form.bookingType === "OPEN_EVENT" && (
             <>
               <Field label="Duration">
@@ -408,6 +441,9 @@ export default function CreateMatchPage() {
             <ReviewRow label="Pitch" value={selectedPitch?.name ?? "—"} />
             <ReviewRow label="When" value={dayjs(`${form.date}T${form.time}`).format("ddd, MMM D · HH:mm")} />
             {form.bookingType !== "FULL_BOOKING" && <ReviewRow label="Format" value={form.format} />}
+            {form.bookingType !== "FULL_BOOKING" && (
+              <ReviewRow label="Match type" value={form.matchType === "CASUAL" ? "😎 Casual" : "⚔️ Competitive"} />
+            )}
             {form.bookingType === "OPEN_EVENT" && <ReviewRow label="Max players" value={String(form.maxPlayers)} />}
             {form.bookingType === "GROUP_BOOKING" && (
               <>
@@ -492,6 +528,33 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       }}
     >
       {children}
+    </button>
+  );
+}
+
+function MatchTypeButton({
+  active,
+  icon,
+  title,
+  color,
+  onClick,
+}: {
+  active: boolean;
+  icon: string;
+  title: string;
+  color: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center gap-1 rounded-2xl p-3 border-2 transition-colors"
+      style={{ background: "var(--tg-card)", borderColor: active ? color : "transparent" }}
+    >
+      <span className="text-2xl">{icon}</span>
+      <span className="text-sm font-semibold" style={{ color: active ? color : "var(--tg-text)" }}>
+        {title}
+      </span>
     </button>
   );
 }

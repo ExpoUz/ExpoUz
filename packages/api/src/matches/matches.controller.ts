@@ -14,6 +14,7 @@ import { MatchesService } from './matches.service';
 import { CreateMatchDto } from './dto/create-match.dto';
 import { QueryMatchesDto } from './dto/query-matches.dto';
 import { RatePlayerDto } from './dto/rate-player.dto';
+import { SubmitResultDto } from './dto/submit-result.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -181,5 +182,39 @@ export class MatchesController {
     @Body('ratings') ratings: RatePlayerDto[],
   ) {
     return this.matchesService.ratePlayers(id, user.id, ratings);
+  }
+
+  @Get(':id/result')
+  @ApiOperation({ summary: 'Get the submitted result for a match' })
+  getResult(@Param('id') id: string) {
+    return this.matchesService.getResult(id);
+  }
+
+  @Post(':id/result')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Submit a match result (set scores)' })
+  submitResult(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: SubmitResultDto,
+  ) {
+    return this.matchesService.submitResult(id, user.id, dto);
+  }
+
+  @Post(':id/result/confirm')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Confirm a submitted result' })
+  confirmResult(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.matchesService.confirmResult(id, user.id);
+  }
+
+  @Post(':id/result/dispute')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Dispute a submitted result' })
+  disputeResult(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.matchesService.disputeResult(id, user.id);
   }
 }

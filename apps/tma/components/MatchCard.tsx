@@ -2,14 +2,34 @@
 
 import Link from "next/link";
 import dayjs from "dayjs";
-import { MapPin, Users, Clock } from "lucide-react";
-import { formatUZS } from "@/lib/api";
+import { MapPin, Clock } from "lucide-react";
+import { formatUZS, getSkillBand, formatLevel } from "@/lib/api";
 import { hapticImpact } from "@/lib/telegram";
 
+interface SlotPlayer {
+  id: string;
+  firstName?: string;
+  avatarUrl?: string | null;
+  skillRating?: number;
+}
+
 export function MatchCard({ match }: { match: any }) {
-  const spotsLeft = Math.max(0, (match.maxPlayers ?? 0) - (match.currentPlayers ?? match._count?.bookings ?? 0));
+  const maxPlayers = match.maxPlayers ?? 0;
+  const players: SlotPlayer[] = (match.bookings ?? [])
+    .map((b: any) => b.user)
+    .filter(Boolean);
+  const filled = match.currentPlayers ?? match._count?.bookings ?? players.length;
+  const spotsLeft = Math.max(0, maxPlayers - filled);
   const isFull = spotsLeft === 0;
-  const photo = match.pitch?.photos?.[0];
+  const isCompetitive = match.matchType !== "CASUAL";
+  const hasRange = match.minLevel != null || match.maxLevel != null;
+
+  // Build avatar slots: real players first, then "available" placeholders.
+  const emptySlots = Math.max(0, maxPlayers - players.length);
+  const slots: (SlotPlayer | null)[] = [
+    ...players.slice(0, maxPlayers),
+    ...Array(emptySlots).fill(null),
+  ].slice(0, Math.max(maxPlayers, 4));
 
   return (
     <Link
@@ -18,24 +38,13 @@ export function MatchCard({ match }: { match: any }) {
       className="block rounded-2xl overflow-hidden shadow-sm active:scale-[0.99] transition-transform"
       style={{ background: "var(--tg-card)" }}
     >
-      <div className="h-28 bg-[#0D1117] relative">
-        {photo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo} alt={match.pitch?.name ?? ""} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-4xl">🏟</div>
-        )}
-        <div className="absolute top-2 left-2 flex gap-1.5">
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-black/55 text-white backdrop-blur">
-            {match.format}
-          </span>
-          {match.sport && match.sport !== "FOOTBALL" && (
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-black/55 text-white backdrop-blur">
-              {match.sport}
-            </span>
-          )}
-        </div>
-        <div className="absolute top-2 right-2">
+      <div className="p-3.5">
+        {/* Top row: date/time + status */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: "var(--tg-hint)" }}>
+            <Clock size={13} />
+            {dayjs(match.startTime).format("ddd, MMM D · HH:mm")}
+          </div>
           <span
             className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
               isFull ? "bg-[#FF5252] text-white" : "bg-[#00C853] text-white"
@@ -44,29 +53,92 @@ export function MatchCard({ match }: { match: any }) {
             {isFull ? "Full" : `${spotsLeft} left`}
           </span>
         </div>
-      </div>
 
-      <div className="p-3">
-        <div className="font-semibold text-[15px] leading-tight truncate">
-          {match.pitch?.name ?? "Pitch"}
-        </div>
-        <div className="flex items-center gap-1 text-xs mt-1" style={{ color: "var(--tg-hint)" }}>
-          <MapPin size={12} />
-          <span className="truncate">{match.pitch?.district ?? match.pitch?.city ?? "Tashkent"}</span>
+        {/* Match type + level range */}
+        <div className="flex items-center gap-2 mt-2">
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold"
+            style={{
+              background: isCompetitive ? "rgba(239,68,68,0.12)" : "rgba(0,176,255,0.12)",
+              color: isCompetitive ? "#EF4444" : "#00B0FF",
+            }}
+          >
+            {isCompetitive ? "⚔️ Competitive" : "😎 Casual"}
+          </span>
+          {hasRange && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: "var(--tg-hint)" }}>
+              🎾 {formatLevel(match.minLevel ?? 0)} – {formatLevel(match.maxLevel ?? 7)}
+            </span>
+          )}
+          <span className="ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full bg-black/5">
+            {match.format}
+          </span>
         </div>
 
-        <div className="flex items-center justify-between mt-2.5">
-          <div className="flex items-center gap-3 text-xs" style={{ color: "var(--tg-hint)" }}>
-            <span className="flex items-center gap-1">
-              <Clock size={12} /> {dayjs(match.startTime).format("ddd HH:mm")}
-            </span>
-            <span className="flex items-center gap-1">
-              <Users size={12} /> {match.currentPlayers ?? match._count?.bookings ?? 0}/{match.maxPlayers}
-            </span>
+        {/* Player slots */}
+        <div className="flex items-center gap-2 mt-3">
+          {slots.map((p, i) => (
+            <PlayerSlot key={p?.id ?? `empty-${i}`} player={p} />
+          ))}
+        </div>
+
+        {/* Footer: pitch · duration · price */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t" style={{ borderColor: "rgba(0,0,0,0.06)" }}>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1 text-xs font-medium truncate">
+              <MapPin size={12} className="shrink-0" />
+              <span className="truncate">{match.pitch?.name ?? "Pitch"}</span>
+            </div>
+            <div className="text-[11px] mt-0.5" style={{ color: "var(--tg-hint)" }}>
+              {match.pitch?.district ?? match.pitch?.city ?? "Tashkent"} · {match.durationMinutes ?? 60} min
+            </div>
           </div>
-          <span className="text-sm font-bold text-[#00C853]">{formatUZS(match.pricePerPlayer)}</span>
+          <span className="text-sm font-bold text-[#00C853] shrink-0">{formatUZS(match.pricePerPlayer)}</span>
         </div>
       </div>
     </Link>
+  );
+}
+
+function PlayerSlot({ player }: { player: SlotPlayer | null }) {
+  if (!player) {
+    return (
+      <div className="flex flex-col items-center gap-1 w-12">
+        <div
+          className="w-10 h-10 rounded-full border-2 border-dashed flex items-center justify-center text-lg"
+          style={{ borderColor: "rgba(0,0,0,0.15)", color: "var(--tg-hint)" }}
+        >
+          +
+        </div>
+        <span className="text-[9px]" style={{ color: "var(--tg-hint)" }}>
+          Open
+        </span>
+      </div>
+    );
+  }
+  const band = getSkillBand(Number(player.skillRating ?? 0));
+  const initial = (player.firstName?.[0] ?? "?").toUpperCase();
+  return (
+    <div className="flex flex-col items-center gap-1 w-12">
+      <div className="relative">
+        <div className="w-10 h-10 rounded-full bg-[#00C853]/15 text-[#00875A] flex items-center justify-center text-sm font-bold overflow-hidden">
+          {player.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={player.avatarUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            initial
+          )}
+        </div>
+        <span
+          className="absolute -bottom-1 -right-1 text-[8px] font-bold text-white rounded px-1 leading-tight"
+          style={{ background: band.color }}
+        >
+          {formatLevel(player.skillRating)}
+        </span>
+      </div>
+      <span className="text-[9px] truncate max-w-full" style={{ color: "var(--tg-hint)" }}>
+        {player.firstName ?? "Player"}
+      </span>
+    </div>
   );
 }

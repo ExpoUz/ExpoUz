@@ -17,6 +17,8 @@ import { ActivityService } from '../activity/activity.service';
 import { RemindersService } from '../reminders/reminders.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RankingService } from '../ranking/ranking.service';
+import { LevelService } from '../level/level.service';
+import { SubmitResultDto } from './dto/submit-result.dto';
 import { BookingType } from '@prisma/client';
 import { randomBytes } from 'crypto';
 
@@ -31,6 +33,7 @@ export class MatchesService {
     private reminders: RemindersService,
     private notifications: NotificationsService,
     private ranking: RankingService,
+    private level: LevelService,
   ) {}
 
   private generateShareCode(): string {
@@ -81,6 +84,7 @@ export class MatchesService {
     if (sport) where.sport = sport;
     if (format) where.format = format;
     if (skillLevel) where.skillFilter = skillLevel;
+    if (query.matchType) where.matchType = query.matchType;
     if (maxPrice) where.pricePerPlayer = { lte: maxPrice };
     if (city) where.pitch = { ...where.pitch, city };
     if (district) where.pitch = { ...where.pitch, district };
@@ -138,6 +142,15 @@ export class MatchesService {
           },
           host: {
             select: { id: true, firstName: true, lastName: true, avatarUrl: true },
+          },
+          bookings: {
+            where: { status: { in: ['CONFIRMED', 'COMPLETED', 'PENDING_PAYMENT'] } },
+            select: {
+              teamSide: true,
+              user: {
+                select: { id: true, firstName: true, avatarUrl: true, skillRating: true },
+              },
+            },
           },
           _count: { select: { bookings: true } },
         },
@@ -318,6 +331,9 @@ export class MatchesService {
         description: dto.description,
         formation: dto.formation,
         cancellationDeadlineHours: dto.cancellationDeadlineHours || 5,
+        matchType: dto.matchType || 'COMPETITIVE',
+        minLevel: dto.minLevel ?? null,
+        maxLevel: dto.maxLevel ?? null,
         shareCode,
         telegramShareLink,
         // status left at default OPEN — the codebase treats OPEN as the live,
@@ -897,5 +913,112 @@ export class MatchesService {
     }
 
     return { message: 'Ratings submitted successfully' };
+  }
+
+  // ─── MATCH RESULTS & SCORING ──────────────────────────────────────────────
+  private determineWinner(dto: SubmitResultDto): number {
+    let team1Sets = 0;
+    let team2Sets = 0;
+    const sets: [number | undefined, number | undefined][] = [
+      [dto.team1Set1, dto.team2Set1],
+      [dto.team1Set2, dto.team2Set2],
+      [dto.team1Set3, dto.team2Set3],
+    ];
+    for (const [a, b] of sets) {
+      if (a == null || b == null) continue;
+      if (a > b) team1Sets++;
+      else if (b > a) team2Sets++;
+    }
+    return team1Sets >= team2Sets ? 1 : 2;
+  }
+
+  async getResult(matchId: string) {
+    return this.prisma.matchResult.findUnique({
+      where: { matchId },
+      include: {
+        players: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      },
+    });
+  }
+
+  async submitResult(matchId: string, userId: string, dto: SubmitResultDto) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      include: { result: true },
+    });
+    if (!match) throw new NotFoundException('Match not found');
+    if (match.result) {
+      throw new ConflictException('A result has already been submitted for this match');
+    }
+
+    // Verify the submitter actually played in this match.
+    const participants = await this.prisma.booking.findMany({
+      where: { matchId, status: { in: ['CONFIRMED', 'COMPLETED'] } },
+      select: { userId: true },
+    });
+    const playerIds = participants.map((p) => p.userId);
+    if (!playerIds.includes(userId)) {
+      throw new ForbiddenException('Only players in this match can submit a result');
+    }
+
+    const result = await this.prisma.matchResult.create({
+      data: {
+        matchId,
+        team1Set1: dto.team1Set1,
+        team2Set1: dto.team2Set1,
+        team1Set2: dto.team1Set2,
+        team2Set2: dto.team2Set2,
+        team1Set3: dto.team1Set3 ?? null,
+        team2Set3: dto.team2Set3 ?? null,
+        winningTeam: this.determineWinner(dto),
+        submittedById: userId,
+        confirmedBy: [userId],
+        players: { connect: playerIds.map((id) => ({ id })) },
+      },
+    });
+
+    // Ask the other players to confirm the score.
+    for (const pid of playerIds) {
+      if (pid === userId) continue;
+      await this.notifications
+        .send(pid, 'MATCH_CONFIRMED' as any, matchId, { matchTitle: match.title })
+        .catch(() => {});
+    }
+
+    return result;
+  }
+
+  async confirmResult(matchId: string, userId: string) {
+    const result = await this.prisma.matchResult.findUnique({ where: { matchId } });
+    if (!result) throw new NotFoundException('No result submitted for this match');
+    if (result.isConfirmed) return result;
+
+    const confirmedBy = [...new Set([...result.confirmedBy, userId])];
+    const updated = await this.prisma.matchResult.update({
+      where: { matchId },
+      data: { confirmedBy, isConfirmed: confirmedBy.length >= 2, isDisputed: false },
+    });
+
+    // Once confirmed by at least two players → run the rating algorithm.
+    if (updated.isConfirmed) {
+      await this.prisma.match.update({
+        where: { id: matchId },
+        data: { resultSubmitted: true, status: 'COMPLETED' },
+      });
+      await this.level.processMatchResult(matchId);
+    }
+    return updated;
+  }
+
+  async disputeResult(matchId: string, userId: string) {
+    const result = await this.prisma.matchResult.findUnique({ where: { matchId } });
+    if (!result) throw new NotFoundException('No result submitted for this match');
+    if (result.isConfirmed) {
+      throw new ConflictException('This result is already confirmed and cannot be disputed');
+    }
+    return this.prisma.matchResult.update({
+      where: { matchId },
+      data: { isDisputed: true },
+    });
   }
 }

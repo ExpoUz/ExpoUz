@@ -24,6 +24,7 @@ export default function HomePage() {
   const [date, setDate] = useState("");
   const [timeOfDay, setTimeOfDay] = useState("");
   const [spotsOnly, setSpotsOnly] = useState(false);
+  const [matchType, setMatchType] = useState(""); // "" | COMPETITIVE | CASUAL
 
   const [cityOpen, setCityOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
@@ -31,7 +32,7 @@ export default function HomePage() {
   const { data: cities } = useQuery({ queryKey: ["cities"], queryFn: getCities });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["tma-matches", city, district, date, timeOfDay, spotsOnly],
+    queryKey: ["tma-matches", city, district, date, timeOfDay, spotsOnly, matchType],
     queryFn: () =>
       getMatches({
         sport: "PADEL",
@@ -40,6 +41,7 @@ export default function HomePage() {
         ...(date ? { date: dayjs(date).toISOString() } : {}),
         ...(timeOfDay ? { timeOfDay } : {}),
         ...(spotsOnly ? { minSpotsAvailable: 1 } : {}),
+        ...(matchType ? { matchType } : {}),
       }),
   });
 
@@ -102,6 +104,24 @@ export default function HomePage() {
             <span>{TIMES.find((t) => t.key === timeOfDay)?.label ?? "Time"}</span>
           </button>
           <button
+            className={`pill ${matchType === "COMPETITIVE" ? "pill-active" : ""}`}
+            onClick={() => {
+              hapticImpact("light");
+              setMatchType((v) => (v === "COMPETITIVE" ? "" : "COMPETITIVE"));
+            }}
+          >
+            <span>⚔️ Competitive</span>
+          </button>
+          <button
+            className={`pill ${matchType === "CASUAL" ? "pill-active" : ""}`}
+            onClick={() => {
+              hapticImpact("light");
+              setMatchType((v) => (v === "CASUAL" ? "" : "CASUAL"));
+            }}
+          >
+            <span>😎 Casual</span>
+          </button>
+          <button
             className={`pill ${spotsOnly ? "pill-active" : ""}`}
             onClick={() => {
               hapticImpact("light");
@@ -110,7 +130,7 @@ export default function HomePage() {
           >
             <span>Spots available</span>
           </button>
-          {(date || timeOfDay || spotsOnly || district) && (
+          {(date || timeOfDay || spotsOnly || district || matchType) && (
             <button
               className="pill"
               onClick={() => {
@@ -118,6 +138,7 @@ export default function HomePage() {
                 setTimeOfDay("");
                 setSpotsOnly(false);
                 setDistrict("");
+                setMatchType("");
               }}
             >
               ✕ Clear

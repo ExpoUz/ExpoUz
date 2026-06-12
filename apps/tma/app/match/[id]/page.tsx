@@ -148,6 +148,12 @@ export default function MatchDetailPage() {
               </span>
             )}
             <span
+              className="px-2 py-0.5 rounded-full text-[11px] font-bold text-white"
+              style={{ background: match.matchType === "CASUAL" ? "#00B0FF" : "#EF4444" }}
+            >
+              {match.matchType === "CASUAL" ? "😎 Casual" : "⚔️ Competitive"}
+            </span>
+            <span
               className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
                 isFull ? "bg-[#FF5252]" : "bg-[#00C853]"
               }`}
@@ -314,6 +320,29 @@ export default function MatchDetailPage() {
             ))}
           </div>
         </div>
+
+        {/* Result entry — available once the match has started */}
+        {hoursUntilMatch <= 0 && (joined || isHost) && (
+          <Link
+            href={`/match/${id}/result`}
+            onClick={() => hapticImpact("light")}
+            className="rounded-2xl p-4 flex items-center gap-3"
+            style={{ background: "var(--tg-card)" }}
+          >
+            <div className="text-2xl">🏆</div>
+            <div className="flex-1">
+              <div className="font-semibold text-sm">
+                {match.resultSubmitted ? "View match result" : "Submit match result"}
+              </div>
+              <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
+                {match.matchType === "CASUAL"
+                  ? "Record the score (casual — no level change)"
+                  : "Record the score — confirmed results update everyone's level"}
+              </div>
+            </div>
+            <ChevronRight size={18} style={{ color: "var(--tg-hint)" }} />
+          </Link>
+        )}
 
         {joined && (
           <div className="rounded-2xl p-3 text-center text-sm font-medium text-[#00875A] bg-[#00C853]/10">

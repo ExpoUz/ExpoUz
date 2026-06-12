@@ -8,6 +8,7 @@ import {
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { MatchType } from '@prisma/client';
 
 export enum TimeOfDay {
   MORNING = 'MORNING',
@@ -82,6 +83,11 @@ export class QueryMatchesDto {
   @IsOptional()
   @IsEnum(SkillLevel)
   skillLevel?: SkillLevel;
+
+  @ApiPropertyOptional({ description: 'Filter by CASUAL or COMPETITIVE' })
+  @IsOptional()
+  @IsEnum(MatchType)
+  matchType?: MatchType;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -124,6 +124,12 @@ export class UsersController {
     return this.ranking.getUserRanking(id);
   }
 
+  @Get(':id/statistics')
+  @ApiOperation({ summary: 'Full player statistics (skill rating, streaks, history, social)' })
+  getStatistics(@Param('id') id: string) {
+    return this.usersService.getStatistics(id);
+  }
+
   @Post('me/referral')
   @ApiOperation({ summary: 'Apply referral code' })
   applyReferral(@CurrentUser() user: any, @Body('code') code: string) {

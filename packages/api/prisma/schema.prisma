@@ -9,58 +9,104 @@ datasource db {
 
 // ============ USER & AUTH ============
 model User {
-  id               String     @id @default(cuid())
-  phone            String?    @unique
-  email            String?    @unique
-  googleId         String?    @unique
+  id               String      @id @default(cuid())
+  phone            String?     @unique
+  email            String?     @unique
+  googleId         String?     @unique
   firstName        String
   lastName         String
   avatarUrl        String?
   dateOfBirth      DateTime?
-  gender           Gender     @default(MALE)
+  gender           Gender      @default(MALE)
   bio              String?
-  reliabilityScore Float      @default(100.0)
-  eloRating        Int        @default(1000)
-  skillLevel       SkillLevel @default(AMATEUR)
-  gamesAttended    Int        @default(0)
-  gamesThisMonth   Int        @default(0)
-  winCount         Int        @default(0)
+  reliabilityScore Float       @default(100.0)
+  eloRating        Int         @default(1000)
+  skillLevel       SkillLevel  @default(AMATEUR)
+  gamesAttended    Int         @default(0)
+  gamesThisMonth   Int         @default(0)
+  winCount         Int         @default(0)
   playerLevel      PlayerLevel @default(NEW)
-  role             UserRole   @default(PLAYER)
-  city             String     @default("Tashkent")
+
+  // ---- Skill rating (ELO-style 0.0–7.0 ladder) ----
+  skillRating        Float          @default(0.0) // 0.0 to 7.0, dynamic skill rating
+  levelReliability   Int            @default(0) // 0-100%, confidence in the rating
+  initialLevelSet    Boolean        @default(false) // completed onboarding questionnaire
+  matchesPlayed      Int            @default(0)
+  matchesWon         Int            @default(0)
+  matchesLost        Int            @default(0)
+  currentStreak      Int            @default(0) // + = win streak, - = loss streak
+  longestWinStreak   Int            @default(0)
+  bestHand           BestHand?      @default(RIGHT)
+  courtPosition      CourtPosition? @default(BOTH)
+  preferredMatchType MatchType?     @default(COMPETITIVE)
+
+  role             UserRole  @default(PLAYER)
+  city             String    @default("Tashkent")
   district         String?
-  isVerified       Boolean    @default(false)
-  telegramId       String?    @unique
+  isVerified       Boolean   @default(false)
+  telegramId       String?   @unique
   telegramUsername String?
-  credit           Decimal    @default(0) @db.Decimal(12, 2)
-  referralCode     String     @unique @default(cuid())
+  credit           Decimal   @default(0) @db.Decimal(12, 2)
+  referralCode     String    @unique @default(cuid())
   referredBy       String?
-  notifPush        Boolean    @default(true)
-  notifSms         Boolean    @default(true)
-  notifTelegram    Boolean    @default(true)
-  isBanned         Boolean    @default(false)
+  notifPush        Boolean   @default(true)
+  notifSms         Boolean   @default(true)
+  notifTelegram    Boolean   @default(true)
+  isBanned         Boolean   @default(false)
   bannedAt         DateTime?
   bannedReason     String?
   deletedAt        DateTime?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  hostMatches        Match[]              @relation("HostMatches")
-  organizedMatches   Match[]              @relation("OrganizerMatches")
-  bookings           Booking[]
-  transactions       Transaction[]
-  ratingsGiven       PlayerRating[]       @relation("RatingsGiven")
-  ratingsReceived    PlayerRating[]       @relation("RatingsReceived")
-  ownedPitches       Pitch[]              @relation("PitchOwner")
-  messages           Message[]
-  notifications      Notification[]
-  preferredPositions UserPosition[]
-  conversationMemberships ConversationMember[]
-  refreshTokens      RefreshToken[]
-  pitchBookings      PitchBooking[]       @relation("PitchBookingHost")
+  hostMatches                Match[]                   @relation("HostMatches")
+  organizedMatches           Match[]                   @relation("OrganizerMatches")
+  bookings                   Booking[]
+  transactions               Transaction[]
+  ratingsGiven               PlayerRating[]            @relation("RatingsGiven")
+  ratingsReceived            PlayerRating[]            @relation("RatingsReceived")
+  ownedPitches               Pitch[]                   @relation("PitchOwner")
+  messages                   Message[]
+  notifications              Notification[]
+  preferredPositions         UserPosition[]
+  conversationMemberships    ConversationMember[]
+  refreshTokens              RefreshToken[]
+  pitchBookings              PitchBooking[]            @relation("PitchBookingHost")
   pitchBookingParticipations PitchBookingParticipant[]
-  activityLogs       ActivityLog[]
-  session            UserSession?
+  activityLogs               ActivityLog[]
+  session                    UserSession?
+  levelHistory               LevelHistory[]
+  matchResults               MatchResult[]             @relation("PlayerResults")
+}
+
+enum BestHand {
+  LEFT
+  RIGHT
+}
+
+enum CourtPosition {
+  FOREHAND
+  BACKHAND
+  BOTH
+}
+
+enum MatchType {
+  CASUAL
+  COMPETITIVE
+}
+
+model LevelHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level       Float
+  reliability Int
+  change      Float // +0.12, -0.08, etc.
+  matchId     String?
+  reason      String // "Won vs higher level", "Lost competitive match", "Initial assessment"
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
 }
 
 enum Gender {
@@ -84,12 +130,12 @@ enum SkillLevel {
 }
 
 enum PlayerLevel {
-  NEW         // 0 games
-  ROOKIE      // 1-5
-  REGULAR     // 6-15
+  NEW // 0 games
+  ROOKIE // 1-5
+  REGULAR // 6-15
   EXPERIENCED // 16-30
-  VETERAN     // 31-60
-  ELITE       // 61+
+  VETERAN // 31-60
+  ELITE // 61+
 }
 
 model RefreshToken {
@@ -108,41 +154,42 @@ model OtpCode {
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
+
   @@index([phone])
 }
 
 // ============ PITCH / STADIUM ============
 model Pitch {
-  id           String      @id @default(cuid())
-  ownerId      String
-  owner        User        @relation("PitchOwner", fields: [ownerId], references: [id])
-  name         String
-  description  String?
-  addressLine  String
-  district     String
-  city         String      @default("Tashkent")
-  lat          Float
-  lng          Float
-  hourlyRate   Decimal     @db.Decimal(12, 2)
-  photos       String[]
-  amenities    Amenity[]
-  surfaceType  SurfaceType @default(ARTIFICIAL)
-  pitchSize    PitchSize   @default(SEVEN_A_SIDE)
-  isIndoor     Boolean     @default(false)
-  isVerified   Boolean     @default(false)
-  isActive     Boolean     @default(true)
-  noMetalStuds Boolean     @default(false)
-  commission   Float       @default(0.10)
+  id              String          @id @default(cuid())
+  ownerId         String
+  owner           User            @relation("PitchOwner", fields: [ownerId], references: [id])
+  name            String
+  description     String?
+  addressLine     String
+  district        String
+  city            String          @default("Tashkent")
+  lat             Float
+  lng             Float
+  hourlyRate      Decimal         @db.Decimal(12, 2)
+  photos          String[]
+  amenities       Amenity[]
+  surfaceType     SurfaceType     @default(ARTIFICIAL)
+  pitchSize       PitchSize       @default(SEVEN_A_SIDE)
+  isIndoor        Boolean         @default(false)
+  isVerified      Boolean         @default(false)
+  isActive        Boolean         @default(true)
+  noMetalStuds    Boolean         @default(false)
+  commission      Float           @default(0.10)
   rejectionReason String?
   // Padel court attributes
-  courtType    PadelCourtType @default(PANORAMIC)
-  isCovered    Boolean        @default(false)
-  locationId   String?
-  location     Location?   @relation(fields: [locationId], references: [id])
-  createdAt    DateTime    @default(now())
-  matches      Match[]
-  followers    PitchFollower[]
-  pitchBookings PitchBooking[]
+  courtType       PadelCourtType  @default(PANORAMIC)
+  isCovered       Boolean         @default(false)
+  locationId      String?
+  location        Location?       @relation(fields: [locationId], references: [id])
+  createdAt       DateTime        @default(now())
+  matches         Match[]
+  followers       PitchFollower[]
+  pitchBookings   PitchBooking[]
 }
 
 enum SurfaceType {
@@ -162,8 +209,8 @@ enum PitchSize {
 
 enum PadelCourtType {
   PANORAMIC // full glass walls
-  CLASSIC   // mixed glass and mesh
-  SINGLE    // narrower singles court
+  CLASSIC // mixed glass and mesh
+  SINGLE // narrower singles court
 }
 
 model Amenity {
@@ -172,6 +219,7 @@ model Amenity {
   pitch   Pitch       @relation(fields: [pitchId], references: [id], onDelete: Cascade)
   type    AmenityType
 }
+
 enum AmenityType {
   BATHROOM
   PARKING
@@ -210,26 +258,56 @@ model Match {
   updatedAt                 DateTime    @updatedAt
 
   // ---- Booking type ----
-  bookingType           BookingType @default(OPEN_EVENT)
+  bookingType          BookingType @default(OPEN_EVENT)
   // Group booking (BookingType.GROUP_BOOKING)
-  organizerPlayerCount  Int?
-  organizerTotalPaid    Decimal?    @db.Decimal(12, 2)
-  extraSpotsAvailable   Int?
+  organizerPlayerCount Int?
+  organizerTotalPaid   Decimal?    @db.Decimal(12, 2)
+  extraSpotsAvailable  Int?
   // Full booking (BookingType.FULL_BOOKING)
-  isPrivate             Boolean     @default(false)
-  fullBookingHours      Int?
-  fullBookingTotalCost  Decimal?    @db.Decimal(12, 2)
+  isPrivate            Boolean     @default(false)
+  fullBookingHours     Int?
+  fullBookingTotalCost Decimal?    @db.Decimal(12, 2)
   // Telegram sharing / invites
-  telegramShareLink     String?
-  shareCode             String?     @unique
+  telegramShareLink    String?
+  shareCode            String?     @unique
   // Organizer (user who created and paid upfront; may differ from host)
-  organizerId           String?
-  organizer             User?       @relation("OrganizerMatches", fields: [organizerId], references: [id])
+  organizerId          String?
+  organizer            User?       @relation("OrganizerMatches", fields: [organizerId], references: [id])
+
+  // ---- Competitive scoring / skill rating ----
+  matchType       MatchType @default(COMPETITIVE) // CASUAL or COMPETITIVE
+  minLevel        Float? // minimum skill rating to join (e.g. 2.0)
+  maxLevel        Float? // maximum skill rating to join (e.g. 3.5)
+  resultSubmitted Boolean   @default(false)
 
   bookings      Booking[]
   positions     MatchPosition[]
   ratings       PlayerRating[]
   notifications Notification[]
+  result        MatchResult?
+}
+
+model MatchResult {
+  id      String @id @default(cuid())
+  matchId String @unique
+  match   Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  // Padel scoring — best of 3 sets
+  team1Set1   Int?
+  team2Set1   Int?
+  team1Set2   Int?
+  team2Set2   Int?
+  team1Set3   Int?
+  team2Set3   Int?
+  winningTeam Int // 1 or 2
+
+  submittedById String
+  confirmedBy   String[] // user IDs who confirmed the score
+  isDisputed    Boolean  @default(false)
+  isConfirmed   Boolean  @default(false)
+
+  players   User[]   @relation("PlayerResults")
+  createdAt DateTime @default(now())
 }
 
 enum Sport {
@@ -301,19 +379,19 @@ model UserPosition {
 
 // ============ BOOKING ============
 model Booking {
-  id            String        @id @default(cuid())
+  id            String         @id @default(cuid())
   userId        String
-  user          User          @relation(fields: [userId], references: [id])
+  user          User           @relation(fields: [userId], references: [id])
   matchId       String
-  match         Match         @relation(fields: [matchId], references: [id])
-  status        BookingStatus @default(PENDING_PAYMENT)
+  match         Match          @relation(fields: [matchId], references: [id])
+  status        BookingStatus  @default(PENDING_PAYMENT)
   teamSide      TeamSide?
   positionTaken MatchPosition?
-  qrCode        String        @unique @default(cuid())
-  checkedIn     Boolean       @default(false)
-  isNoShow      Boolean       @default(false)
+  qrCode        String         @unique @default(cuid())
+  checkedIn     Boolean        @default(false)
+  isNoShow      Boolean        @default(false)
   transaction   Transaction?
-  createdAt     DateTime      @default(now())
+  createdAt     DateTime       @default(now())
 }
 
 enum BookingStatus {
@@ -373,6 +451,7 @@ model PlayerRating {
   thumbsUp  Boolean
   comment   String?
   createdAt DateTime @default(now())
+
   @@unique([matchId, raterId, ratedId])
 }
 
@@ -389,6 +468,7 @@ model Conversation {
   pitchBooking    PitchBooking?        @relation(fields: [pitchBookingId], references: [id])
   createdAt       DateTime             @default(now())
 }
+
 enum ConvType {
   DIRECT
   MATCH_GROUP
@@ -451,49 +531,50 @@ model PitchFollower {
   pitch     Pitch    @relation(fields: [pitchId], references: [id], onDelete: Cascade)
   userId    String
   createdAt DateTime @default(now())
+
   @@id([pitchId, userId])
 }
 
 model AppSettings {
-  id               String  @id @default("singleton")
-  commissionRate   Float   @default(0.10)
-  platformFeeRate  Float   @default(0.05)
-  cancellationFeeRate Float @default(0.50)
-  cancellationWindowHours Int @default(5)
-  updatedAt        DateTime @updatedAt
+  id                      String   @id @default("singleton")
+  commissionRate          Float    @default(0.10)
+  platformFeeRate         Float    @default(0.05)
+  cancellationFeeRate     Float    @default(0.50)
+  cancellationWindowHours Int      @default(5)
+  updatedAt               DateTime @updatedAt
 }
 
 // ============ DIRECT PITCH BOOKING ============
 // Allows booking a pitch for 1+ hours as a group hire or open-join session,
 // independent of a structured match with formations.
 model PitchBooking {
-  id                       String               @id @default(cuid())
-  pitchId                  String
-  pitch                    Pitch                @relation(fields: [pitchId], references: [id])
-  hostId                   String
-  host                     User                 @relation("PitchBookingHost", fields: [hostId], references: [id])
-  title                    String
-  type                     PitchBookingType     @default(GROUP_HIRE)
-  startTime                DateTime
-  durationHours            Int                  @default(1)
-  totalPrice               Decimal              @db.Decimal(12, 2)
-  pricePerParticipant      Decimal?             @db.Decimal(12, 2)
-  maxParticipants          Int?
-  status                   PitchBookingStatus   @default(PENDING_PAYMENT)
-  cancellationDeadlineHours Int                 @default(5)
-  cancellationFeeRate      Float                @default(0.50)
-  notes                    String?
-  telegramTopicId          String?
-  conversation             Conversation?
-  participants             PitchBookingParticipant[]
-  transaction              Transaction?
-  createdAt                DateTime             @default(now())
-  updatedAt                DateTime             @updatedAt
+  id                        String                    @id @default(cuid())
+  pitchId                   String
+  pitch                     Pitch                     @relation(fields: [pitchId], references: [id])
+  hostId                    String
+  host                      User                      @relation("PitchBookingHost", fields: [hostId], references: [id])
+  title                     String
+  type                      PitchBookingType          @default(GROUP_HIRE)
+  startTime                 DateTime
+  durationHours             Int                       @default(1)
+  totalPrice                Decimal                   @db.Decimal(12, 2)
+  pricePerParticipant       Decimal?                  @db.Decimal(12, 2)
+  maxParticipants           Int?
+  status                    PitchBookingStatus        @default(PENDING_PAYMENT)
+  cancellationDeadlineHours Int                       @default(5)
+  cancellationFeeRate       Float                     @default(0.50)
+  notes                     String?
+  telegramTopicId           String?
+  conversation              Conversation?
+  participants              PitchBookingParticipant[]
+  transaction               Transaction?
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
 }
 
 enum PitchBookingType {
-  GROUP_HIRE    // One person books the whole pitch, no individual joining
-  OPEN_JOIN     // Book a pitch, open slots for others to join and share cost
+  GROUP_HIRE // One person books the whole pitch, no individual joining
+  OPEN_JOIN // Book a pitch, open slots for others to join and share cost
 }
 
 enum PitchBookingStatus {
@@ -515,6 +596,7 @@ model PitchBookingParticipant {
   status     ParticipantStatus @default(CONFIRMED)
   paidAmount Decimal?          @db.Decimal(12, 2)
   joinedAt   DateTime          @default(now())
+
   @@unique([bookingId, userId])
 }
 
@@ -527,16 +609,16 @@ enum ParticipantStatus {
 // ============ LOCATION ============
 // Geographic zones used to organise pitches under Super Admin hierarchy
 model Location {
-  id          String   @id @default(cuid())
-  name        String
-  city        String
-  district    String?
-  lat         Float?
-  lng         Float?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  pitches     Pitch[]
+  id        String   @id @default(cuid())
+  name      String
+  city      String
+  district  String?
+  lat       Float?
+  lng       Float?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  pitches   Pitch[]
 }
 
 // ============ ACTIVITY LOG ============
@@ -545,12 +627,12 @@ model ActivityLog {
   id          String            @id @default(cuid())
   userId      String
   user        User              @relation(fields: [userId], references: [id])
-  action      String   // e.g. "BAN_USER", "VERIFY_PITCH", "MATCH_JOINED"
+  action      String // e.g. "BAN_USER", "VERIFY_PITCH", "MATCH_JOINED"
   category    ActivityCategory? // typed classification for user-facing activity feeds
-  description String?           // human-readable summary shown in history feeds
-  entityType  String?  // e.g. "User", "Pitch", "Match"
+  description String? // human-readable summary shown in history feeds
+  entityType  String? // e.g. "User", "Pitch", "Match"
   entityId    String?
-  meta        Json?    // arbitrary payload snapshot
+  meta        Json? // arbitrary payload snapshot
   ipAddress   String?
   createdAt   DateTime          @default(now())
 

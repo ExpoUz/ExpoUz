@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { BookingType } from '@prisma/client';
+import { BookingType, MatchType } from '@prisma/client';
 
 export enum Sport {
   FOOTBALL = 'FOOTBALL',
@@ -126,4 +126,22 @@ export class CreateMatchDto {
   @IsNumber()
   @Type(() => Number)
   cancellationDeadlineHours?: number;
+
+  // ---- Competitive vs casual + level range ----
+  @ApiPropertyOptional({ enum: MatchType, default: MatchType.COMPETITIVE })
+  @IsOptional()
+  @IsEnum(MatchType)
+  matchType?: MatchType;
+
+  @ApiPropertyOptional({ description: 'Minimum skill rating to join (0.0–7.0)' })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  minLevel?: number;
+
+  @ApiPropertyOptional({ description: 'Maximum skill rating to join (0.0–7.0)' })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  maxLevel?: number;
 }
