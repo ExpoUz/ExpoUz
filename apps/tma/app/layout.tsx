@@ -5,7 +5,7 @@ import Providers from "./providers";
 import { AuthGate } from "@/components/AuthGate";
 
 export const metadata: Metadata = {
-  title: "ScoreWithUs",
+  title: "ExpoUz",
   description: "Find and join pickup football games in Uzbekistan",
 };
 

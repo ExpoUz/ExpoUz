@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -39,7 +40,7 @@ export class AuthService {
     if (process.env.NODE_ENV !== 'production') {
       console.log(`[DEV OTP] Phone: ${phone}, Code: ${code}`);
     } else {
-      await this.sendEskizSms(phone, `Your PlayWithUs code: ${code}. Valid 2 minutes.`);
+      await this.sendEskizSms(phone, `Your ExpoUz code: ${code}. Valid 2 minutes.`);
     }
 
     const maskedPhone = phone.replace(/(\+998)(\d{2})(\d{3})(\d{4})/, '$1$2***$4');
@@ -283,6 +284,54 @@ export class AuthService {
     });
 
     return { ...tokens, isNewUser, user };
+  }
+
+  /**
+   * Authenticate an admin from the @ExpoUzAdminBot Mini App.
+   * Validates initData against the ADMIN bot token, then requires that the
+   * Telegram account is already linked to an ADMIN/SUPER_ADMIN user.
+   */
+  async telegramAdminAuth(initData: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: any;
+  }> {
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash');
+    if (!hash) throw new UnauthorizedException('Missing hash');
+    params.delete('hash');
+
+    const dataCheckString = Array.from(params.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n');
+
+    const botToken =
+      this.config.get<string>('TELEGRAM_ADMIN_BOT_TOKEN') ||
+      this.config.get<string>('TELEGRAM_BOT_TOKEN');
+    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+    const checkHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+    if (checkHash !== hash) throw new UnauthorizedException('Invalid Telegram initData');
+
+    const userParam = params.get('user');
+    if (!userParam) throw new UnauthorizedException('Missing user data');
+    const tgUser = JSON.parse(userParam);
+
+    const user = await this.prisma.user.findUnique({
+      where: { telegramId: String(tgUser.id) },
+    });
+    if (!user || !['SUPER_ADMIN', 'ADMIN'].includes(user.role)) {
+      throw new ForbiddenException('Admin access required. Contact the platform owner.');
+    }
+    if (user.isBanned) throw new UnauthorizedException('Your account has been banned');
+
+    const tokens = await this.generateTokens(user.id, user.role);
+    const refreshExpiry = new Date();
+    refreshExpiry.setDate(refreshExpiry.getDate() + 30);
+    await this.prisma.refreshToken.create({
+      data: { userId: user.id, token: tokens.refreshToken, expiresAt: refreshExpiry },
+    });
+    return { ...tokens, user };
   }
 
   async googleAuth(credential: string): Promise<{

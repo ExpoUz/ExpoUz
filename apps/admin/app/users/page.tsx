@@ -3,12 +3,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { getUsers } from "@/lib/api";
 import { useState } from "react";
+import Link from "next/link";
 import dayjs from "dayjs";
 
 export default function UsersPage() {
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
-    queryFn: getUsers,
+    queryFn: () => getUsers(),
   });
 
   const [search, setSearch] = useState("");
@@ -84,7 +85,8 @@ export default function UsersPage() {
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">User</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">ELO</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">⚽ Football</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">🎾 Padel</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Reliability</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">City</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
@@ -95,7 +97,7 @@ export default function UsersPage() {
             {isLoading &&
               [...Array(8)].map((_, i) => (
                 <tr key={i}>
-                  {[...Array(8)].map((_, j) => (
+                  {[...Array(9)].map((_, j) => (
                     <td key={j} className="px-5 py-3">
                       <div className="h-4 bg-gray-100 rounded animate-pulse" />
                     </td>
@@ -104,7 +106,7 @@ export default function UsersPage() {
               ))}
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-5 py-12 text-center text-gray-400">
+                <td colSpan={9} className="px-5 py-12 text-center text-gray-400">
                   No users found
                 </td>
               </tr>
@@ -118,9 +120,12 @@ export default function UsersPage() {
                         {u.firstName?.[0] ?? "?"}
                       </div>
                       <div>
-                        <div className="font-medium text-gray-900">
+                        <Link
+                          href={`/users/${u.id}`}
+                          className="font-medium text-gray-900 hover:text-green-700 hover:underline"
+                        >
                           {u.firstName} {u.lastName}
-                        </div>
+                        </Link>
                         {u.email && (
                           <div className="text-xs text-gray-400">{u.email}</div>
                         )}
@@ -132,17 +137,29 @@ export default function UsersPage() {
                     <RoleBadge role={u.role} />
                   </td>
                   <td className="px-5 py-3">
-                    <span
-                      className={`font-bold ${
-                        u.eloRating >= 1300
-                          ? "text-red-500"
-                          : u.eloRating >= 1100
-                          ? "text-yellow-500"
-                          : "text-green-600"
-                      }`}
-                    >
-                      {u.eloRating ?? 1000}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`font-bold ${
+                          u.eloRating >= 1300
+                            ? "text-red-500"
+                            : u.eloRating >= 1100
+                            ? "text-yellow-500"
+                            : "text-green-600"
+                        }`}
+                      >
+                        {u.eloRating ?? 1000}
+                      </span>
+                      {u.skillLevel && (
+                        <span className="text-[10px] text-gray-400 uppercase">{u.skillLevel}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    {u.padelInitialSet ? (
+                      <span className="font-bold text-[#00B0FF]">{Number(u.padelLevel ?? 0).toFixed(1)}</span>
+                    ) : (
+                      <span className="text-xs text-gray-300">unrated</span>
+                    )}
                   </td>
                   <td className="px-5 py-3">
                     <ReliabilityBar score={u.reliabilityScore ?? 100} />
@@ -151,12 +168,12 @@ export default function UsersPage() {
                   <td className="px-5 py-3">
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        u.isActive
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-500"
+                        u.isBanned
+                          ? "bg-red-100 text-red-500"
+                          : "bg-green-100 text-green-700"
                       }`}
                     >
-                      {u.isActive ? "Active" : "Banned"}
+                      {u.isBanned ? "Banned" : "Active"}
                     </span>
                   </td>
                   <td className="px-5 py-3 text-gray-400 text-xs">

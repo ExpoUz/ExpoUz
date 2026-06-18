@@ -8,10 +8,20 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { CreateMatchDto } from './dto/create-match.dto';
+import { Sport } from '@prisma/client';
 import { QueryMatchesDto, TimeOfDay, SortBy } from './dto/query-matches.dto';
 import { RatePlayerDto } from './dto/rate-player.dto';
 import { FormationService } from '../formation/formation.service';
 import { TelegramService } from '../telegram/telegram.service';
+import { ActivityService } from '../activity/activity.service';
+import { RemindersService } from '../reminders/reminders.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { RankingService } from '../ranking/ranking.service';
+import { LevelService } from '../level/level.service';
+import { SubmitResultDto } from './dto/submit-result.dto';
+import { BookingType } from '@prisma/client';
+import { getMaxPlayers } from './format-caps';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class MatchesService {
@@ -20,7 +30,47 @@ export class MatchesService {
     private redis: RedisService,
     private formationService: FormationService,
     private telegramService: TelegramService,
+    private activity: ActivityService,
+    private reminders: RemindersService,
+    private notifications: NotificationsService,
+    private ranking: RankingService,
+    private level: LevelService,
   ) {}
+
+  private generateShareCode(): string {
+    return randomBytes(4).toString('hex').toUpperCase().slice(0, 6);
+  }
+
+  private buildShareLink(shareCode: string): string {
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'ExpoScoreBot';
+    return `https://t.me/${botUsername}?start=join_${shareCode}`;
+  }
+
+  // A match enforces a level range when the host set a min and/or max. Padel
+  // uses the 0.0–7.0 padelLevel; football normalizes eloRating to the same scale.
+  private async assertWithinLevelRange(
+    match: { sport: Sport; minLevel: number | null; maxLevel: number | null },
+    userId: string,
+  ) {
+    if (match.minLevel == null && match.maxLevel == null) return;
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { padelLevel: true, eloRating: true },
+    });
+    if (!user) return;
+    const userLevel =
+      match.sport === Sport.PADEL ? user.padelLevel : user.eloRating / 1000;
+    if (match.minLevel != null && userLevel < match.minLevel) {
+      throw new BadRequestException(
+        `Your level (${userLevel.toFixed(2)}) is below this match's minimum (${match.minLevel}).`,
+      );
+    }
+    if (match.maxLevel != null && userLevel > match.maxLevel) {
+      throw new BadRequestException(
+        `Your level (${userLevel.toFixed(2)}) is above this match's maximum (${match.maxLevel}).`,
+      );
+    }
+  }
 
   async findAll(query: QueryMatchesDto) {
     const {
@@ -49,10 +99,14 @@ export class MatchesService {
     if (sport) where.sport = sport;
     if (format) where.format = format;
     if (skillLevel) where.skillFilter = skillLevel;
+    if (query.matchType) where.matchType = query.matchType;
     if (maxPrice) where.pricePerPlayer = { lte: maxPrice };
     if (city) where.pitch = { ...where.pitch, city };
     if (district) where.pitch = { ...where.pitch, district };
     if (isIndoor !== undefined) where.pitch = { ...where.pitch, isIndoor };
+    if (query.courtType) where.pitch = { ...where.pitch, courtType: query.courtType };
+    if (query.isCovered !== undefined)
+      where.pitch = { ...where.pitch, isCovered: query.isCovered };
 
     if (date) {
       const d = new Date(date);
@@ -104,6 +158,15 @@ export class MatchesService {
           host: {
             select: { id: true, firstName: true, lastName: true, avatarUrl: true },
           },
+          bookings: {
+            where: { status: { in: ['CONFIRMED', 'COMPLETED', 'PENDING_PAYMENT'] } },
+            select: {
+              teamSide: true,
+              user: {
+                select: { id: true, firstName: true, avatarUrl: true, padelLevel: true },
+              },
+            },
+          },
           _count: { select: { bookings: true } },
         },
         orderBy,
@@ -145,6 +208,22 @@ export class MatchesService {
     return { data: result, total, page, limit };
   }
 
+  async getAvailableCities() {
+    const pitches = await this.prisma.pitch.findMany({
+      where: { isActive: true },
+      select: { city: true, district: true },
+    });
+    const cities = new Map<string, Set<string>>();
+    for (const p of pitches) {
+      if (!cities.has(p.city)) cities.set(p.city, new Set());
+      if (p.district) cities.get(p.city)!.add(p.district);
+    }
+    return Array.from(cities.entries()).map(([city, districts]) => ({
+      city,
+      districts: Array.from(districts).sort(),
+    }));
+  }
+
   async findToday() {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
@@ -178,6 +257,23 @@ export class MatchesService {
             },
           },
         },
+        // Active bookings with team side + padel level — used by the padel
+        // (Team A/B) detail layout, which has no formation positions.
+        bookings: {
+          where: { status: { in: ['CONFIRMED', 'COMPLETED', 'PENDING_PAYMENT'] } },
+          select: {
+            teamSide: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                avatarUrl: true,
+                padelLevel: true,
+              },
+            },
+          },
+        },
         _count: { select: { bookings: true } },
       },
     });
@@ -199,28 +295,99 @@ export class MatchesService {
       minute: '2-digit',
       hour12: false,
     });
-    const sport = dto.sport || 'FOOTBALL';
-    const autoTitle = `${sport.charAt(0) + sport.slice(1).toLowerCase()} at ${pitch.name} - ${dayName} ${timeStr}`;
+    // DTO Sport enum and Prisma Sport enum diverge (pre-existing); cast the
+    // overlapping value through.
+    const sport: Sport = (dto.sport as unknown as Sport) || Sport.FOOTBALL;
+    const bookingType: BookingType = dto.bookingType || BookingType.OPEN_EVENT;
+
+    // ---- Pricing / capacity derived from booking type ----
+    let pricePerPlayer = Number(dto.pricePerPlayer ?? 0);
+    let maxPlayers = dto.maxPlayers ?? 0;
+    let organizerPlayerCount: number | null = null;
+    let organizerTotalPaid: number | null = null;
+    let extraSpotsAvailable: number | null = null;
+    let fullBookingHours: number | null = null;
+    let fullBookingTotalCost: number | null = null;
+    let currentPlayers = 1;
+
+    if (bookingType === BookingType.GROUP_BOOKING) {
+      organizerPlayerCount = dto.organizerPlayerCount || 1;
+      extraSpotsAvailable = dto.extraSpotsAvailable || 0;
+      maxPlayers = organizerPlayerCount + extraSpotsAvailable;
+      organizerTotalPaid = pricePerPlayer * organizerPlayerCount;
+      currentPlayers = organizerPlayerCount;
+    } else if (bookingType === BookingType.FULL_BOOKING) {
+      fullBookingHours = dto.fullBookingHours || 1;
+      fullBookingTotalCost = Number(pitch.hourlyRate ?? 0) * fullBookingHours;
+      pricePerPlayer = 0;
+      maxPlayers = dto.maxPlayers || 22;
+    } else {
+      // OPEN_EVENT — player cap is fixed by the sport + format
+      // (football: 5v5->10, 6v6->12; padel: 1v1->2, 2v2->4).
+      const cap = getMaxPlayers(sport, dto.format);
+      if (maxPlayers && maxPlayers > cap) {
+        throw new BadRequestException(
+          `A ${dto.format} match allows a maximum of ${cap} players. You requested ${maxPlayers}.`,
+        );
+      }
+      maxPlayers = cap; // lock to the format cap
+    }
+
+    const titleSport = sport.charAt(0) + sport.slice(1).toLowerCase();
+    const autoTitle = this.generateTitle(bookingType, titleSport, dto.format, pitch.name);
+    const shareCode = this.generateShareCode();
+    const telegramShareLink = this.buildShareLink(shareCode);
 
     const match = await this.prisma.match.create({
       data: {
         pitchId: dto.pitchId,
         hostId,
+        organizerId: hostId,
         title: autoTitle,
-        sport: dto.sport || 'FOOTBALL',
+        sport,
         format: dto.format,
         startTime,
         durationMinutes: dto.durationMinutes || 60,
-        maxPlayers: dto.maxPlayers,
-        minPlayers: dto.minPlayers || 10,
-        pricePerPlayer: dto.pricePerPlayer,
+        maxPlayers,
+        minPlayers: dto.minPlayers || Math.max(1, Math.floor(maxPlayers * 0.7)),
+        currentPlayers,
+        pricePerPlayer,
+        bookingType,
+        organizerPlayerCount,
+        organizerTotalPaid,
+        extraSpotsAvailable,
+        fullBookingHours,
+        fullBookingTotalCost,
+        isPrivate: dto.isPrivate || false,
         isCoEd: dto.isCoEd !== undefined ? dto.isCoEd : true,
         skillFilter: dto.skillFilter,
         description: dto.description,
         formation: dto.formation,
         cancellationDeadlineHours: dto.cancellationDeadlineHours || 5,
+        matchType: dto.matchType || 'COMPETITIVE',
+        minLevel: dto.minLevel ?? null,
+        maxLevel: dto.maxLevel ?? null,
+        shareCode,
+        telegramShareLink,
+        // status left at default OPEN — the codebase treats OPEN as the live,
+        // joinable/listed state (join() and findAll() key off OPEN). DRAFT/PUBLISHED
+        // exist in the enum for future use but must not replace OPEN here.
       },
     });
+
+    await this.activity.log(
+      hostId,
+      'MATCH_CREATED',
+      `Created ${bookingType} match: ${match.title}`,
+      { matchId: match.id, bookingType },
+    );
+
+    // Schedule the "free cancellation closing soon" reminder.
+    await this.reminders.scheduleCancellationWarning(
+      match.id,
+      startTime,
+      match.cancellationDeadlineHours,
+    );
 
     if (dto.formation) {
       await this.formationService.generatePositions(match.id, dto.formation, dto.format);
@@ -241,6 +408,167 @@ export class MatchesService {
     }
 
     return match;
+  }
+
+  private generateTitle(
+    bookingType: BookingType,
+    sport: string,
+    format: string,
+    pitchName: string,
+  ): string {
+    switch (bookingType) {
+      case BookingType.GROUP_BOOKING:
+        return `${format} ${sport} Group Game at ${pitchName}`;
+      case BookingType.FULL_BOOKING:
+        return `Full Pitch Booking at ${pitchName}`;
+      default:
+        return `${format} ${sport} Pickup Game at ${pitchName}`;
+    }
+  }
+
+  // ─── INVITE / SHARE ───────────────────────────────────────────────────────
+  async findByShareCode(shareCode: string) {
+    const match = await this.prisma.match.findUnique({
+      where: { shareCode },
+      include: {
+        pitch: { include: { amenities: true } },
+        host: {
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true },
+        },
+        _count: { select: { bookings: true } },
+      },
+    });
+    if (!match) throw new NotFoundException('Invalid invite link');
+    return match;
+  }
+
+  async getShareLink(id: string) {
+    const match = await this.prisma.match.findUnique({
+      where: { id },
+      select: { id: true, shareCode: true, telegramShareLink: true, title: true },
+    });
+    if (!match) throw new NotFoundException('Match not found');
+
+    // Backfill a share code for matches created before this feature existed.
+    if (!match.shareCode) {
+      const shareCode = this.generateShareCode();
+      const telegramShareLink = this.buildShareLink(shareCode);
+      await this.prisma.match.update({
+        where: { id },
+        data: { shareCode, telegramShareLink },
+      });
+      return { ...match, shareCode, telegramShareLink };
+    }
+    return match;
+  }
+
+  async joinByShareCode(
+    shareCode: string,
+    userId: string,
+    body: { positionId?: string; teamSide?: string } = {},
+  ) {
+    const match = await this.prisma.match.findUnique({ where: { shareCode } });
+    if (!match) throw new NotFoundException('Invalid invite link');
+    if (match.status === 'CANCELLED') {
+      throw new BadRequestException('This event has been cancelled');
+    }
+    if (match.currentPlayers >= match.maxPlayers) {
+      throw new BadRequestException('This event is full');
+    }
+    const result = await this.join(match.id, userId, body.positionId, body.teamSide);
+    await this.activity.log(userId, 'INVITE_ACCEPTED', `Joined via invite: ${match.title}`, {
+      matchId: match.id,
+      shareCode,
+    });
+
+    // Notify the organizer that someone joined via their invite link.
+    if (match.organizerId && match.organizerId !== userId) {
+      const joiner = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true },
+      });
+      const spotsLeft = Math.max(0, match.maxPlayers - (match.currentPlayers + 1));
+      await this.notifications.send(
+        match.organizerId,
+        // Valid NotificationType at runtime/schema; cast avoids a stale local client.
+        'INVITE_JOINED' as any,
+        match.id,
+        { matchTitle: match.title, joinerName: joiner?.firstName, spotsLeft },
+      );
+    }
+    return result;
+  }
+
+  // ─── PRICING PREVIEW ──────────────────────────────────────────────────────
+  calculateGroupBookingPrice(
+    pitchHourlyRate: number,
+    organizerPlayerCount: number,
+    totalMaxPlayers: number,
+    hours: number,
+  ) {
+    const commissionRate = 0.1; // platform commission on the pitch
+    const playerFeeRate = 0.05; // platform fee charged to players
+    const totalPitchCost = pitchHourlyRate * hours;
+    const platformCommission = totalPitchCost * commissionRate;
+    const netPitchCost = totalPitchCost - platformCommission;
+    const costPerPlayer = totalMaxPlayers > 0 ? netPitchCost / totalMaxPlayers : 0;
+    const organizerTotal = costPerPlayer * organizerPlayerCount * (1 + playerFeeRate);
+
+    return {
+      totalPitchCost,
+      platformCommission: Math.ceil(platformCommission),
+      costPerPlayer: Math.ceil(costPerPlayer),
+      organizerPayNow: Math.ceil(organizerTotal),
+      perJoiningPlayer: Math.ceil(costPerPlayer * (1 + playerFeeRate)),
+    };
+  }
+
+  async calculatePricingPreview(body: {
+    pitchId: string;
+    bookingType: string;
+    organizerPlayerCount?: number;
+    extraSpotsAvailable?: number;
+    fullBookingHours?: number;
+    maxPlayers?: number;
+    pricePerPlayer?: number;
+  }) {
+    const pitch = await this.prisma.pitch.findUnique({ where: { id: body.pitchId } });
+    if (!pitch) throw new NotFoundException('Pitch not found');
+    const hourlyRate = Number(pitch.hourlyRate ?? 0);
+    const playerFeeRate = 0.05;
+
+    if (body.bookingType === 'GROUP_BOOKING') {
+      const organizerCount = body.organizerPlayerCount || 1;
+      const totalMax = organizerCount + (body.extraSpotsAvailable || 0);
+      const hours = body.fullBookingHours || 1;
+      return {
+        bookingType: 'GROUP_BOOKING',
+        ...this.calculateGroupBookingPrice(hourlyRate, organizerCount, totalMax, hours),
+      };
+    }
+
+    if (body.bookingType === 'FULL_BOOKING') {
+      const hours = body.fullBookingHours || 1;
+      const totalCost = hourlyRate * hours;
+      return {
+        bookingType: 'FULL_BOOKING',
+        hourlyRate,
+        hours,
+        totalCost,
+        platformCommission: Math.ceil(totalCost * 0.1),
+        youPay: totalCost,
+      };
+    }
+
+    // OPEN_EVENT
+    const base = Number(body.pricePerPlayer ?? 0);
+    const fee = Math.ceil(base * playerFeeRate);
+    return {
+      bookingType: 'OPEN_EVENT',
+      basePrice: base,
+      platformFee: fee,
+      youPay: base + fee,
+    };
   }
 
   async update(id: string, hostId: string, dto: Partial<CreateMatchDto>) {
@@ -362,6 +690,9 @@ export class MatchesService {
     if (match.status === 'FULL') {
       throw new ConflictException('Match is full');
     }
+
+    // Host-set level range is a hard wall (padel level / normalized football elo).
+    await this.assertWithinLevelRange(match, userId);
 
     const existingBooking = await this.prisma.booking.findFirst({
       where: {
@@ -552,6 +883,9 @@ export class MatchesService {
       }
     }
 
+    // Ranking: credit a game played to each participant and re-derive levels.
+    await this.ranking.incrementGamesAttended(match.bookings.map((b) => b.userId));
+
     return { message: 'Match completed, payments released' };
   }
 
@@ -615,5 +949,112 @@ export class MatchesService {
     }
 
     return { message: 'Ratings submitted successfully' };
+  }
+
+  // ─── MATCH RESULTS & SCORING ──────────────────────────────────────────────
+  private determineWinner(dto: SubmitResultDto): number {
+    let team1Sets = 0;
+    let team2Sets = 0;
+    const sets: [number | undefined, number | undefined][] = [
+      [dto.team1Set1, dto.team2Set1],
+      [dto.team1Set2, dto.team2Set2],
+      [dto.team1Set3, dto.team2Set3],
+    ];
+    for (const [a, b] of sets) {
+      if (a == null || b == null) continue;
+      if (a > b) team1Sets++;
+      else if (b > a) team2Sets++;
+    }
+    return team1Sets >= team2Sets ? 1 : 2;
+  }
+
+  async getResult(matchId: string) {
+    return this.prisma.matchResult.findUnique({
+      where: { matchId },
+      include: {
+        players: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      },
+    });
+  }
+
+  async submitResult(matchId: string, userId: string, dto: SubmitResultDto) {
+    const match = await this.prisma.match.findUnique({
+      where: { id: matchId },
+      include: { result: true },
+    });
+    if (!match) throw new NotFoundException('Match not found');
+    if (match.result) {
+      throw new ConflictException('A result has already been submitted for this match');
+    }
+
+    // Verify the submitter actually played in this match.
+    const participants = await this.prisma.booking.findMany({
+      where: { matchId, status: { in: ['CONFIRMED', 'COMPLETED'] } },
+      select: { userId: true },
+    });
+    const playerIds = participants.map((p) => p.userId);
+    if (!playerIds.includes(userId)) {
+      throw new ForbiddenException('Only players in this match can submit a result');
+    }
+
+    const result = await this.prisma.matchResult.create({
+      data: {
+        matchId,
+        team1Set1: dto.team1Set1,
+        team2Set1: dto.team2Set1,
+        team1Set2: dto.team1Set2,
+        team2Set2: dto.team2Set2,
+        team1Set3: dto.team1Set3 ?? null,
+        team2Set3: dto.team2Set3 ?? null,
+        winningTeam: this.determineWinner(dto),
+        submittedById: userId,
+        confirmedBy: [userId],
+        players: { connect: playerIds.map((id) => ({ id })) },
+      },
+    });
+
+    // Ask the other players to confirm the score.
+    for (const pid of playerIds) {
+      if (pid === userId) continue;
+      await this.notifications
+        .send(pid, 'MATCH_CONFIRMED' as any, matchId, { matchTitle: match.title })
+        .catch(() => {});
+    }
+
+    return result;
+  }
+
+  async confirmResult(matchId: string, userId: string) {
+    const result = await this.prisma.matchResult.findUnique({ where: { matchId } });
+    if (!result) throw new NotFoundException('No result submitted for this match');
+    if (result.isConfirmed) return result;
+
+    const confirmedBy = [...new Set([...result.confirmedBy, userId])];
+    const updated = await this.prisma.matchResult.update({
+      where: { matchId },
+      data: { confirmedBy, isConfirmed: confirmedBy.length >= 2, isDisputed: false },
+    });
+
+    // Once confirmed by at least two players → run the rating algorithm.
+    if (updated.isConfirmed) {
+      await this.prisma.match.update({
+        where: { id: matchId },
+        data: { resultSubmitted: true, status: 'COMPLETED' },
+      });
+      await this.level.processMatchResult(matchId);
+    }
+    return updated;
+  }
+
+  async disputeResult(matchId: string, userId: string) {
+    const result = await this.prisma.matchResult.findUnique({ where: { matchId } });
+    if (!result) throw new NotFoundException('No result submitted for this match');
+    if (result.isConfirmed) {
+      throw new ConflictException('This result is already confirmed and cannot be disputed');
+    }
+    return this.prisma.matchResult.update({
+      where: { matchId },
+      data: { isDisputed: true },
+    });
   }
 }

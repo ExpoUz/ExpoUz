@@ -117,7 +117,7 @@ export default function RevenuePage() {
               <section className="bg-[#0D1117] rounded-2xl p-5 text-white">
                 <h2 className="font-semibold mb-1">How commission works</h2>
                 <p className="text-sm text-gray-400">
-                  ScoreWithUs deducts a platform commission from each completed booking on your
+                  ExpoUz deducts a platform commission from each completed booking on your
                   pitches. The rest is yours, paid out on the weekly settlement.
                 </p>
               </section>

@@ -9,8 +9,8 @@ import * as SecureStore from '@/lib/storage';
 import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { Button } from '@/components/ui/Button';
-import { Gender, MatchPosition } from '@playwithus/shared';
-import { UZBEKISTAN_CITIES } from '@playwithus/shared';
+import { Gender, MatchPosition } from '@expouz/shared';
+import { UZBEKISTAN_CITIES } from '@expouz/shared';
 
 const POSITIONS = ['GK','LB','CB','RB','CM','CDM','CAM','LW','RW','ST'];
 

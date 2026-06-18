@@ -62,6 +62,22 @@ export async function getUserById(id: string) {
   return data;
 }
 
+// ─── Activity ────────────────────────────────────────────────
+export async function getActivityLog(params?: {
+  userId?: string;
+  category?: string;
+  action?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ data: any[]; total: number; page: number; limit: number }> {
+  const { data } = await adminApi.get("/admin/activity-log", {
+    params: { limit: 50, ...params },
+  });
+  return data?.data ? data : { data: data ?? [], total: 0, page: 1, limit: 50 };
+}
+
 export async function changeUserRole(id: string, role: string) {
   const { data } = await adminApi.patch(`/admin/users/${id}/role`, { role });
   return data;
@@ -88,8 +104,8 @@ export async function verifyPitch(id: string, approved: boolean) {
   return data;
 }
 
-export async function getAllPitches(): Promise<any[]> {
-  const { data } = await adminApi.get("/admin/pitches");
+export async function getAllPitches(params?: { sport?: string }): Promise<any[]> {
+  const { data } = await adminApi.get("/admin/pitches", { params: { limit: 200, ...params } });
   return data?.data ?? data ?? [];
 }
 
@@ -146,7 +162,7 @@ export async function deleteLocation(id: string) {
 }
 
 // ─── Matches ─────────────────────────────────────────────────
-export async function getMatches(params?: { page?: number; limit?: number }): Promise<any[]> {
+export async function getMatches(params?: { page?: number; limit?: number; sport?: string }): Promise<any[]> {
   const { data } = await adminApi.get("/admin/matches", { params: { limit: 100, ...params } });
   return data?.data ?? data ?? [];
 }
@@ -171,6 +187,16 @@ export async function manualRelease(transactionId: string) {
 export async function getRevenue(period: "week" | "month" | "year" = "month"): Promise<any[]> {
   const { data } = await adminApi.get("/admin/analytics/revenue", { params: { period } });
   return Array.isArray(data) ? data : [];
+}
+
+// ─── Padel Analytics ──────────────────────────────────────────
+export async function getPadelAnalytics(): Promise<{
+  totalAssessed: number;
+  distribution: { band: string; count: number }[];
+  matchTypeSplit: { casual: number; competitive: number };
+}> {
+  const { data } = await adminApi.get("/admin/analytics/padel");
+  return data;
 }
 
 // ─── Settings ─────────────────────────────────────────────────

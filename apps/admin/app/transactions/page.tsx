@@ -25,7 +25,7 @@ const TYPE_COLORS: Record<string, string> = {
 export default function TransactionsPage() {
   const { data: txs, isLoading } = useQuery({
     queryKey: ["admin-transactions"],
-    queryFn: getTransactions,
+    queryFn: () => getTransactions(),
   });
 
   const [statusFilter, setStatusFilter] = useState("ALL");

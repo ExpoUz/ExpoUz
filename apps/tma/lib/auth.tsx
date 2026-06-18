@@ -62,7 +62,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           return;
         } catch {
+          // Dead session (e.g. tokens from before a DB reset) — drop both
+          // tokens and fall through to a fresh Telegram initData login.
           localStorage.removeItem("tma_access_token");
+          localStorage.removeItem("tma_refresh_token");
         }
       }
 

@@ -95,7 +95,7 @@ export default function AdminLoginScreen() {
         <View className="items-center mb-10">
           <Text className="text-4xl mb-2">🏟️</Text>
           <Text className="text-white text-2xl font-bold">Admin Panel</Text>
-          <Text className="text-gray-400 text-sm mt-1">ScoreWithUs · Pitch Management</Text>
+          <Text className="text-gray-400 text-sm mt-1">ExpoUz · Pitch Management</Text>
         </View>
 
         <View className="bg-gray-900 rounded-2xl p-6">

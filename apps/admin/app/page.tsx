@@ -52,12 +52,12 @@ export default function DashboardPage() {
 
   const { data: recentMatches } = useQuery({
     queryKey: ["admin-matches"],
-    queryFn: getMatches,
+    queryFn: () => getMatches(),
   });
 
   const { data: users } = useQuery({
     queryKey: ["admin-users"],
-    queryFn: getUsers,
+    queryFn: () => getUsers(),
   });
 
   const topMatches = (recentMatches ?? []).slice(0, 8);
@@ -138,6 +138,31 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Sport breakdown */}
+      {dashboard?.sportBreakdown && (
+        <div className="grid grid-cols-2 gap-5 mb-8">
+          <SportBreakdownCard
+            icon="⚽"
+            title="Football"
+            color="#00C853"
+            rows={[
+              { label: "Matches", value: dashboard.sportBreakdown.football?.matches ?? 0 },
+              { label: "Pitches", value: dashboard.sportBreakdown.football?.pitches ?? 0 },
+            ]}
+          />
+          <SportBreakdownCard
+            icon="🎾"
+            title="Padel"
+            color="#00B0FF"
+            rows={[
+              { label: "Matches", value: dashboard.sportBreakdown.padel?.matches ?? 0 },
+              { label: "Courts", value: dashboard.sportBreakdown.padel?.pitches ?? 0 },
+              { label: "Rated players", value: dashboard.sportBreakdown.padel?.assessedPlayers ?? 0 },
+            ]}
+          />
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-6">
         {/* Recent Matches */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -194,6 +219,37 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SportBreakdownCard({
+  icon,
+  title,
+  color,
+  rows,
+}: {
+  icon: string;
+  title: string;
+  color: string;
+  rows: { label: string; value: number }[];
+}) {
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-2xl">{icon}</span>
+        <span className="font-semibold text-gray-900">{title}</span>
+      </div>
+      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(0, 1fr))` }}>
+        {rows.map((r) => (
+          <div key={r.label}>
+            <div className="text-2xl font-extrabold" style={{ color }}>
+              {r.value.toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">{r.label}</div>
+          </div>
+        ))}
       </div>
     </div>
   );

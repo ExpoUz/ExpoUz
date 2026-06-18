@@ -31,6 +31,7 @@ export class PitchesService {
   }
 
   async findAll(filters: {
+    sport?: string;
     city?: string;
     district?: string;
     isIndoor?: boolean;
@@ -39,6 +40,7 @@ export class PitchesService {
     isVerified?: boolean;
   }) {
     const where: any = { isActive: true };
+    if (filters.sport) where.sport = filters.sport;
     if (filters.city) where.city = filters.city;
     if (filters.district) where.district = filters.district;
     if (filters.isIndoor !== undefined) where.isIndoor = filters.isIndoor;

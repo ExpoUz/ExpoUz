@@ -20,6 +20,10 @@ import { PitchAdminModule } from './pitch-admin/pitch-admin.module';
 import { FormationModule } from './formation/formation.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { ActivityModule } from './activity/activity.module';
+import { RemindersModule } from './reminders/reminders.module';
+import { RankingModule } from './ranking/ranking.module';
+import { LevelModule } from './level/level.module';
 import { OnlineStatusMiddleware } from './admin/online-status.middleware';
 import { HealthController } from './health.controller';
 
@@ -53,6 +57,9 @@ import { HealthController } from './health.controller';
     }),
     PrismaModule,
     RedisModule,
+    ActivityModule,
+    RankingModule,
+    LevelModule,
     TelegramModule,
     AuthModule,
     UsersModule,
@@ -62,6 +69,7 @@ import { HealthController } from './health.controller';
     PitchBookingsModule,
     PaymentsModule,
     EscrowModule,
+    RemindersModule,
     NotificationsModule,
     MessagesModule,
     AdminModule,

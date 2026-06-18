@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { getRevenue } from "@/lib/api";
+import { getRevenue, getPadelAnalytics } from "@/lib/api";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import dayjs from "dayjs";
 
@@ -14,6 +14,11 @@ export default function AnalyticsPage() {
   const { data: yearlyData } = useQuery({
     queryKey: ["admin-revenue", "year"],
     queryFn: () => getRevenue("year"),
+  });
+
+  const { data: padel } = useQuery({
+    queryKey: ["admin-padel-analytics"],
+    queryFn: getPadelAnalytics,
   });
 
   const daily: any[] = dailyData ?? [];
@@ -109,12 +114,75 @@ export default function AnalyticsPage() {
         </div>
       )}
 
+      {/* Padel — level distribution + match-type split */}
+      <div className="mt-8">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">🎾 Padel Insights</h2>
+        <p className="text-gray-500 text-sm mb-4">
+          {padel?.totalAssessed ?? 0} rated players · {(padel?.matchTypeSplit?.casual ?? 0) + (padel?.matchTypeSplit?.competitive ?? 0)} padel matches
+        </p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Level Distribution (0.0 – 7.0)</h3>
+            {(padel?.distribution ?? []).some((d) => d.count > 0) ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={padel?.distribution ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
+                  <XAxis dataKey="band" tick={{ fontSize: 11, fill: "#9CA3AF" }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#9CA3AF" }} />
+                  <Tooltip formatter={(v: any) => [`${v} players`, "Count"]} />
+                  <Bar dataKey="count" fill="#00B0FF" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[240px] flex items-center justify-center text-sm text-gray-400">
+                No rated padel players yet
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Casual vs Competitive</h3>
+            <div className="space-y-4">
+              <SplitRow
+                label="⚔️ Competitive"
+                value={padel?.matchTypeSplit?.competitive ?? 0}
+                total={(padel?.matchTypeSplit?.casual ?? 0) + (padel?.matchTypeSplit?.competitive ?? 0)}
+                color="#EF4444"
+              />
+              <SplitRow
+                label="😎 Casual"
+                value={padel?.matchTypeSplit?.casual ?? 0}
+                total={(padel?.matchTypeSplit?.casual ?? 0) + (padel?.matchTypeSplit?.competitive ?? 0)}
+                color="#00B0FF"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       {!isLoading && daily.length === 0 && monthly.length === 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center mt-6">
           <div className="text-4xl mb-3">📊</div>
-          <div className="text-gray-500">No analytics data yet</div>
+          <div className="text-gray-500">No revenue data yet</div>
         </div>
       )}
+    </div>
+  );
+}
+
+function SplitRow({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+  return (
+    <div>
+      <div className="flex items-center justify-between text-sm mb-1">
+        <span className="text-gray-700 font-medium">{label}</span>
+        <span className="text-gray-500">
+          {value} ({pct}%)
+        </span>
+      </div>
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
     </div>
   );
 }

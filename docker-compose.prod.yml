@@ -2,16 +2,16 @@ services:
   # ─── PostgreSQL ──────────────────────────────────────────────────────────────
   postgres:
     image: postgis/postgis:16-3.4
-    container_name: scorewithus_postgres
+    container_name: expouz_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-scorewithus}
+      POSTGRES_DB: ${POSTGRES_DB:-expouz}
       POSTGRES_USER: ${POSTGRES_USER:-swu}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-swu} -d ${POSTGRES_DB:-scorewithus}']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-swu} -d ${POSTGRES_DB:-expouz}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -21,7 +21,7 @@ services:
   # ─── Redis ───────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: scorewithus_redis
+    container_name: expouz_redis
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
@@ -39,11 +39,11 @@ services:
     build:
       context: ./packages/api
       dockerfile: Dockerfile
-    container_name: scorewithus_api
+    container_name: expouz_api
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-swu}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-scorewithus}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-swu}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-expouz}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
@@ -81,10 +81,10 @@ services:
     build:
       context: ./apps/admin
       dockerfile: Dockerfile
-    container_name: scorewithus_admin
+    container_name: expouz_admin
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-https://api.scorewithus.uz/v1}
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-https://api.expouz.uz/v1}
     depends_on:
       - api
     networks:
@@ -95,7 +95,7 @@ services:
   # ─── Nginx Reverse Proxy ─────────────────────────────────────────────────────
   nginx:
     image: nginx:alpine
-    container_name: scorewithus_nginx
+    container_name: expouz_nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -114,7 +114,7 @@ services:
   # ─── Certbot (SSL auto-renewal) ───────────────────────────────────────────────
   certbot:
     image: certbot/certbot
-    container_name: scorewithus_certbot
+    container_name: expouz_certbot
     volumes:
       - ./nginx/ssl:/etc/letsencrypt
       - certbot_webroot:/var/www/certbot

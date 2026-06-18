@@ -17,7 +17,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { FormationPitch } from '@/components/ui/FormationPitch';
 import { QRDisplay } from '@/components/ui/QRDisplay';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
-import { formatUZS } from '@playwithus/shared';
+import { formatUZS } from '@expouz/shared';
 
 type Step = 1 | 2 | 3 | 4;
 type TeamSide = 'HOME' | 'AWAY' | null;

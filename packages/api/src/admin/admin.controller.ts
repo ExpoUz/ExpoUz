@@ -34,6 +34,12 @@ export class AdminController {
     return this.adminService.getDashboard();
   }
 
+  @Patch('link-telegram')
+  @ApiOperation({ summary: 'Link the current admin account to a Telegram ID (for admin Mini App)' })
+  linkTelegram(@Body('telegramId') telegramId: string, @Req() req: any) {
+    return this.adminService.linkTelegram(req.user.id, telegramId);
+  }
+
   @Get('users')
   @ApiOperation({ summary: 'Get all users with filters' })
   @ApiQuery({ name: 'role', required: false })
@@ -88,14 +94,16 @@ export class AdminController {
 
   @Get('matches')
   @ApiOperation({ summary: 'Get all matches' })
+  @ApiQuery({ name: 'sport', required: false })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   getMatches(
+    @Query('sport') sport?: string,
     @Query('status') status?: string,
     @Query('page') page = 1,
     @Query('limit') limit = 20,
   ) {
-    return this.adminService.getMatches({ status, page: +page, limit: +limit });
+    return this.adminService.getMatches({ sport, status, page: +page, limit: +limit });
   }
 
   @Delete('matches/:id')
@@ -127,6 +135,12 @@ export class AdminController {
   @ApiQuery({ name: 'period', enum: ['week', 'month', 'year'], required: false })
   getRevenueAnalytics(@Query('period') period: 'week' | 'month' | 'year' = 'month') {
     return this.adminService.getRevenueAnalytics(period);
+  }
+
+  @Get('analytics/padel')
+  @ApiOperation({ summary: 'Padel level distribution + casual/competitive split' })
+  getPadelAnalytics() {
+    return this.adminService.getPadelAnalytics();
   }
 
   @Patch('settings/commission')
@@ -288,6 +302,7 @@ export class AdminController {
 
   @Get('pitches')
   @ApiOperation({ summary: 'Get all pitches with owner, location, and booking counts' })
+  @ApiQuery({ name: 'sport', required: false })
   @ApiQuery({ name: 'city', required: false })
   @ApiQuery({ name: 'ownerId', required: false })
   @ApiQuery({ name: 'locationId', required: false })
@@ -296,6 +311,7 @@ export class AdminController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getAllPitches(
+    @Query('sport') sport?: string,
     @Query('city') city?: string,
     @Query('ownerId') ownerId?: string,
     @Query('locationId') locationId?: string,
@@ -305,6 +321,7 @@ export class AdminController {
     @Query('limit') limit = 20,
   ) {
     return this.adminService.getAllPitches({
+      sport,
       city,
       ownerId,
       locationId,
@@ -376,6 +393,7 @@ export class AdminController {
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'entityType', required: false })
   @ApiQuery({ name: 'action', required: false })
+  @ApiQuery({ name: 'category', required: false })
   @ApiQuery({ name: 'from', required: false })
   @ApiQuery({ name: 'to', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
@@ -384,13 +402,14 @@ export class AdminController {
     @Query('userId') userId?: string,
     @Query('entityType') entityType?: string,
     @Query('action') action?: string,
+    @Query('category') category?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('page') page = 1,
     @Query('limit') limit = 30,
   ) {
     return this.adminService.getActivityLog({
-      userId, entityType, action, from, to, page: +page, limit: +limit,
+      userId, entityType, action, category, from, to, page: +page, limit: +limit,
     });
   }
 

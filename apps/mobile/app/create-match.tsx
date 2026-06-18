@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { pitchesApi, matchesApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { useAppStore } from '@/store/app.store';
-import { Sport } from '@playwithus/shared';
+import { Sport } from '@expouz/shared';
 
 const FORMATIONS = ['4-3-3', '4-4-2', '4-2-3-1', '3-5-2', '5-3-2', '2-2', '2-1-2'];
 const DURATIONS = [45, 60, 75, 90];

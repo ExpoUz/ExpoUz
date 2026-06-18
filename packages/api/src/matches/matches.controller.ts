@@ -14,6 +14,7 @@ import { MatchesService } from './matches.service';
 import { CreateMatchDto } from './dto/create-match.dto';
 import { QueryMatchesDto } from './dto/query-matches.dto';
 import { RatePlayerDto } from './dto/rate-player.dto';
+import { SubmitResultDto } from './dto/submit-result.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -34,10 +35,48 @@ export class MatchesController {
     return this.matchesService.findToday();
   }
 
+  @Get('cities')
+  @ApiOperation({ summary: 'Available cities + districts (for filters)' })
+  getCities() {
+    return this.matchesService.getAvailableCities();
+  }
+
+  // NOTE: static/prefixed routes must precede the ':id' route so 'code'/'pricing'
+  // are not captured as an :id param.
+  @Get('code/:shareCode')
+  @ApiOperation({ summary: 'Get match by invite/share code' })
+  findByShareCode(@Param('shareCode') shareCode: string) {
+    return this.matchesService.findByShareCode(shareCode);
+  }
+
+  @Post('pricing/calculate')
+  @ApiOperation({ summary: 'Preview pricing for a booking type before creating' })
+  calculatePricing(@Body() body: any) {
+    return this.matchesService.calculatePricingPreview(body);
+  }
+
+  @Post('join/code/:shareCode')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Join a match via invite/share code' })
+  joinByShareCode(
+    @Param('shareCode') shareCode: string,
+    @CurrentUser() user: any,
+    @Body() body: any,
+  ) {
+    return this.matchesService.joinByShareCode(shareCode, user.id, body);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get match by ID' })
   findOne(@Param('id') id: string) {
     return this.matchesService.findOne(id);
+  }
+
+  @Get(':id/share')
+  @ApiOperation({ summary: 'Get share link + code for a match' })
+  getShareLink(@Param('id') id: string) {
+    return this.matchesService.getShareLink(id);
   }
 
   @Post()
@@ -143,5 +182,39 @@ export class MatchesController {
     @Body('ratings') ratings: RatePlayerDto[],
   ) {
     return this.matchesService.ratePlayers(id, user.id, ratings);
+  }
+
+  @Get(':id/result')
+  @ApiOperation({ summary: 'Get the submitted result for a match' })
+  getResult(@Param('id') id: string) {
+    return this.matchesService.getResult(id);
+  }
+
+  @Post(':id/result')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Submit a match result (set scores)' })
+  submitResult(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: SubmitResultDto,
+  ) {
+    return this.matchesService.submitResult(id, user.id, dto);
+  }
+
+  @Post(':id/result/confirm')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Confirm a submitted result' })
+  confirmResult(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.matchesService.confirmResult(id, user.id);
+  }
+
+  @Post(':id/result/dispute')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Dispute a submitted result' })
+  disputeResult(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.matchesService.disputeResult(id, user.id);
   }
 }

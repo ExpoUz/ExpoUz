@@ -8,6 +8,7 @@ import {
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
+import { MatchType } from '@prisma/client';
 
 export enum TimeOfDay {
   MORNING = 'MORNING',
@@ -23,12 +24,11 @@ export enum SortBy {
   DISTANCE = 'DISTANCE',
 }
 
+// Must stay in sync with the Prisma `Sport` enum (schema.prisma).
 export enum Sport {
   FOOTBALL = 'FOOTBALL',
-  BASKETBALL = 'BASKETBALL',
-  VOLLEYBALL = 'VOLLEYBALL',
+  PADEL = 'PADEL',
   TENNIS = 'TENNIS',
-  BADMINTON = 'BADMINTON',
 }
 
 export enum SkillLevel {
@@ -83,11 +83,27 @@ export class QueryMatchesDto {
   @IsEnum(SkillLevel)
   skillLevel?: SkillLevel;
 
+  @ApiPropertyOptional({ description: 'Filter by CASUAL or COMPETITIVE' })
+  @IsOptional()
+  @IsEnum(MatchType)
+  matchType?: MatchType;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
   @Type(() => Boolean)
   isIndoor?: boolean;
+
+  @ApiPropertyOptional({ description: 'Padel court type: PANORAMIC | CLASSIC | SINGLE' })
+  @IsOptional()
+  @IsString()
+  courtType?: string;
+
+  @ApiPropertyOptional({ description: 'Only covered/indoor padel courts' })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  isCovered?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

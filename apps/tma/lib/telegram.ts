@@ -119,3 +119,25 @@ export function showAlert(message: string) {
   if (wa?.showAlert) wa.showAlert(message);
   else if (typeof window !== "undefined") window.alert(message);
 }
+
+// ─── Sharing ──────────────────────────────────────────────────
+/** Open the Telegram share sheet for an invite link. */
+export function shareToTelegram(link: string, text = "Join my game on ExpoUz! ⚽") {
+  const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`;
+  const wa = getWebApp();
+  if (wa?.openTelegramLink) wa.openTelegramLink(shareUrl);
+  else if (typeof window !== "undefined") window.open(shareUrl, "_blank");
+}
+
+/** Copy text to clipboard; returns true on success. */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}

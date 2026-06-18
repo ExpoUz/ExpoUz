@@ -193,6 +193,59 @@ export class TelegramService implements OnModuleInit {
   private registerHandlers() {
     if (!this.bot) return;
 
+    // Private-chat deep links: t.me/<bot>?start=join_<shareCode> arrives here as
+    // a "/start join_<code>" message in a 1:1 chat with the bot.
+    this.bot.on('message', async (msg) => {
+      if (msg.chat?.type !== 'private') return;
+      const text = msg.text || '';
+      if (!text.startsWith('/start')) return;
+
+      const chatId = msg.chat.id;
+      const miniAppUrl =
+        process.env.PLAYER_TMA_URL ||
+        process.env.TELEGRAM_MINI_APP_URL ||
+        '';
+      const arg = text.replace('/start', '').trim();
+
+      try {
+        if (arg.startsWith('join_')) {
+          const shareCode = arg.replace('join_', '').trim();
+          await this.bot!.sendMessage(
+            chatId,
+            `🔗 <b>You were invited to join a game!</b>\n\nTap below to view the match and join:`,
+            {
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: '⚽ View & Join Match',
+                      web_app: { url: `${miniAppUrl}/join/${shareCode}` },
+                    },
+                  ],
+                ],
+              },
+            },
+          );
+        } else {
+          await this.bot!.sendMessage(
+            chatId,
+            `👋 <b>Welcome to ExpoUz!</b>\n\nFind and join football games in Tashkent. Tap below to open the app.`,
+            {
+              parse_mode: 'HTML',
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: '⚽ Open ExpoUz', web_app: { url: miniAppUrl } }],
+                ],
+              },
+            },
+          );
+        }
+      } catch (err) {
+        this.logger.error('Failed to handle /start deep link', err);
+      }
+    });
+
     this.bot.on('message', async (msg) => {
       // Only handle messages from the configured forum group
       if (msg.chat.id !== this.forumGroupId) return;

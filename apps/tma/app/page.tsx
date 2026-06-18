@@ -3,30 +3,56 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { getMatches } from "@/lib/api";
+import { Calendar, Clock, Check } from "lucide-react";
+import dayjs from "dayjs";
+import { getMatches, getCities } from "@/lib/api";
 import { MatchCard } from "@/components/MatchCard";
+import { SportCityHeader } from "@/components/SportCityHeader";
 import { BottomNav } from "@/components/BottomNav";
+import { useSportStore, setSport, sportMeta } from "@/lib/sport-store";
 import { showMainButton, hideMainButton, hapticImpact } from "@/lib/telegram";
 
-const SPORTS = [
-  { key: "", label: "All" },
-  { key: "FOOTBALL", label: "⚽ Football" },
-  { key: "BASKETBALL", label: "🏀 Basketball" },
-  { key: "VOLLEYBALL", label: "🏐 Volleyball" },
-  { key: "TENNIS", label: "🎾 Tennis" },
+const TIMES = [
+  { key: "", label: "Any time" },
+  { key: "MORNING", label: "🌅 Morning" },
+  { key: "AFTERNOON", label: "☀️ Afternoon" },
+  { key: "EVENING", label: "🌆 Evening" },
 ];
 
 export default function HomePage() {
   const router = useRouter();
-  const [sport, setSport] = useState("");
+  const { sport } = useSportStore();
+  const meta = sportMeta(sport);
+  const isPadel = sport === "PADEL";
+  const [city, setCity] = useState("Tashkent");
+  const [district, setDistrict] = useState("");
+  const [date, setDate] = useState("");
+  const [timeOfDay, setTimeOfDay] = useState("");
+  const [spotsOnly, setSpotsOnly] = useState(false);
+  const [matchType, setMatchType] = useState(""); // "" | COMPETITIVE | CASUAL
+
+  const [cityOpen, setCityOpen] = useState(false);
+  const [timeOpen, setTimeOpen] = useState(false);
+
+  const { data: cities } = useQuery({ queryKey: ["cities"], queryFn: getCities });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["tma-matches", sport],
-    queryFn: () => getMatches(sport ? { sport } : {}),
+    queryKey: ["tma-matches", sport, city, district, date, timeOfDay, spotsOnly, matchType],
+    queryFn: () =>
+      getMatches({
+        sport,
+        ...(city ? { city } : {}),
+        ...(district ? { district } : {}),
+        ...(date ? { date: dayjs(date).toISOString() } : {}),
+        ...(timeOfDay ? { timeOfDay } : {}),
+        ...(spotsOnly ? { minSpotsAvailable: 1 } : {}),
+        // Match type only applies to padel.
+        ...(isPadel && matchType ? { matchType } : {}),
+      }),
   });
 
   useEffect(() => {
-    const cleanup = showMainButton("🏟️ Host a Game", () => {
+    const cleanup = showMainButton(`${meta.icon} Host a Game`, () => {
       hapticImpact("medium");
       router.push("/create");
     });
@@ -34,41 +60,94 @@ export default function HomePage() {
       cleanup();
       hideMainButton();
     };
-  }, [router]);
+  }, [router, meta.icon]);
 
   const matches = data?.data ?? [];
 
   return (
     <div className="min-h-screen pb-24">
-      {/* Header */}
       <header className="px-4 pt-5 pb-3 sticky top-0 z-30" style={{ background: "var(--tg-bg)" }}>
-        <div className="text-xl font-extrabold tracking-tight">
-          <span className="text-[#00C853]">SCORE</span>
-          <span> WITH US</span>
-        </div>
-        <p className="text-sm mt-0.5" style={{ color: "var(--tg-hint)" }}>
-          Games in Tashkent
-        </p>
+        {/* Sport in City */}
+        <SportCityHeader
+          sport={sport}
+          city={district || city}
+          onSportChange={(s) => {
+            setSport(s);
+            // Match-type filter is padel-only; clear it when leaving padel.
+            if (s !== "PADEL") setMatchType("");
+          }}
+          onCityClick={() => setCityOpen(true)}
+        />
 
-        {/* Sport filter chips */}
+        {/* Filter pills */}
         <div className="flex gap-2 overflow-x-auto mt-3 -mx-4 px-4 pb-1">
-          {SPORTS.map((s) => (
+          <label className={`pill ${date ? "pill-active" : ""}`}>
+            <Calendar size={15} />
+            <span>{date ? dayjs(date).format("MMM D") : "Date"}</span>
+            <input
+              type="date"
+              value={date}
+              min={dayjs().format("YYYY-MM-DD")}
+              onChange={(e) => setDate(e.target.value)}
+              className="absolute inset-0 opacity-0"
+            />
+          </label>
+          <button
+            className={`pill ${timeOfDay ? "pill-active" : ""}`}
+            onClick={() => {
+              hapticImpact("light");
+              setTimeOpen(true);
+            }}
+          >
+            <Clock size={15} />
+            <span>{TIMES.find((t) => t.key === timeOfDay)?.label ?? "Time"}</span>
+          </button>
+          {/* Match type is padel-only */}
+          {isPadel && (
+            <>
+              <button
+                className={`pill ${matchType === "COMPETITIVE" ? "pill-active" : ""}`}
+                onClick={() => {
+                  hapticImpact("light");
+                  setMatchType((v) => (v === "COMPETITIVE" ? "" : "COMPETITIVE"));
+                }}
+              >
+                <span>⚔️ Competitive</span>
+              </button>
+              <button
+                className={`pill ${matchType === "CASUAL" ? "pill-active" : ""}`}
+                onClick={() => {
+                  hapticImpact("light");
+                  setMatchType((v) => (v === "CASUAL" ? "" : "CASUAL"));
+                }}
+              >
+                <span>😎 Casual</span>
+              </button>
+            </>
+          )}
+          <button
+            className={`pill ${spotsOnly ? "pill-active" : ""}`}
+            onClick={() => {
+              hapticImpact("light");
+              setSpotsOnly((v) => !v);
+            }}
+          >
+            <span>Spots available</span>
+          </button>
+          {(date || timeOfDay || spotsOnly || district || matchType) && (
             <button
-              key={s.key}
+              className="pill"
               onClick={() => {
-                hapticImpact("light");
-                setSport(s.key);
+                setDate("");
+                setTimeOfDay("");
+                setSpotsOnly(false);
+                setDistrict("");
+                setMatchType("");
               }}
-              className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                sport === s.key
-                  ? "bg-[#00C853] text-white border-[#00C853]"
-                  : "border-black/10 text-[color:var(--tg-hint)]"
-              }`}
-              style={sport === s.key ? {} : { background: "var(--tg-card)" }}
             >
-              {s.label}
+              ✕ Clear
             </button>
-          ))}
+          )}
         </div>
       </header>
 
@@ -80,10 +159,10 @@ export default function HomePage() {
           </div>
         ) : matches.length === 0 ? (
           <div className="text-center py-20">
-            <div className="text-4xl mb-2">🗓️</div>
-            <p className="font-medium">No open games right now</p>
+            <div className="text-4xl mb-2">{meta.icon}</div>
+            <p className="font-medium">No {meta.label.toLowerCase()} games match your filters</p>
             <p className="text-sm mt-1" style={{ color: "var(--tg-hint)" }}>
-              Be the first — host one!
+              Try clearing filters — or host one!
             </p>
           </div>
         ) : (
@@ -91,7 +170,142 @@ export default function HomePage() {
         )}
       </div>
 
+      {/* City bottom sheet */}
+      {cityOpen && (
+        <Sheet title="Select location" onClose={() => setCityOpen(false)}>
+          {(cities ?? []).map((c) => (
+            <div key={c.city} className="mb-2">
+              <SheetRow
+                label={c.city}
+                selected={city === c.city && !district}
+                onClick={() => {
+                  setCity(c.city);
+                  setDistrict("");
+                  setCityOpen(false);
+                }}
+              />
+              <div className="pl-3">
+                {c.districts.map((d) => (
+                  <SheetRow
+                    key={d}
+                    label={d}
+                    small
+                    selected={district === d}
+                    onClick={() => {
+                      setCity(c.city);
+                      setDistrict(d);
+                      setCityOpen(false);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+          {(cities ?? []).length === 0 && (
+            <p className="text-sm text-center py-6" style={{ color: "var(--tg-hint)" }}>
+              No locations yet.
+            </p>
+          )}
+        </Sheet>
+      )}
+
+      {/* Time-of-day bottom sheet */}
+      {timeOpen && (
+        <Sheet title="Time of day" onClose={() => setTimeOpen(false)}>
+          {TIMES.map((t) => (
+            <SheetRow
+              key={t.key}
+              label={t.label}
+              selected={timeOfDay === t.key}
+              onClick={() => {
+                setTimeOfDay(t.key);
+                setTimeOpen(false);
+              }}
+            />
+          ))}
+        </Sheet>
+      )}
+
       <BottomNav />
+
+      <style jsx>{`
+        .dropdown {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 12px;
+          border-radius: 999px;
+          background: var(--tg-card);
+          font-size: 15px;
+        }
+        .pill {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          flex-shrink: 0;
+          padding: 7px 13px;
+          border-radius: 999px;
+          font-size: 13px;
+          font-weight: 500;
+          background: var(--tg-card);
+          color: var(--tg-hint);
+          border: 1px solid rgba(0, 0, 0, 0.08);
+        }
+        .pill-active {
+          background: #00c853;
+          color: #fff;
+          border-color: #00c853;
+        }
+      `}</style>
     </div>
+  );
+}
+
+function Sheet({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={onClose}>
+      <div
+        className="w-full max-h-[70vh] overflow-y-auto rounded-t-3xl p-4 pb-8"
+        style={{ background: "var(--tg-bg)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="font-bold text-base mb-3">{title}</div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SheetRow({
+  label,
+  selected,
+  small,
+  onClick,
+}: {
+  label: string;
+  selected?: boolean;
+  small?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center justify-between rounded-xl px-3 ${
+        small ? "py-2 text-sm" : "py-2.5"
+      }`}
+      style={{ color: selected ? "#00C853" : "var(--tg-text)" }}
+    >
+      <span>{label}</span>
+      {selected && <Check size={16} />}
+    </button>
   );
 }

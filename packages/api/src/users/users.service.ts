@@ -1,11 +1,17 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { RankingService } from '../ranking/ranking.service';
+import { LevelService } from '../level/level.service';
 import { v2 as cloudinary } from 'cloudinary';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private ranking: RankingService,
+    private level: LevelService,
+  ) {
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
@@ -179,7 +185,18 @@ export class UsersService {
         eloRating: true,
         reliabilityScore: true,
         skillLevel: true,
+        padelLevel: true,
+        padelReliability: true,
+        padelMatchesPlayed: true,
+        padelMatchesWon: true,
+        currentStreak: true,
+        bestHand: true,
+        courtPosition: true,
         city: true,
+        district: true,
+        gamesAttended: true,
+        gamesThisMonth: true,
+        playerLevel: true,
         createdAt: true,
         preferredPositions: true,
         _count: {
@@ -217,8 +234,186 @@ export class UsersService {
 
     return {
       ...user,
+      levelInfo: this.ranking.getLevelInfo(user.playerLevel),
+      band: this.level.getLevelBand(user.padelLevel),
       ratings: { thumbsUp, thumbsDown },
       recentMatches,
+    };
+  }
+
+  async searchPlayers(query: string, city?: string) {
+    if (!query || query.trim().length < 2) return [];
+    return this.prisma.user.findMany({
+      where: {
+        role: 'PLAYER',
+        isBanned: false,
+        ...(city ? { city } : {}),
+        OR: [
+          { firstName: { contains: query, mode: 'insensitive' } },
+          { lastName: { contains: query, mode: 'insensitive' } },
+          { telegramUsername: { contains: query, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        gamesAttended: true,
+        playerLevel: true,
+        eloRating: true,
+        city: true,
+        district: true,
+      },
+      orderBy: { gamesAttended: 'desc' },
+      take: 30,
+    });
+  }
+
+  async getMatchPlayers(matchId: string) {
+    const bookings = await this.prisma.booking.findMany({
+      where: { matchId, status: { in: ['CONFIRMED', 'COMPLETED'] } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            gamesAttended: true,
+            playerLevel: true,
+            eloRating: true,
+            padelLevel: true,
+          },
+        },
+        positionTaken: { select: { position: true } },
+      },
+    });
+    return bookings.map((b) => ({
+      ...b.user,
+      position: b.positionTaken?.position ?? null,
+      teamSide: b.teamSide,
+      checkedIn: b.checkedIn,
+    }));
+  }
+
+  // ─── PLAYER STATISTICS (skill rating profile) ─────────────────────────────
+  async getStatistics(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        padelLevel: true,
+        padelReliability: true,
+        padelMatchesPlayed: true,
+        padelMatchesWon: true,
+        padelMatchesLost: true,
+        currentStreak: true,
+        longestWinStreak: true,
+        bestHand: true,
+        courtPosition: true,
+        preferredMatchType: true,
+      },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const effectiveness =
+      user.padelMatchesPlayed > 0
+        ? Math.round((user.padelMatchesWon / user.padelMatchesPlayed) * 100)
+        : 0;
+
+    const [{ partners, opponents, clubs }, levelHistory] = await Promise.all([
+      this.getPlayHistory(userId),
+      this.level.getLevelHistory(userId),
+    ]);
+
+    return {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      avatarUrl: user.avatarUrl,
+      level: user.padelLevel,
+      reliability: user.padelReliability,
+      band: this.level.getLevelBand(user.padelLevel),
+      matchesPlayed: user.padelMatchesPlayed,
+      matchesWon: user.padelMatchesWon,
+      matchesLost: user.padelMatchesLost,
+      effectiveness,
+      currentStreak: user.currentStreak,
+      longestWinStreak: user.longestWinStreak,
+      preferences: {
+        bestHand: user.bestHand,
+        courtPosition: user.courtPosition,
+        preferredMatchType: user.preferredMatchType,
+      },
+      recentPartners: partners,
+      recentOpponents: opponents,
+      recentClubs: clubs,
+      levelHistory,
+    };
+  }
+
+  // Single pass over the user's recent completed matches to derive the social
+  // history shown on the profile: partners (same team), opponents (other team),
+  // and clubs played at (with visit counts).
+  private async getPlayHistory(userId: string) {
+    const myBookings = await this.prisma.booking.findMany({
+      where: { userId, status: { in: ['COMPLETED', 'CONFIRMED'] } },
+      select: {
+        teamSide: true,
+        match: {
+          select: {
+            id: true,
+            startTime: true,
+            pitch: { select: { id: true, name: true, district: true } },
+            bookings: {
+              where: { status: { in: ['COMPLETED', 'CONFIRMED'] } },
+              select: {
+                teamSide: true,
+                user: {
+                  select: { id: true, firstName: true, lastName: true, avatarUrl: true, padelLevel: true },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { match: { startTime: 'desc' } },
+      take: 40,
+    });
+
+    type PlayerLite = { id: string; firstName: string; lastName: string; avatarUrl: string | null; padelLevel: number };
+    const partnerMap = new Map<string, PlayerLite & { count: number }>();
+    const opponentMap = new Map<string, PlayerLite & { count: number }>();
+    const clubMap = new Map<string, { id: string; name: string; district: string | null; visits: number }>();
+
+    for (const b of myBookings) {
+      const pitch = b.match.pitch;
+      if (pitch) {
+        const c = clubMap.get(pitch.id);
+        if (c) c.visits++;
+        else clubMap.set(pitch.id, { id: pitch.id, name: pitch.name, district: pitch.district, visits: 1 });
+      }
+      for (const co of b.match.bookings) {
+        if (co.user.id === userId) continue;
+        const sameTeam = b.teamSide != null && co.teamSide != null && b.teamSide === co.teamSide;
+        const map = sameTeam ? partnerMap : opponentMap;
+        const existing = map.get(co.user.id);
+        if (existing) existing.count++;
+        else map.set(co.user.id, { ...co.user, count: 1 });
+      }
+    }
+
+    const sortByCount = <T extends { count: number }>(arr: T[]) =>
+      arr.sort((a, b) => b.count - a.count).slice(0, 10);
+
+    return {
+      partners: sortByCount([...partnerMap.values()]),
+      opponents: sortByCount([...opponentMap.values()]),
+      clubs: [...clubMap.values()].sort((a, b) => b.visits - a.visits).slice(0, 10),
     };
   }
 

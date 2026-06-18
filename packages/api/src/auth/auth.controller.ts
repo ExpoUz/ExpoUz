@@ -74,6 +74,14 @@ export class AuthController {
     return this.authService.telegramAuth(initData);
   }
 
+  @Post('telegram/admin')
+  @ApiOperation({ summary: 'Authenticate an admin via @ExpoUzAdminBot Mini App' })
+  @ApiResponse({ status: 200, description: 'Tokens returned' })
+  @ApiResponse({ status: 403, description: 'Not an authorized admin' })
+  telegramAdminAuth(@Body('initData') initData: string) {
+    return this.authService.telegramAdminAuth(initData);
+  }
+
   @Post('google')
   @ApiOperation({ summary: 'Sign in or register with Google ID token' })
   @ApiResponse({ status: 200, description: 'Tokens returned' })

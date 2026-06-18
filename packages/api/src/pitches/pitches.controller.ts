@@ -33,6 +33,7 @@ export class PitchesController {
 
   @Get()
   @ApiOperation({ summary: 'Get all pitches with optional filters' })
+  @ApiQuery({ name: 'sport', required: false })
   @ApiQuery({ name: 'city', required: false })
   @ApiQuery({ name: 'district', required: false })
   @ApiQuery({ name: 'isIndoor', required: false, type: Boolean })
@@ -40,6 +41,7 @@ export class PitchesController {
   @ApiQuery({ name: 'pitchSize', required: false })
   @ApiQuery({ name: 'isVerified', required: false, type: Boolean })
   findAll(
+    @Query('sport') sport?: string,
     @Query('city') city?: string,
     @Query('district') district?: string,
     @Query('isIndoor') isIndoor?: string,
@@ -48,6 +50,7 @@ export class PitchesController {
     @Query('isVerified') isVerified?: string,
   ) {
     return this.pitchesService.findAll({
+      sport,
       city,
       district,
       isIndoor: isIndoor !== undefined ? isIndoor === 'true' : undefined,

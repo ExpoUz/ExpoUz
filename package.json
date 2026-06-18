@@ -1,12 +1,12 @@
 {
-  "name": "playwithus",
+  "name": "expouz",
   "version": "1.0.0",
   "private": true,
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
-  "description": "PlayWithUs — Sports matchmaking and booking platform for Uzbekistan",
+  "description": "ExpoUz — Sports matchmaking and booking platform for Uzbekistan",
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",

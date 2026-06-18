@@ -61,7 +61,7 @@ export default function AdminAiScreen() {
     {
       id: '0',
       role: 'assistant',
-      text: "Hi! I'm your ScoreWithUs AI assistant powered by Gemini. I have access to live platform data — ask me anything about users, pitches, revenue, or platform health.\n\nTry one of the quick prompts below to get started.",
+      text: "Hi! I'm your ExpoUz AI assistant powered by Gemini. I have access to live platform data — ask me anything about users, pitches, revenue, or platform health.\n\nTry one of the quick prompts below to get started.",
       timestamp: new Date(),
     },
   ]);

@@ -1,10 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
 
 type Step = "phone" | "otp";
+
+// Persist tokens to localStorage AND the cookie the middleware checks.
+function setSession(accessToken: string, refreshToken: string, user: any) {
+  localStorage.setItem("admin_access_token", accessToken);
+  localStorage.setItem("admin_refresh_token", refreshToken);
+  localStorage.setItem("admin_user", JSON.stringify(user));
+  document.cookie = `admin_token=${accessToken}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,6 +21,42 @@ export default function LoginPage() {
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [tgChecking, setTgChecking] = useState(true);
+
+  // If launched inside Telegram (@ExpoUzAdminBot), authenticate via initData.
+  useEffect(() => {
+    const tg = (typeof window !== "undefined" && (window as any).Telegram?.WebApp) || null;
+    const initData = tg?.initData;
+    if (!initData) {
+      setTgChecking(false);
+      return;
+    }
+    tg.ready?.();
+    tg.expand?.();
+    (async () => {
+      try {
+        const { data } = await authApi.post("/auth/telegram/admin", { initData });
+        setSession(data.accessToken, data.refreshToken, data.user);
+        router.replace("/");
+      } catch (err: any) {
+        setError(
+          err?.response?.data?.message ??
+            "This Telegram account isn't authorized for admin access.",
+        );
+        setTgChecking(false);
+      }
+    })();
+  }, [router]);
+
+  if (tgChecking && typeof window !== "undefined" && (window as any).Telegram?.WebApp?.initData) {
+    return (
+      <div className="min-h-screen bg-[#0D1117] flex flex-col items-center justify-center gap-3">
+        <span className="w-7 h-7 border-2 border-[#00C853] border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-400 text-sm">Signing you in…</p>
+        {error && <p className="text-red-400 text-xs px-8 text-center">{error}</p>}
+      </div>
+    );
+  }
 
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
@@ -48,9 +92,7 @@ export default function LoginPage() {
         return;
       }
 
-      localStorage.setItem("admin_access_token", accessToken);
-      localStorage.setItem("admin_refresh_token", refreshToken);
-      localStorage.setItem("admin_user", JSON.stringify(user));
+      setSession(accessToken, refreshToken, user);
       router.replace("/");
     } catch (err: any) {
       setError(err?.response?.data?.message ?? "Invalid OTP");

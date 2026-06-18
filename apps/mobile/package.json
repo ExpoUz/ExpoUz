@@ -1,5 +1,5 @@
 {
-  "name": "@playwithus/mobile",
+  "name": "@expouz/mobile",
   "version": "1.0.0",
   "private": true,
   "main": "expo-router/entry",
@@ -14,7 +14,7 @@
   "dependencies": {
     "@babel/runtime": "^7.29.2",
     "@expo/metro-runtime": "^3.2.3",
-    "@playwithus/shared": "workspace:*",
+    "@expouz/shared": "workspace:*",
     "@tanstack/react-query": "^5.40.0",
     "@twa-dev/sdk": "^8.0.2",
     "axios": "^1.7.2",

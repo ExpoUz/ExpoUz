@@ -1,15 +1,15 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────────────────
-#  ScoreWithUs — Production Deploy Script
+#  ExpoUz — Production Deploy Script
 #  Usage: ./scripts/deploy.sh [--skip-build]
 # ─────────────────────────────────────────────────────────────────
 set -e
 
-DOMAIN_API="api.scorewithus.uz"
-DOMAIN_ADMIN="admin.scorewithus.uz"
-DOMAIN_APP="app.scorewithus.uz"
+DOMAIN_API="api.expouz.uz"
+DOMAIN_ADMIN="admin.expouz.uz"
+DOMAIN_APP="app.expouz.uz"
 
-echo "🚀 ScoreWithUs Deploy"
+echo "🚀 ExpoUz Deploy"
 echo "─────────────────────"
 
 # ── 1. Check .env exists ─────────────────────────────────────────
@@ -45,7 +45,7 @@ for DOMAIN in $DOMAIN_API $DOMAIN_ADMIN $DOMAIN_APP; do
       certbot/certbot certonly \
         --webroot -w /var/www/certbot \
         -d "$DOMAIN" \
-        --email admin@scorewithus.uz \
+        --email admin@expouz.uz \
         --agree-tos --non-interactive
   else
     echo "   ✓ Cert exists for $DOMAIN"

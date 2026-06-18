@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
-import { IUserPublic } from '@playwithus/shared';
+import { IUserPublic } from '@expouz/shared';
 
 export type AvatarSize = 'sm' | 'md' | 'lg';
 

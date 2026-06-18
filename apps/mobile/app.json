@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "PlayWithUs",
-    "slug": "playwithus",
+    "name": "ExpoUz",
+    "slug": "expouz",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,14 +14,14 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.playwithus.app"
+      "bundleIdentifier": "com.expouz.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1A3A2E"
       },
-      "package": "com.playwithus.app"
+      "package": "com.expouz.app"
     },
     "plugins": [
       "expo-router",
@@ -30,10 +30,10 @@
       "expo-notifications",
       [
         "expo-secure-store",
-        { "faceIDPermission": "Allow PlayWithUs to use Face ID." }
+        { "faceIDPermission": "Allow ExpoUz to use Face ID." }
       ]
     ],
-    "scheme": "playwithus",
+    "scheme": "expouz",
     "web": {
       "bundler": "metro",
       "output": "single",

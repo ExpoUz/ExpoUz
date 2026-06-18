@@ -19,7 +19,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
 import { PlayerAvatar } from '@/components/ui/PlayerAvatar';
 import { BottomSheet } from '@/components/ui/BottomSheet';
-import { formatUZS } from '@playwithus/shared';
+import { formatUZS } from '@expouz/shared';
 
 const SPORT_ICON: Record<string, string> = { FOOTBALL: '⚽', PADEL: '🏓', TENNIS: '🎾' };
 const AMENITY_ICON: Record<string, string> = {

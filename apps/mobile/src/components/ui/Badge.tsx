@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
-import { MatchStatus } from '@playwithus/shared';
+import { MatchStatus } from '@expouz/shared';
 
 export type BadgeVariant = 'full' | 'hot' | 'indoor' | 'outdoor' | 'skill' | 'status' | 'custom';
 
