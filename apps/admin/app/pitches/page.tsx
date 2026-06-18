@@ -4,9 +4,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPendingPitches, verifyPitch, getAllPitches, createPitch, getPitchAdmins } from "@/lib/api";
 import { useState } from "react";
 import dayjs from "dayjs";
+import { useSportFilter, sportParam } from "@/lib/sport-store";
 
 export default function PitchesPage() {
   const qc = useQueryClient();
+  const sport = useSportFilter();
   const [tab, setTab] = useState<"pending" | "all">("pending");
   const [showCreate, setShowCreate] = useState(false);
 
@@ -17,8 +19,8 @@ export default function PitchesPage() {
   });
 
   const { data: allPitches, isLoading: allLoading } = useQuery({
-    queryKey: ["admin-pitches-all"],
-    queryFn: getAllPitches,
+    queryKey: ["admin-pitches-all", sport],
+    queryFn: () => getAllPitches({ sport: sportParam(sport) }),
     enabled: tab === "all",
   });
 
@@ -38,8 +40,12 @@ export default function PitchesPage() {
     <div className="p-8">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pitches</h1>
-          <p className="text-gray-500 text-sm mt-1">Review and manage padel courts</p>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {sport === "PADEL" ? "Padel Courts" : sport === "FOOTBALL" ? "Football Pitches" : "Pitches & Courts"}
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Review and manage football pitches and padel courts
+          </p>
         </div>
         <button
           type="button"
@@ -120,6 +126,7 @@ function PitchCard({
   isPending: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const isPadel = pitch.sport === "PADEL";
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -128,34 +135,46 @@ function PitchCard({
           {/* Main Info */}
           <div className="flex items-start gap-4 flex-1 min-w-0">
             <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center text-2xl flex-shrink-0">
-              🏟
+              {isPadel ? "🎾" : "⚽"}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-semibold text-gray-900 text-base">{pitch.name}</span>
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                  {isPadel ? "🎾 Padel" : "⚽ Football"}
+                </span>
                 {pitch.isVerified ? (
                   <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✓ Verified</span>
                 ) : (
                   <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Pending</span>
                 )}
               </div>
-              <div className="text-sm text-gray-500">{pitch.address}</div>
+              <div className="text-sm text-gray-500">{pitch.addressLine}</div>
               <div className="text-xs text-gray-400 mt-0.5">
-                {pitch.city} · Owner: {pitch.owner?.firstName ?? "—"} {pitch.owner?.lastName ?? ""}
+                {pitch.district ? `${pitch.district}, ` : ""}{pitch.city} · Owner: {pitch.owner?.firstName ?? "—"} {pitch.owner?.lastName ?? ""}
               </div>
 
-              <div className="flex gap-4 mt-3 text-xs text-gray-500">
-                <span>⚽ {pitch.sport ?? "FOOTBALL"}</span>
-                <span>👥 Capacity: {pitch.capacity ?? "?"}</span>
-                <span>🕐 {pitch.openTime ?? "—"} – {pitch.closeTime ?? "—"}</span>
-                <span>💰 {pitch.pricePerHour?.toLocaleString() ?? "?"} UZS/hr</span>
+              <div className="flex gap-4 mt-3 text-xs text-gray-500 flex-wrap">
+                {isPadel ? (
+                  <>
+                    <span>🎾 {pitch.courtType ?? "—"}</span>
+                    <span>{pitch.isCovered ? "🏠 Covered" : "☀️ Outdoor"}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🌱 {pitch.surfaceType ?? "—"}</span>
+                    <span>{pitch.isIndoor ? "🏠 Indoor" : "☀️ Outdoor"}</span>
+                    <span>👥 {pitch.pitchSize ?? "—"}</span>
+                  </>
+                )}
+                <span>💰 {Number(pitch.hourlyRate ?? 0).toLocaleString()} UZS/hr</span>
               </div>
 
               {pitch.amenities && pitch.amenities.length > 0 && (
                 <div className="flex gap-1 mt-2 flex-wrap">
                   {pitch.amenities.slice(0, 5).map((a: any) => (
                     <span key={a.id} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                      {a.name}
+                      {a.type}
                     </span>
                   ))}
                 </div>
@@ -196,7 +215,7 @@ function PitchCard({
         {expanded && (
           <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-600 space-y-1">
             <div><span className="font-medium">Description:</span> {pitch.description ?? "—"}</div>
-            <div><span className="font-medium">Lat/Lon:</span> {pitch.latitude ?? "—"} / {pitch.longitude ?? "—"}</div>
+            <div><span className="font-medium">Lat/Lon:</span> {pitch.lat ?? "—"} / {pitch.lng ?? "—"}</div>
             <div><span className="font-medium">Submitted:</span> {dayjs(pitch.createdAt).format("MMMM D, YYYY HH:mm")}</div>
           </div>
         )}

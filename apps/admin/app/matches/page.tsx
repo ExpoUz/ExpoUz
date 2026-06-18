@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getMatches } from "@/lib/api";
 import { useState } from "react";
 import dayjs from "dayjs";
+import { useSportFilter, sportParam } from "@/lib/sport-store";
 
 const STATUS_COLORS: Record<string, string> = {
   OPEN: "bg-green-100 text-green-700",
@@ -16,6 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 const SPORT_ICONS: Record<string, string> = {
   FOOTBALL: "⚽",
+  PADEL: "🎾",
   FUTSAL: "🎯",
   BASKETBALL: "🏀",
   VOLLEYBALL: "🏐",
@@ -23,9 +25,10 @@ const SPORT_ICONS: Record<string, string> = {
 };
 
 export default function MatchesPage() {
+  const sport = useSportFilter();
   const { data: matches, isLoading } = useQuery({
-    queryKey: ["admin-matches"],
-    queryFn: () => getMatches(),
+    queryKey: ["admin-matches", sport],
+    queryFn: () => getMatches({ sport: sportParam(sport) }),
   });
 
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -86,6 +89,7 @@ export default function MatchesPage() {
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Pitch</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Creator</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Format</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Players</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Date / Time</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
@@ -96,7 +100,7 @@ export default function MatchesPage() {
             {isLoading &&
               [...Array(6)].map((_, i) => (
                 <tr key={i}>
-                  {[...Array(8)].map((_, j) => (
+                  {[...Array(9)].map((_, j) => (
                     <td key={j} className="px-5 py-3">
                       <div className="h-4 bg-gray-100 rounded animate-pulse" />
                     </td>
@@ -105,7 +109,7 @@ export default function MatchesPage() {
               ))}
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-5 py-12 text-center text-gray-400">
+                <td colSpan={9} className="px-5 py-12 text-center text-gray-400">
                   No matches found
                 </td>
               </tr>
@@ -139,6 +143,15 @@ export default function MatchesPage() {
                   </td>
                   <td className="px-5 py-3 text-gray-600">
                     {m.format ?? "—"}
+                  </td>
+                  <td className="px-5 py-3">
+                    {m.sport === "PADEL" ? (
+                      <span className="text-xs font-medium text-gray-600">
+                        {m.matchType === "CASUAL" ? "😎 Casual" : "⚔️ Competitive"}
+                      </span>
+                    ) : (
+                      <span className="text-gray-300">—</span>
+                    )}
                   </td>
                   <td className="px-5 py-3">
                     <PlayersBar

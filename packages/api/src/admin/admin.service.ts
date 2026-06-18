@@ -31,6 +31,11 @@ export class AdminService {
       pendingPitches,
       failedTransactions,
       activeBookingsToday,
+      footballMatches,
+      padelMatches,
+      footballPitches,
+      padelPitches,
+      assessedPadelPlayers,
     ] = await Promise.all([
       this.prisma.user.count({ where: { deletedAt: null, isBanned: false } }),
       this.prisma.match.count({ where: { status: { in: ['OPEN', 'FULL', 'CONFIRMED', 'IN_PROGRESS'] } } }),
@@ -56,6 +61,11 @@ export class AdminService {
           createdAt: { gte: todayStart },
         },
       }),
+      this.prisma.match.count({ where: { sport: 'FOOTBALL' } }),
+      this.prisma.match.count({ where: { sport: 'PADEL' } }),
+      this.prisma.pitch.count({ where: { sport: 'FOOTBALL' } }),
+      this.prisma.pitch.count({ where: { sport: 'PADEL' } }),
+      this.prisma.user.count({ where: { padelInitialSet: true } }),
     ]);
 
     return {
@@ -66,6 +76,10 @@ export class AdminService {
       pendingPitches,
       failedTransactions,
       dailyActiveUsers: activeBookingsToday,
+      sportBreakdown: {
+        football: { matches: footballMatches, pitches: footballPitches },
+        padel: { matches: padelMatches, pitches: padelPitches, assessedPlayers: assessedPadelPlayers },
+      },
     };
   }
 
@@ -103,6 +117,10 @@ export class AdminService {
           isBanned: true,
           eloRating: true,
           skillLevel: true,
+          reliabilityScore: true,
+          gamesAttended: true,
+          padelLevel: true,
+          padelInitialSet: true,
           city: true,
           createdAt: true,
           _count: { select: { bookings: true } },
@@ -159,10 +177,11 @@ export class AdminService {
     });
   }
 
-  async getMatches(filters: { status?: string; page?: number; limit?: number }) {
-    const { status, page = 1, limit = 20 } = filters;
+  async getMatches(filters: { sport?: string; status?: string; page?: number; limit?: number }) {
+    const { sport, status, page = 1, limit = 20 } = filters;
     const where: any = {};
     if (status) where.status = status;
+    if (sport) where.sport = sport;
 
     const skip = (page - 1) * limit;
     const [matches, total] = await Promise.all([
@@ -275,6 +294,39 @@ export class AdminService {
     }
 
     return Object.values(grouped);
+  }
+
+  // Padel-specific analytics: level distribution across the 0–7 bands and the
+  // casual vs competitive match split. Only counts players who've been assessed.
+  async getPadelAnalytics() {
+    const [players, casual, competitive] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { padelInitialSet: true },
+        select: { padelLevel: true },
+      }),
+      this.prisma.match.count({ where: { sport: 'PADEL', matchType: 'CASUAL' } }),
+      this.prisma.match.count({ where: { sport: 'PADEL', matchType: 'COMPETITIVE' } }),
+    ]);
+
+    const bands = [
+      { band: '0–1', min: 0, max: 1 },
+      { band: '1–2', min: 1, max: 2 },
+      { band: '2–3', min: 2, max: 3 },
+      { band: '3–4', min: 3, max: 4 },
+      { band: '4–5', min: 4, max: 5 },
+      { band: '5–6', min: 5, max: 6 },
+      { band: '6–7', min: 6, max: 7.0001 },
+    ];
+    const distribution = bands.map((b) => ({
+      band: b.band,
+      count: players.filter((p) => p.padelLevel >= b.min && p.padelLevel < b.max).length,
+    }));
+
+    return {
+      totalAssessed: players.length,
+      distribution,
+      matchTypeSplit: { casual, competitive },
+    };
   }
 
   async updateCommission(rate: number) {
@@ -639,6 +691,7 @@ export class AdminService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   async getAllPitches(filters: {
+    sport?: string;
     city?: string;
     ownerId?: string;
     locationId?: string;
@@ -647,8 +700,9 @@ export class AdminService {
     page?: number;
     limit?: number;
   }) {
-    const { page = 1, limit = 20, isVerified, city, ownerId, locationId, search } = filters;
+    const { page = 1, limit = 20, isVerified, sport, city, ownerId, locationId, search } = filters;
     const where: any = {};
+    if (sport) where.sport = sport;
     if (city) where.city = city;
     if (ownerId) where.ownerId = ownerId;
     if (locationId) where.locationId = locationId;

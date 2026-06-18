@@ -104,8 +104,8 @@ export async function verifyPitch(id: string, approved: boolean) {
   return data;
 }
 
-export async function getAllPitches(): Promise<any[]> {
-  const { data } = await adminApi.get("/admin/pitches");
+export async function getAllPitches(params?: { sport?: string }): Promise<any[]> {
+  const { data } = await adminApi.get("/admin/pitches", { params: { limit: 200, ...params } });
   return data?.data ?? data ?? [];
 }
 
@@ -162,7 +162,7 @@ export async function deleteLocation(id: string) {
 }
 
 // ─── Matches ─────────────────────────────────────────────────
-export async function getMatches(params?: { page?: number; limit?: number }): Promise<any[]> {
+export async function getMatches(params?: { page?: number; limit?: number; sport?: string }): Promise<any[]> {
   const { data } = await adminApi.get("/admin/matches", { params: { limit: 100, ...params } });
   return data?.data ?? data ?? [];
 }
@@ -187,6 +187,16 @@ export async function manualRelease(transactionId: string) {
 export async function getRevenue(period: "week" | "month" | "year" = "month"): Promise<any[]> {
   const { data } = await adminApi.get("/admin/analytics/revenue", { params: { period } });
   return Array.isArray(data) ? data : [];
+}
+
+// ─── Padel Analytics ──────────────────────────────────────────
+export async function getPadelAnalytics(): Promise<{
+  totalAssessed: number;
+  distribution: { band: string; count: number }[];
+  matchTypeSplit: { casual: number; competitive: number };
+}> {
+  const { data } = await adminApi.get("/admin/analytics/padel");
+  return data;
 }
 
 // ─── Settings ─────────────────────────────────────────────────

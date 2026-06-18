@@ -94,14 +94,16 @@ export class AdminController {
 
   @Get('matches')
   @ApiOperation({ summary: 'Get all matches' })
+  @ApiQuery({ name: 'sport', required: false })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   getMatches(
+    @Query('sport') sport?: string,
     @Query('status') status?: string,
     @Query('page') page = 1,
     @Query('limit') limit = 20,
   ) {
-    return this.adminService.getMatches({ status, page: +page, limit: +limit });
+    return this.adminService.getMatches({ sport, status, page: +page, limit: +limit });
   }
 
   @Delete('matches/:id')
@@ -133,6 +135,12 @@ export class AdminController {
   @ApiQuery({ name: 'period', enum: ['week', 'month', 'year'], required: false })
   getRevenueAnalytics(@Query('period') period: 'week' | 'month' | 'year' = 'month') {
     return this.adminService.getRevenueAnalytics(period);
+  }
+
+  @Get('analytics/padel')
+  @ApiOperation({ summary: 'Padel level distribution + casual/competitive split' })
+  getPadelAnalytics() {
+    return this.adminService.getPadelAnalytics();
   }
 
   @Patch('settings/commission')
@@ -294,6 +302,7 @@ export class AdminController {
 
   @Get('pitches')
   @ApiOperation({ summary: 'Get all pitches with owner, location, and booking counts' })
+  @ApiQuery({ name: 'sport', required: false })
   @ApiQuery({ name: 'city', required: false })
   @ApiQuery({ name: 'ownerId', required: false })
   @ApiQuery({ name: 'locationId', required: false })
@@ -302,6 +311,7 @@ export class AdminController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getAllPitches(
+    @Query('sport') sport?: string,
     @Query('city') city?: string,
     @Query('ownerId') ownerId?: string,
     @Query('locationId') locationId?: string,
@@ -311,6 +321,7 @@ export class AdminController {
     @Query('limit') limit = 20,
   ) {
     return this.adminService.getAllPitches({
+      sport,
       city,
       ownerId,
       locationId,
