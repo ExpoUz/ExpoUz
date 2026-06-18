@@ -1,21 +1,37 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import Link from "next/link";
-import { getMe, getStatistics, getMyBookings, getSkillBand, formatLevel } from "@/lib/api";
+import {
+  getMe,
+  getStatistics,
+  getMyBookings,
+  getSkillBand,
+  formatLevel,
+  LEVEL_META,
+} from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { LevelChart } from "@/components/LevelChart";
 import { SkillBadge } from "@/components/SkillBadge";
 import { useAuth } from "@/lib/auth";
-import { hideMainButton } from "@/lib/telegram";
+import { useSportStore, type Sport } from "@/lib/sport-store";
+import { hideMainButton, hapticImpact } from "@/lib/telegram";
 import { useEffect } from "react";
 
 const HAND_LABEL: Record<string, string> = { LEFT: "Left ✋", RIGHT: "Right ✋" };
 const POS_LABEL: Record<string, string> = { FOREHAND: "Forehand", BACKHAND: "Backhand", BOTH: "Both sides" };
+const FOOTBALL_SKILL: Record<string, { label: string; color: string }> = {
+  BEGINNER: { label: "Beginner", color: "#34D399" },
+  AMATEUR: { label: "Amateur", color: "#00B0FF" },
+  PRO: { label: "Pro", color: "#F59E0B" },
+};
 
 export default function ProfilePage() {
   const { user: cached } = useAuth();
+  const { sport: storeSport } = useSportStore();
+  const [tab, setTab] = useState<Sport>(storeSport);
 
   useEffect(() => {
     hideMainButton();
@@ -30,11 +46,7 @@ export default function ProfilePage() {
   const { data: bookings } = useQuery({ queryKey: ["tma-bookings"], queryFn: getMyBookings });
 
   const initials = `${me?.firstName?.[0] ?? ""}${me?.lastName?.[0] ?? ""}`.toUpperCase() || "?";
-  const level = stats?.level ?? me?.skillRating ?? 0;
-  const band = getSkillBand(Number(level));
-  const reliability = stats?.reliability ?? me?.levelReliability ?? 0;
-  const effectiveness = stats?.effectiveness ?? 0;
-  const streak = stats?.currentStreak ?? 0;
+  const isPadel = tab === "PADEL";
 
   return (
     <div className="min-h-screen pb-24">
@@ -53,17 +65,53 @@ export default function ProfilePage() {
             <h1 className="text-lg font-bold truncate">
               {me?.firstName} {me?.lastName}
             </h1>
-            <div className="mt-1">
-              <SkillBadge level={level} size="md" showLabel />
+            <div className="text-xs mt-0.5" style={{ color: "var(--tg-hint)" }}>
+              {me?.city ?? "Tashkent"}
+              {me?.district ? ` · ${me.district}` : ""}
             </div>
-            <div className="mt-2 flex items-center gap-2">
-              <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.08)" }}>
-                <div className="h-full rounded-full" style={{ width: `${reliability}%`, background: band.color }} />
-              </div>
-              <span className="text-[11px] font-semibold" style={{ color: "var(--tg-hint)" }}>
-                {reliability}% reliable
-              </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Sport tabs */}
+      <div className="px-4 mt-4">
+        <div className="flex gap-2 rounded-2xl p-1" style={{ background: "var(--tg-card)" }}>
+          <SportTab active={tab === "FOOTBALL"} icon="⚽" label="Football" onClick={() => { hapticImpact("light"); setTab("FOOTBALL"); }} />
+          <SportTab active={tab === "PADEL"} icon="🎾" label="Padel" onClick={() => { hapticImpact("light"); setTab("PADEL"); }} />
+        </div>
+      </div>
+
+      {isPadel ? <PadelProfile me={me} stats={stats} /> : <FootballProfile me={me} />}
+
+      {/* My games (filtered to the active sport) */}
+      <MyGames bookings={bookings} sport={tab} />
+
+      <BottomNav />
+    </div>
+  );
+}
+
+// ─── PADEL TAB ────────────────────────────────────────────────────────────────
+function PadelProfile({ me, stats }: { me: any; stats: any }) {
+  const level = stats?.level ?? me?.padelLevel ?? 0;
+  const band = getSkillBand(Number(level));
+  const reliability = stats?.reliability ?? me?.padelReliability ?? 0;
+  const effectiveness = stats?.effectiveness ?? 0;
+  const streak = stats?.currentStreak ?? 0;
+
+  return (
+    <>
+      {/* Level summary */}
+      <div className="px-4 mt-4">
+        <div className="rounded-2xl p-4" style={{ background: "var(--tg-card)" }}>
+          <SkillBadge level={level} size="md" showLabel />
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.08)" }}>
+              <div className="h-full rounded-full" style={{ width: `${reliability}%`, background: band.color }} />
             </div>
+            <span className="text-[11px] font-semibold" style={{ color: "var(--tg-hint)" }}>
+              {reliability}% reliable
+            </span>
           </div>
         </div>
       </div>
@@ -118,7 +166,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Recent partners */}
+      {/* Recent partners / opponents */}
       <PlayerStrip title="Recent Partners" players={stats?.recentPartners} />
       <PlayerStrip title="Recent Opponents" players={stats?.recentOpponents} />
 
@@ -138,45 +186,125 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+    </>
+  );
+}
 
-      {/* My games */}
-      <div className="px-4 mt-6">
-        <SectionTitle>My Games</SectionTitle>
-        <div className="space-y-2">
-          {(bookings ?? []).length === 0 ? (
-            <div className="rounded-2xl py-10 text-center text-sm" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
-              You haven&apos;t joined any games yet.
+// ─── FOOTBALL TAB ─────────────────────────────────────────────────────────────
+function FootballProfile({ me }: { me: any }) {
+  const skill = FOOTBALL_SKILL[me?.skillLevel] ?? { label: me?.skillLevel ?? "—", color: "#9CA3AF" };
+  const playerMeta = LEVEL_META[me?.playerLevel] ?? LEVEL_META.NEW;
+  const reliability = Math.round(Number(me?.reliabilityScore ?? 0));
+
+  return (
+    <>
+      {/* Skill level summary */}
+      <div className="px-4 mt-4">
+        <div className="rounded-2xl p-4" style={{ background: "var(--tg-card)" }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <span
+                className="inline-block px-2.5 py-1 rounded-full text-xs font-bold text-white"
+                style={{ background: skill.color }}
+              >
+                {skill.label}
+              </span>
+              <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold" style={{ color: "var(--tg-hint)" }}>
+                {playerMeta.icon} {playerMeta.label}
+              </span>
             </div>
-          ) : (
-            (bookings ?? []).map((b: any) => {
-              const match = b.match ?? b;
-              return (
-                <Link
-                  key={b.id}
-                  href={match?.id ? `/match/${match.id}` : "#"}
-                  className="block rounded-2xl p-3"
-                  style={{ background: "var(--tg-card)" }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0">
-                      <div className="font-medium text-sm truncate">{match?.pitch?.name ?? match?.title ?? "Match"}</div>
-                      <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-                        {match?.startTime ? dayjs(match.startTime).format("ddd, MMM D · HH:mm") : ""}
-                      </div>
-                    </div>
-                    <span className="text-xs font-semibold text-[#00875A] shrink-0">
-                      {b.status?.replace(/_/g, " ")}
-                    </span>
-                  </div>
-                </Link>
-              );
-            })
-          )}
+            <div className="text-right">
+              <div className="text-xl font-bold text-[#00C853]">{me?.eloRating ?? 1000}</div>
+              <div className="text-[10px]" style={{ color: "var(--tg-hint)" }}>ELO</div>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(0,0,0,0.08)" }}>
+              <div className="h-full rounded-full" style={{ width: `${reliability}%`, background: skill.color }} />
+            </div>
+            <span className="text-[11px] font-semibold" style={{ color: "var(--tg-hint)" }}>
+              {reliability}% reliable
+            </span>
+          </div>
         </div>
       </div>
 
-      <BottomNav />
+      {/* Football stats */}
+      <div className="px-4 mt-5 grid grid-cols-3 gap-2">
+        <StatCard value={me?.gamesAttended ?? 0} label="Games played" />
+        <StatCard value={me?.gamesThisMonth ?? 0} label="This month" />
+        <StatCard value={me?.winCount ?? 0} label="Wins" />
+      </div>
+
+      <div className="px-4 mt-5">
+        <div className="rounded-2xl p-4 text-xs" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
+          Football tracks your skill level (Beginner → Pro), ELO from thumbs-up ratings, and games
+          attended. Your padel level is tracked separately on the Padel tab.
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── My games (sport-filtered) ───────────────────────────────────────────────
+function MyGames({ bookings, sport }: { bookings: any[] | undefined; sport: Sport }) {
+  const filtered = (bookings ?? []).filter((b: any) => {
+    const s = (b.match ?? b)?.sport;
+    // Older bookings may not carry sport — show them under padel (the default).
+    return s ? s === sport : sport === "PADEL";
+  });
+
+  return (
+    <div className="px-4 mt-6">
+      <SectionTitle>My {sport === "FOOTBALL" ? "Football" : "Padel"} Games</SectionTitle>
+      <div className="space-y-2">
+        {filtered.length === 0 ? (
+          <div className="rounded-2xl py-10 text-center text-sm" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
+            No {sport === "FOOTBALL" ? "football" : "padel"} games yet.
+          </div>
+        ) : (
+          filtered.map((b: any) => {
+            const match = b.match ?? b;
+            return (
+              <Link
+                key={b.id}
+                href={match?.id ? `/match/${match.id}` : "#"}
+                className="block rounded-2xl p-3"
+                style={{ background: "var(--tg-card)" }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm truncate">{match?.pitch?.name ?? match?.title ?? "Match"}</div>
+                    <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
+                      {match?.startTime ? dayjs(match.startTime).format("ddd, MMM D · HH:mm") : ""}
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-[#00875A] shrink-0">
+                    {b.status?.replace(/_/g, " ")}
+                  </span>
+                </div>
+              </Link>
+            );
+          })
+        )}
+      </div>
     </div>
+  );
+}
+
+function SportTab({ active, icon, label, onClick }: { active: boolean; icon: string; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-sm font-semibold transition-colors"
+      style={{
+        background: active ? "#00C853" : "transparent",
+        color: active ? "#fff" : "var(--tg-hint)",
+      }}
+    >
+      <span>{icon}</span>
+      {label}
+    </button>
   );
 }
 
@@ -248,8 +376,8 @@ function PlayerStrip({ title, players }: { title: string; players?: any[] }) {
               )}
             </div>
             <span className="text-[11px] font-medium truncate max-w-full">{p.firstName}</span>
-            <span className="text-[10px] font-bold" style={{ color: getSkillBand(Number(p.skillRating ?? 0)).color }}>
-              {formatLevel(p.skillRating)}
+            <span className="text-[10px] font-bold" style={{ color: getSkillBand(Number(p.padelLevel ?? 0)).color }}>
+              {formatLevel(p.padelLevel)}
             </span>
           </Link>
         ))}

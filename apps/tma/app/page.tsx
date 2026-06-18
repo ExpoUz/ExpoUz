@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Calendar, Clock, Check } from "lucide-react";
+import { Calendar, Clock, Check } from "lucide-react";
 import dayjs from "dayjs";
 import { getMatches, getCities } from "@/lib/api";
 import { MatchCard } from "@/components/MatchCard";
+import { SportCityHeader } from "@/components/SportCityHeader";
 import { BottomNav } from "@/components/BottomNav";
+import { useSportStore, setSport, sportMeta } from "@/lib/sport-store";
 import { showMainButton, hideMainButton, hapticImpact } from "@/lib/telegram";
 
 const TIMES = [
@@ -19,6 +21,9 @@ const TIMES = [
 
 export default function HomePage() {
   const router = useRouter();
+  const { sport } = useSportStore();
+  const meta = sportMeta(sport);
+  const isPadel = sport === "PADEL";
   const [city, setCity] = useState("Tashkent");
   const [district, setDistrict] = useState("");
   const [date, setDate] = useState("");
@@ -32,21 +37,22 @@ export default function HomePage() {
   const { data: cities } = useQuery({ queryKey: ["cities"], queryFn: getCities });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["tma-matches", city, district, date, timeOfDay, spotsOnly, matchType],
+    queryKey: ["tma-matches", sport, city, district, date, timeOfDay, spotsOnly, matchType],
     queryFn: () =>
       getMatches({
-        sport: "PADEL",
+        sport,
         ...(city ? { city } : {}),
         ...(district ? { district } : {}),
         ...(date ? { date: dayjs(date).toISOString() } : {}),
         ...(timeOfDay ? { timeOfDay } : {}),
         ...(spotsOnly ? { minSpotsAvailable: 1 } : {}),
-        ...(matchType ? { matchType } : {}),
+        // Match type only applies to padel.
+        ...(isPadel && matchType ? { matchType } : {}),
       }),
   });
 
   useEffect(() => {
-    const cleanup = showMainButton("🎾 Host a Game", () => {
+    const cleanup = showMainButton(`${meta.icon} Host a Game`, () => {
       hapticImpact("medium");
       router.push("/create");
     });
@@ -54,7 +60,7 @@ export default function HomePage() {
       cleanup();
       hideMainButton();
     };
-  }, [router]);
+  }, [router, meta.icon]);
 
   const matches = data?.data ?? [];
 
@@ -62,23 +68,16 @@ export default function HomePage() {
     <div className="min-h-screen pb-24">
       <header className="px-4 pt-5 pb-3 sticky top-0 z-30" style={{ background: "var(--tg-bg)" }}>
         {/* Sport in City */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button className="dropdown" disabled>
-            <span>🎾</span>
-            <span className="font-bold">Padel</span>
-          </button>
-          <span className="text-sm" style={{ color: "var(--tg-hint)" }}>in</span>
-          <button
-            className="dropdown"
-            onClick={() => {
-              hapticImpact("light");
-              setCityOpen(true);
-            }}
-          >
-            <span className="font-bold">{district || city}</span>
-            <ChevronDown size={16} />
-          </button>
-        </div>
+        <SportCityHeader
+          sport={sport}
+          city={district || city}
+          onSportChange={(s) => {
+            setSport(s);
+            // Match-type filter is padel-only; clear it when leaving padel.
+            if (s !== "PADEL") setMatchType("");
+          }}
+          onCityClick={() => setCityOpen(true)}
+        />
 
         {/* Filter pills */}
         <div className="flex gap-2 overflow-x-auto mt-3 -mx-4 px-4 pb-1">
@@ -103,24 +102,29 @@ export default function HomePage() {
             <Clock size={15} />
             <span>{TIMES.find((t) => t.key === timeOfDay)?.label ?? "Time"}</span>
           </button>
-          <button
-            className={`pill ${matchType === "COMPETITIVE" ? "pill-active" : ""}`}
-            onClick={() => {
-              hapticImpact("light");
-              setMatchType((v) => (v === "COMPETITIVE" ? "" : "COMPETITIVE"));
-            }}
-          >
-            <span>⚔️ Competitive</span>
-          </button>
-          <button
-            className={`pill ${matchType === "CASUAL" ? "pill-active" : ""}`}
-            onClick={() => {
-              hapticImpact("light");
-              setMatchType((v) => (v === "CASUAL" ? "" : "CASUAL"));
-            }}
-          >
-            <span>😎 Casual</span>
-          </button>
+          {/* Match type is padel-only */}
+          {isPadel && (
+            <>
+              <button
+                className={`pill ${matchType === "COMPETITIVE" ? "pill-active" : ""}`}
+                onClick={() => {
+                  hapticImpact("light");
+                  setMatchType((v) => (v === "COMPETITIVE" ? "" : "COMPETITIVE"));
+                }}
+              >
+                <span>⚔️ Competitive</span>
+              </button>
+              <button
+                className={`pill ${matchType === "CASUAL" ? "pill-active" : ""}`}
+                onClick={() => {
+                  hapticImpact("light");
+                  setMatchType((v) => (v === "CASUAL" ? "" : "CASUAL"));
+                }}
+              >
+                <span>😎 Casual</span>
+              </button>
+            </>
+          )}
           <button
             className={`pill ${spotsOnly ? "pill-active" : ""}`}
             onClick={() => {
@@ -155,8 +159,8 @@ export default function HomePage() {
           </div>
         ) : matches.length === 0 ? (
           <div className="text-center py-20">
-            <div className="text-4xl mb-2">🎾</div>
-            <p className="font-medium">No padel games match your filters</p>
+            <div className="text-4xl mb-2">{meta.icon}</div>
+            <p className="font-medium">No {meta.label.toLowerCase()} games match your filters</p>
             <p className="text-sm mt-1" style={{ color: "var(--tg-hint)" }}>
               Try clearing filters — or host one!
             </p>

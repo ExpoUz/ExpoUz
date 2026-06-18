@@ -185,10 +185,10 @@ export class UsersService {
         eloRating: true,
         reliabilityScore: true,
         skillLevel: true,
-        skillRating: true,
-        levelReliability: true,
-        matchesPlayed: true,
-        matchesWon: true,
+        padelLevel: true,
+        padelReliability: true,
+        padelMatchesPlayed: true,
+        padelMatchesWon: true,
         currentStreak: true,
         bestHand: true,
         courtPosition: true,
@@ -235,7 +235,7 @@ export class UsersService {
     return {
       ...user,
       levelInfo: this.ranking.getLevelInfo(user.playerLevel),
-      band: this.level.getLevelBand(user.skillRating),
+      band: this.level.getLevelBand(user.padelLevel),
       ratings: { thumbsUp, thumbsDown },
       recentMatches,
     };
@@ -283,7 +283,7 @@ export class UsersService {
             gamesAttended: true,
             playerLevel: true,
             eloRating: true,
-            skillRating: true,
+            padelLevel: true,
           },
         },
         positionTaken: { select: { position: true } },
@@ -306,11 +306,11 @@ export class UsersService {
         firstName: true,
         lastName: true,
         avatarUrl: true,
-        skillRating: true,
-        levelReliability: true,
-        matchesPlayed: true,
-        matchesWon: true,
-        matchesLost: true,
+        padelLevel: true,
+        padelReliability: true,
+        padelMatchesPlayed: true,
+        padelMatchesWon: true,
+        padelMatchesLost: true,
         currentStreak: true,
         longestWinStreak: true,
         bestHand: true,
@@ -321,8 +321,8 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
 
     const effectiveness =
-      user.matchesPlayed > 0
-        ? Math.round((user.matchesWon / user.matchesPlayed) * 100)
+      user.padelMatchesPlayed > 0
+        ? Math.round((user.padelMatchesWon / user.padelMatchesPlayed) * 100)
         : 0;
 
     const [{ partners, opponents, clubs }, levelHistory] = await Promise.all([
@@ -335,12 +335,12 @@ export class UsersService {
       firstName: user.firstName,
       lastName: user.lastName,
       avatarUrl: user.avatarUrl,
-      level: user.skillRating,
-      reliability: user.levelReliability,
-      band: this.level.getLevelBand(user.skillRating),
-      matchesPlayed: user.matchesPlayed,
-      matchesWon: user.matchesWon,
-      matchesLost: user.matchesLost,
+      level: user.padelLevel,
+      reliability: user.padelReliability,
+      band: this.level.getLevelBand(user.padelLevel),
+      matchesPlayed: user.padelMatchesPlayed,
+      matchesWon: user.padelMatchesWon,
+      matchesLost: user.padelMatchesLost,
       effectiveness,
       currentStreak: user.currentStreak,
       longestWinStreak: user.longestWinStreak,
@@ -374,7 +374,7 @@ export class UsersService {
               select: {
                 teamSide: true,
                 user: {
-                  select: { id: true, firstName: true, lastName: true, avatarUrl: true, skillRating: true },
+                  select: { id: true, firstName: true, lastName: true, avatarUrl: true, padelLevel: true },
                 },
               },
             },
@@ -385,7 +385,7 @@ export class UsersService {
       take: 40,
     });
 
-    type PlayerLite = { id: string; firstName: string; lastName: string; avatarUrl: string | null; skillRating: number };
+    type PlayerLite = { id: string; firstName: string; lastName: string; avatarUrl: string | null; padelLevel: number };
     const partnerMap = new Map<string, PlayerLite & { count: number }>();
     const opponentMap = new Map<string, PlayerLite & { count: number }>();
     const clubMap = new Map<string, { id: string; name: string; district: string | null; visits: number }>();

@@ -11,12 +11,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { BookingType, MatchType } from '@prisma/client';
 
+// Must stay in sync with the Prisma `Sport` enum (schema.prisma).
 export enum Sport {
   FOOTBALL = 'FOOTBALL',
-  BASKETBALL = 'BASKETBALL',
-  VOLLEYBALL = 'VOLLEYBALL',
+  PADEL = 'PADEL',
   TENNIS = 'TENNIS',
-  BADMINTON = 'BADMINTON',
 }
 
 export enum SkillLevel {

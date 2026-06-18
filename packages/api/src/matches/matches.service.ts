@@ -20,6 +20,7 @@ import { RankingService } from '../ranking/ranking.service';
 import { LevelService } from '../level/level.service';
 import { SubmitResultDto } from './dto/submit-result.dto';
 import { BookingType } from '@prisma/client';
+import { getMaxPlayers } from './format-caps';
 import { randomBytes } from 'crypto';
 
 @Injectable()
@@ -45,16 +46,30 @@ export class MatchesService {
     return `https://t.me/${botUsername}?start=join_${shareCode}`;
   }
 
-  // Player cap is derived from the "NvN" format string (per side × 2).
-  // Padel: 1v1 -> 2, 2v2 -> 4. Generic so future formats (5v5 -> 10) just work.
-  private getMaxPlayersForFormat(format: string): number {
-    const m = format?.match(/^(\d+)v(\d+)$/);
-    if (!m) {
+  // A match enforces a level range when the host set a min and/or max. Padel
+  // uses the 0.0–7.0 padelLevel; football normalizes eloRating to the same scale.
+  private async assertWithinLevelRange(
+    match: { sport: Sport; minLevel: number | null; maxLevel: number | null },
+    userId: string,
+  ) {
+    if (match.minLevel == null && match.maxLevel == null) return;
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { padelLevel: true, eloRating: true },
+    });
+    if (!user) return;
+    const userLevel =
+      match.sport === Sport.PADEL ? user.padelLevel : user.eloRating / 1000;
+    if (match.minLevel != null && userLevel < match.minLevel) {
       throw new BadRequestException(
-        `Invalid format: ${format}. Use NvN (e.g. 1v1 or 2v2).`,
+        `Your level (${userLevel.toFixed(2)}) is below this match's minimum (${match.minLevel}).`,
       );
     }
-    return parseInt(m[1], 10) + parseInt(m[2], 10);
+    if (match.maxLevel != null && userLevel > match.maxLevel) {
+      throw new BadRequestException(
+        `Your level (${userLevel.toFixed(2)}) is above this match's maximum (${match.maxLevel}).`,
+      );
+    }
   }
 
   async findAll(query: QueryMatchesDto) {
@@ -148,7 +163,7 @@ export class MatchesService {
             select: {
               teamSide: true,
               user: {
-                select: { id: true, firstName: true, avatarUrl: true, skillRating: true },
+                select: { id: true, firstName: true, avatarUrl: true, padelLevel: true },
               },
             },
           },
@@ -242,6 +257,23 @@ export class MatchesService {
             },
           },
         },
+        // Active bookings with team side + padel level — used by the padel
+        // (Team A/B) detail layout, which has no formation positions.
+        bookings: {
+          where: { status: { in: ['CONFIRMED', 'COMPLETED', 'PENDING_PAYMENT'] } },
+          select: {
+            teamSide: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                avatarUrl: true,
+                padelLevel: true,
+              },
+            },
+          },
+        },
         _count: { select: { bookings: true } },
       },
     });
@@ -290,8 +322,9 @@ export class MatchesService {
       pricePerPlayer = 0;
       maxPlayers = dto.maxPlayers || 22;
     } else {
-      // OPEN_EVENT — player cap is fixed by the format (padel: 1v1->2, 2v2->4).
-      const cap = this.getMaxPlayersForFormat(dto.format);
+      // OPEN_EVENT — player cap is fixed by the sport + format
+      // (football: 5v5->10, 6v6->12; padel: 1v1->2, 2v2->4).
+      const cap = getMaxPlayers(sport, dto.format);
       if (maxPlayers && maxPlayers > cap) {
         throw new BadRequestException(
           `A ${dto.format} match allows a maximum of ${cap} players. You requested ${maxPlayers}.`,
@@ -657,6 +690,9 @@ export class MatchesService {
     if (match.status === 'FULL') {
       throw new ConflictException('Match is full');
     }
+
+    // Host-set level range is a hard wall (padel level / normalized football elo).
+    await this.assertWithinLevelRange(match, userId);
 
     const existingBooking = await this.prisma.booking.findFirst({
       where: {

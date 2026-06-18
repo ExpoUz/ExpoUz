@@ -28,14 +28,24 @@ model User {
   playerLevel      PlayerLevel @default(NEW)
 
   // ---- Skill rating (ELO-style 0.0–7.0 ladder) ----
-  skillRating        Float          @default(0.0) // 0.0 to 7.0, dynamic skill rating
-  levelReliability   Int            @default(0) // 0-100%, confidence in the rating
-  initialLevelSet    Boolean        @default(false) // completed onboarding questionnaire
-  matchesPlayed      Int            @default(0)
+  // NOTE: these are the PADEL ladder's legacy fields. The padel track now lives
+  // on the dedicated padel* fields below; football uses eloRating/skillLevel.
+  skillRating        Float          @default(0.0) // legacy/padel — superseded by padelLevel
+  levelReliability   Int            @default(0)
+  initialLevelSet    Boolean        @default(false)
+  matchesPlayed      Int            @default(0) // FOOTBALL match counts
   matchesWon         Int            @default(0)
   matchesLost        Int            @default(0)
-  currentStreak      Int            @default(0) // + = win streak, - = loss streak
+  currentStreak      Int            @default(0) // + = win streak, - = loss streak (padel)
   longestWinStreak   Int            @default(0)
+
+  // ---- Padel level track (0.0–7.0 ELO, independent of football) ----
+  padelLevel         Float          @default(0.0)
+  padelReliability   Int            @default(0) // 0-100% confidence
+  padelInitialSet    Boolean        @default(false) // completed padel onboarding
+  padelMatchesPlayed Int            @default(0)
+  padelMatchesWon    Int            @default(0)
+  padelMatchesLost   Int            @default(0)
   bestHand           BestHand?      @default(RIGHT)
   courtPosition      CourtPosition? @default(BOTH)
   preferredMatchType MatchType?     @default(COMPETITIVE)
@@ -181,6 +191,9 @@ model Pitch {
   noMetalStuds    Boolean         @default(false)
   commission      Float           @default(0.10)
   rejectionReason String?
+  // A venue belongs to one sport. Defaults to PADEL to keep existing courts
+  // correctly labelled after the padel pivot; football pitches set FOOTBALL.
+  sport           Sport           @default(PADEL)
   // Padel court attributes
   courtType       PadelCourtType  @default(PANORAMIC)
   isCovered       Boolean         @default(false)

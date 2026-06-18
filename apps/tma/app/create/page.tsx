@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { getPitches, createMatch, getPricingPreview, formatUZS } from "@/lib/api";
+import { useSportStore, setSport, sportMeta, SPORTS } from "@/lib/sport-store";
 import {
   showMainButton,
   hideMainButton,
@@ -16,8 +17,6 @@ import {
   showAlert,
 } from "@/lib/telegram";
 
-const FORMATS = ["1v1", "2v2"]; // padel: singles / doubles
-const FORMAT_LABELS: Record<string, string> = { "1v1": "Singles (1v1)", "2v2": "Doubles (2v2)" };
 const DURATIONS = [60, 90, 120];
 const capForFormat = (f: string) => {
   const m = f.match(/^(\d+)v(\d+)$/);
@@ -81,20 +80,26 @@ const STEP_TITLES = ["Booking type", "Choose a pitch", "Match details", "Review 
 
 export default function CreateMatchPage() {
   const router = useRouter();
+  const { sport } = useSportStore();
+  const meta = sportMeta(sport);
+  const isPadel = sport === "PADEL";
   const [step, setStep] = useState(0); // 0..3
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: pitches } = useQuery({ queryKey: ["tma-pitches"], queryFn: () => getPitches() });
+  const { data: pitches } = useQuery({
+    queryKey: ["tma-pitches", sport],
+    queryFn: () => getPitches({ sport }),
+  });
 
   const [form, setForm] = useState<Form>({
     bookingType: "OPEN_EVENT",
     matchType: "COMPETITIVE",
     pitchId: "",
-    format: "2v2",
+    format: meta.formats[meta.formats.length - 1].id, // doubles / 6v6
     date: dayjs().add(1, "day").format("YYYY-MM-DD"),
     time: "19:00",
     durationMinutes: 60,
-    maxPlayers: 4,
+    maxPlayers: meta.formats[meta.formats.length - 1].maxPlayers,
     pricePerPlayer: 50000,
     organizerPlayerCount: 3,
     extraSpotsAvailable: 4,
@@ -104,6 +109,13 @@ export default function CreateMatchPage() {
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
 
+  // When the sport switches, reset format + cap and clear the chosen pitch
+  // (pitches are sport-specific).
+  useEffect(() => {
+    const def = meta.formats[meta.formats.length - 1];
+    setForm((f) => ({ ...f, format: def.id, maxPlayers: def.maxPlayers, pitchId: "" }));
+  }, [sport]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const selectedPitch = useMemo(
     () => (pitches ?? []).find((p: any) => p.id === form.pitchId),
     [pitches, form.pitchId],
@@ -111,9 +123,9 @@ export default function CreateMatchPage() {
 
   function pickFormat(fmt: string) {
     hapticImpact("light");
-    const perSide = parseInt(fmt.split("v")[0], 10) || 7;
+    const f = meta.formats.find((x) => x.id === fmt);
     set("format", fmt);
-    set("maxPlayers", perSide * 2);
+    set("maxPlayers", f?.maxPlayers ?? capForFormat(fmt));
   }
 
   // Pricing preview (review step)
@@ -158,12 +170,14 @@ export default function CreateMatchPage() {
       const startTime = dayjs(`${form.date}T${form.time}`).toISOString();
       const base: any = {
         pitchId: form.pitchId,
+        sport,
         bookingType: form.bookingType,
         format: form.format,
         startTime,
         durationMinutes: form.durationMinutes,
       };
-      if (form.bookingType !== "FULL_BOOKING") {
+      // Match type (casual/competitive) only applies to padel.
+      if (form.bookingType !== "FULL_BOOKING" && isPadel) {
         base.matchType = form.matchType;
       }
       if (form.bookingType === "OPEN_EVENT") {
@@ -236,6 +250,31 @@ export default function CreateMatchPage() {
       {/* STEP 0 — Booking type */}
       {step === 0 && (
         <div className="space-y-3">
+          {/* Sport (inherited from the home filter; changeable here) */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Sport</label>
+            <div className="grid grid-cols-2 gap-2">
+              {SPORTS.map((s) => {
+                const active = s.id === sport;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      hapticImpact("light");
+                      setSport(s.id);
+                    }}
+                    className="flex items-center justify-center gap-2 rounded-2xl p-3 border-2 transition-colors"
+                    style={{ background: "var(--tg-card)", borderColor: active ? "#00C853" : "transparent" }}
+                  >
+                    <span className="text-xl">{s.icon}</span>
+                    <span className="font-semibold text-sm" style={{ color: active ? "#00C853" : "var(--tg-text)" }}>
+                      {s.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           {BOOKING_TYPES.map((bt) => {
             const active = form.bookingType === bt.type;
             return (
@@ -320,19 +359,21 @@ export default function CreateMatchPage() {
           {form.bookingType !== "FULL_BOOKING" && (
             <Field label="Format">
               <div className="flex flex-wrap gap-2">
-                {FORMATS.map((f) => (
-                  <Chip key={f} active={form.format === f} onClick={() => pickFormat(f)}>
-                    {FORMAT_LABELS[f] ?? f}
+                {meta.formats.map((f) => (
+                  <Chip key={f.id} active={form.format === f.id} onClick={() => pickFormat(f.id)}>
+                    {f.label}
                   </Chip>
                 ))}
               </div>
               <p className="text-xs mt-2" style={{ color: "var(--tg-hint)" }}>
-                A {form.format} padel match is capped at {capForFormat(form.format)} players.
+                A {form.format} {meta.label.toLowerCase()} match is capped at{" "}
+                {meta.formats.find((f) => f.id === form.format)?.maxPlayers ?? capForFormat(form.format)} players.
               </p>
             </Field>
           )}
 
-          {form.bookingType !== "FULL_BOOKING" && (
+          {/* Match type (Casual / Competitive) is padel-only */}
+          {form.bookingType !== "FULL_BOOKING" && isPadel && (
             <Field label="Match type">
               <div className="grid grid-cols-2 gap-2">
                 <MatchTypeButton
@@ -440,8 +481,9 @@ export default function CreateMatchPage() {
             <ReviewRow label="Type" value={BOOKING_TYPES.find((b) => b.type === form.bookingType)!.title} />
             <ReviewRow label="Pitch" value={selectedPitch?.name ?? "—"} />
             <ReviewRow label="When" value={dayjs(`${form.date}T${form.time}`).format("ddd, MMM D · HH:mm")} />
+            <ReviewRow label="Sport" value={`${meta.icon} ${meta.label}`} />
             {form.bookingType !== "FULL_BOOKING" && <ReviewRow label="Format" value={form.format} />}
-            {form.bookingType !== "FULL_BOOKING" && (
+            {form.bookingType !== "FULL_BOOKING" && isPadel && (
               <ReviewRow label="Match type" value={form.matchType === "CASUAL" ? "😎 Casual" : "⚔️ Competitive"} />
             )}
             {form.bookingType === "OPEN_EVENT" && <ReviewRow label="Max players" value={String(form.maxPlayers)} />}

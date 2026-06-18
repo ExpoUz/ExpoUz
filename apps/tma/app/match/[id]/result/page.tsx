@@ -226,7 +226,7 @@ function TeamRow({ team, label, highlight }: { team: any[]; label: string; highl
           </div>
           <div className="flex gap-1 mt-0.5">
             {team.map((p) => (
-              <SkillBadge key={p.id} level={p.skillRating ?? p.eloRating} size="xs" />
+              <SkillBadge key={p.id} level={p.padelLevel ?? p.eloRating} size="xs" />
             ))}
           </div>
         </div>

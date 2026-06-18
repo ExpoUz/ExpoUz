@@ -24,12 +24,11 @@ export enum SortBy {
   DISTANCE = 'DISTANCE',
 }
 
+// Must stay in sync with the Prisma `Sport` enum (schema.prisma).
 export enum Sport {
   FOOTBALL = 'FOOTBALL',
-  BASKETBALL = 'BASKETBALL',
-  VOLLEYBALL = 'VOLLEYBALL',
+  PADEL = 'PADEL',
   TENNIS = 'TENNIS',
-  BADMINTON = 'BADMINTON',
 }
 
 export enum SkillLevel {

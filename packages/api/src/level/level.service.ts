@@ -61,15 +61,19 @@ export class LevelService {
 
     if (!match?.result?.isConfirmed) return;
     if (match.matchType !== 'COMPETITIVE') return; // casual doesn't affect level
+    // This ELO ladder is the padel level track. Football has no set-based
+    // result flow (it ranks via games attended / thumbs), so it never reaches
+    // here — but guard explicitly so the two tracks can never cross-contaminate.
+    if (match.sport !== 'PADEL') return;
 
     // Split players into teams by their booking's team side
     const team1 = match.bookings.filter((b) => b.teamSide === 'HOME').map((b) => b.user);
     const team2 = match.bookings.filter((b) => b.teamSide === 'AWAY').map((b) => b.user);
     if (team1.length === 0 || team2.length === 0) return;
 
-    // Average level per team
-    const team1Avg = team1.reduce((s, p) => s + p.skillRating, 0) / team1.length;
-    const team2Avg = team2.reduce((s, p) => s + p.skillRating, 0) / team2.length;
+    // Average level per team (padel level)
+    const team1Avg = team1.reduce((s, p) => s + p.padelLevel, 0) / team1.length;
+    const team2Avg = team2.reduce((s, p) => s + p.padelLevel, 0) / team2.length;
 
     // Expected outcome (ELO formula, scaled for the 0-7 range).
     // Divide by 1.5 to spread sensitivity across the padel scale.
@@ -93,7 +97,7 @@ export class LevelService {
   }
 
   private async adjustPlayerLevel(
-    player: { id: string; skillRating: number; levelReliability: number; currentStreak: number; longestWinStreak: number },
+    player: { id: string; padelLevel: number; padelReliability: number; currentStreak: number; longestWinStreak: number },
     expected: number,
     actual: number,
     margin: number,
@@ -103,16 +107,16 @@ export class LevelService {
     // K-factor scales with reliability: new players (low reliability) move fast,
     // established players move slowly. 1.0 down to 0.3.
     const kBase = 0.4;
-    const reliabilityFactor = 1 - (player.levelReliability / 100) * 0.7;
+    const reliabilityFactor = 1 - (player.padelReliability / 100) * 0.7;
     const k = kBase * reliabilityFactor;
 
     const change = k * (actual - expected) * margin;
-    const newLevel = Math.max(0.0, Math.min(7.0, player.skillRating + change));
+    const newLevel = Math.max(0.0, Math.min(7.0, player.padelLevel + change));
 
     // Reliability increases with each match (caps at 100)
     const newReliability = Math.min(
       100,
-      player.levelReliability + (player.levelReliability < 50 ? 8 : 3),
+      player.padelReliability + (player.padelReliability < 50 ? 8 : 3),
     );
 
     const newStreak = won
@@ -126,11 +130,11 @@ export class LevelService {
     await this.prisma.user.update({
       where: { id: player.id },
       data: {
-        skillRating: Math.round(newLevel * 100) / 100,
-        levelReliability: newReliability,
-        matchesPlayed: { increment: 1 },
-        matchesWon: won ? { increment: 1 } : undefined,
-        matchesLost: won ? undefined : { increment: 1 },
+        padelLevel: Math.round(newLevel * 100) / 100,
+        padelReliability: newReliability,
+        padelMatchesPlayed: { increment: 1 },
+        padelMatchesWon: won ? { increment: 1 } : undefined,
+        padelMatchesLost: won ? undefined : { increment: 1 },
         currentStreak: newStreak,
         longestWinStreak:
           won && newStreak > player.longestWinStreak ? newStreak : undefined,
@@ -184,7 +188,7 @@ export class LevelService {
     const { level, reliability } = this.calculateInitialLevel(answers);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { skillRating: level, levelReliability: reliability, initialLevelSet: true },
+      data: { padelLevel: level, padelReliability: reliability, padelInitialSet: true },
     });
     await this.prisma.levelHistory.create({
       data: { userId, level, reliability, change: level, reason: 'Initial assessment' },
