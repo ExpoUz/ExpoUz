@@ -18,6 +18,7 @@ import {
   isInTelegram,
 } from "@/lib/telegram";
 import { useAuth } from "@/lib/auth";
+import { VersusPreview } from "./VersusPreview";
 
 type Side = "A" | "B";
 
@@ -83,15 +84,29 @@ export function PadelMatchDetail({ match }: { match: any }) {
     return { teamA: a, teamB: b, mySide: mine as Side | null };
   }, [match.bookings, perSide, user]);
 
+  // Padded slot arrays (player | null) for the VS preview.
+  const padTeam = (t: PadelPlayer[]) =>
+    [...t.slice(0, perSide), ...Array(Math.max(0, perSide - t.length)).fill(null)].slice(0, perSide);
+  const padA = padTeam(teamA);
+  const padB = padTeam(teamB);
+
   const filled = teamA.length + teamB.length;
+  const available = Math.max(0, match.maxPlayers - filled);
   const isFull = filled >= match.maxPlayers;
   const joined = mySide != null;
 
-  const joinSide = (side: Side) =>
-    joinMatch(id, { teamSide: side === "A" ? "HOME" : "AWAY" });
+  // ── Level gate state ──
+  const [gate, setGate] = useState<null | "confirm" | "blocked">(null);
+  const [pendingSide, setPendingSide] = useState<Side | null>(null);
+  const hasRange = match.minLevel != null || match.maxLevel != null;
+  const myPadelLevel = Number(user?.padelLevel ?? 0);
+  const myBand = getSkillBand(myPadelLevel);
+  const outOfRange =
+    (match.minLevel != null && myPadelLevel < match.minLevel) ||
+    (match.maxLevel != null && myPadelLevel > match.maxLevel);
 
   const join = useMutation({
-    mutationFn: (side: Side) => joinSide(side),
+    mutationFn: (side: Side) => joinMatch(id, { teamSide: side === "A" ? "HOME" : "AWAY" }),
     onMutate: () => setMainButtonLoading(true),
     onSuccess: () => {
       hapticSuccess();
@@ -99,6 +114,11 @@ export function PadelMatchDetail({ match }: { match: any }) {
     },
     onError: (e: any) => {
       hapticError();
+      const code = e?.response?.data?.code;
+      if (code === "PADEL_LEVEL_REQUIRED") {
+        router.push(`/onboarding?next=/match/${id}`);
+        return;
+      }
       showAlert(e?.response?.data?.message ?? "Could not join this match.");
     },
     onSettled: () => setMainButtonLoading(false),
@@ -118,10 +138,28 @@ export function PadelMatchDetail({ match }: { match: any }) {
     onSettled: () => setMainButtonLoading(false),
   });
 
-  // Reserve via a free slot — prefer the team with an opening.
+  // Level gate runs before any join. Routes to onboarding if unassessed, blocks
+  // if out of range, otherwise asks for a one-tap level confirmation.
+  function handleJoin(side: Side) {
+    if (joined || isFull || isCancelled) return;
+    if (!user?.padelInitialSet) {
+      hapticImpact("light");
+      router.push(`/onboarding?next=/match/${id}`);
+      return;
+    }
+    if (hasRange && outOfRange) {
+      hapticImpact("medium");
+      setGate("blocked");
+      return;
+    }
+    setPendingSide(side);
+    setGate("confirm");
+  }
+
+  // Reserve picks the team with an opening.
   const reserve = () => {
-    if (teamA.length < perSide) join.mutate("A");
-    else if (teamB.length < perSide) join.mutate("B");
+    if (teamA.length < perSide) handleJoin("A");
+    else if (teamB.length < perSide) handleJoin("B");
   };
 
   useEffect(() => {
@@ -179,13 +217,26 @@ export function PadelMatchDetail({ match }: { match: any }) {
 
         {/* Info card */}
         <div className="rounded-2xl p-4" style={{ background: "var(--tg-card)" }}>
-          <div className="text-sm font-bold">🎾 PADEL</div>
-          <div className="text-base font-semibold mt-1">
-            {dayjs(match.startTime).format("dddd, MMMM D")}
-          </div>
-          <div className="text-sm" style={{ color: "var(--tg-hint)" }}>
-            {dayjs(match.startTime).format("h:mm a")} –{" "}
-            {dayjs(match.startTime).add(match.durationMinutes ?? 60, "minute").format("h:mm a")}
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <div className="text-sm font-bold">🎾 PADEL</div>
+              <div className="text-base font-semibold mt-1">
+                {dayjs(match.startTime).format("dddd, MMMM D")}
+              </div>
+              <div className="text-sm" style={{ color: "var(--tg-hint)" }}>
+                {dayjs(match.startTime).format("h:mm a")} –{" "}
+                {dayjs(match.startTime).add(match.durationMinutes ?? 60, "minute").format("h:mm a")}
+              </div>
+            </div>
+            <span
+              className="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold"
+              style={{
+                background: isFull ? "rgba(239,68,68,0.12)" : "rgba(0,200,83,0.12)",
+                color: isFull ? "#EF4444" : "#00C853",
+              }}
+            >
+              {isFull ? "Match full" : `${available} ${available === 1 ? "spot" : "spots"} available`}
+            </span>
           </div>
           <div className="h-px my-3" style={{ background: "rgba(0,0,0,0.08)" }} />
           <div className="grid grid-cols-3 gap-2 text-center">
@@ -225,13 +276,21 @@ export function PadelMatchDetail({ match }: { match: any }) {
           </div>
         </div>
 
+        {/* Versus preview */}
+        <VersusPreview teamA={padA} teamB={padB} />
+
         {/* Players — Team A / Team B */}
         <div>
-          <div className="text-sm font-semibold mb-2 px-1">Players</div>
+          <div className="flex items-baseline justify-between mb-2 px-1">
+            <div className="text-sm font-semibold">Players</div>
+            <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
+              {filled}/{match.maxPlayers} joined · {available} open
+            </div>
+          </div>
           <div className="rounded-2xl p-4 flex items-stretch" style={{ background: "var(--tg-card)" }}>
-            <PadelTeam side="A" players={teamA} perSide={perSide} disabled={isCancelled || isFull} onJoin={() => join.mutate("A")} onTapPlayer={(pid) => router.push(`/players/${pid}`)} />
+            <PadelTeam side="A" players={teamA} perSide={perSide} disabled={isCancelled || isFull} onJoin={() => handleJoin("A")} onTapPlayer={(pid) => router.push(`/players/${pid}`)} />
             <div className="w-px mx-2" style={{ background: "rgba(0,0,0,0.08)" }} />
-            <PadelTeam side="B" players={teamB} perSide={perSide} disabled={isCancelled || isFull} onJoin={() => join.mutate("B")} onTapPlayer={(pid) => router.push(`/players/${pid}`)} />
+            <PadelTeam side="B" players={teamB} perSide={perSide} disabled={isCancelled || isFull} onJoin={() => handleJoin("B")} onTapPlayer={(pid) => router.push(`/players/${pid}`)} />
           </div>
         </div>
 
@@ -293,6 +352,85 @@ export function PadelMatchDetail({ match }: { match: any }) {
                 : `Reserve place — ${formatUZS(match.pricePerPlayer)}`}
           </button>
         )}
+      </div>
+
+      {/* ── Level gate modals ── */}
+      {gate === "confirm" && (
+        <GateSheet onClose={() => setGate(null)}>
+          <div className="text-center">
+            <div className="text-xs" style={{ color: "var(--tg-hint)" }}>Your padel level</div>
+            <div className="text-4xl font-black my-1" style={{ color: myBand.color }}>
+              {formatLevel(myPadelLevel)}
+            </div>
+            <div className="text-sm font-bold" style={{ color: myBand.color }}>{myBand.label}</div>
+            <p className="text-xs mt-3" style={{ color: "var(--tg-hint)" }}>
+              You&apos;ll join <b>Team {pendingSide}</b>. Your level adjusts automatically as you play.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              hapticImpact("medium");
+              setGate(null);
+              join.mutate(pendingSide ?? "A");
+            }}
+            className="mt-4 w-full rounded-2xl py-3.5 font-bold text-white"
+            style={{ background: "#00C853" }}
+          >
+            That&apos;s right — continue
+          </button>
+          <button
+            onClick={() => router.push(`/onboarding?next=/match/${id}`)}
+            className="mt-2 w-full text-sm font-semibold"
+            style={{ color: "var(--tg-hint)" }}
+          >
+            Update my level
+          </button>
+        </GateSheet>
+      )}
+
+      {gate === "blocked" && (
+        <GateSheet onClose={() => setGate(null)}>
+          <div className="text-center">
+            <div className="text-4xl mb-2">🎾</div>
+            <h2 className="text-lg font-bold">
+              This match is for level {formatLevel(match.minLevel ?? 0)}–{formatLevel(match.maxLevel ?? 7)}
+            </h2>
+            <p className="text-sm mt-1" style={{ color: "var(--tg-hint)" }}>
+              Your level is {formatLevel(myPadelLevel)}.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              hapticImpact("light");
+              router.push(`/?sport=PADEL`);
+            }}
+            className="mt-4 w-full rounded-2xl py-3.5 font-bold text-white"
+            style={{ background: "#00B0FF" }}
+          >
+            Find matches for my level
+          </button>
+          <button
+            onClick={() => setGate(null)}
+            className="mt-2 w-full text-sm font-semibold"
+            style={{ color: "var(--tg-hint)" }}
+          >
+            Go back
+          </button>
+        </GateSheet>
+      )}
+    </div>
+  );
+}
+
+function GateSheet({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={onClose}>
+      <div
+        className="w-full rounded-t-3xl p-5 pb-8"
+        style={{ background: "var(--tg-bg)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
       </div>
     </div>
   );
@@ -402,7 +540,10 @@ function EmptySlot({ disabled, onClick }: { disabled: boolean; onClick: () => vo
       >
         +
       </div>
-      <span className="text-[11px] font-semibold text-[#00B0FF]">Join</span>
+      <span className="text-[11px] font-semibold text-[#00B0FF] leading-tight">Join</span>
+      <span className="text-[9px]" style={{ color: "var(--tg-hint)" }}>
+        Available
+      </span>
     </button>
   );
 }

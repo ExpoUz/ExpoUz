@@ -14,6 +14,9 @@ interface TmaUser {
   eloRating?: number;
   reliabilityScore?: number;
   skillLevel?: string;
+  padelLevel?: number;
+  padelReliability?: number;
+  padelInitialSet?: boolean;
 }
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
