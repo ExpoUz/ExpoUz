@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { submitOnboarding, formatLevel } from "@/lib/api";
 import {
   showMainButton,
@@ -27,6 +27,9 @@ const SELF_LABELS = ["Just starting", "Still learning", "Solid rallies", "Strong
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Where to go after onboarding — e.g. back to a match the user tried to join.
+  const next = searchParams.get("next") || "/";
   const [step, setStep] = useState(0);
   const [result, setResult] = useState<{ level: number; band: { label: string; color: string } } | null>(null);
 
@@ -115,12 +118,12 @@ export default function OnboardingPage() {
         <button
           onClick={() => {
             hapticImpact("medium");
-            router.replace("/");
+            router.replace(next);
           }}
           className="mt-8 w-full max-w-xs rounded-2xl py-3.5 font-bold text-white"
           style={{ background: "#00C853" }}
         >
-          Start playing
+          {next === "/" ? "Start playing" : "Continue to match"}
         </button>
       </div>
     );

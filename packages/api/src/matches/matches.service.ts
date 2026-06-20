@@ -46,20 +46,46 @@ export class MatchesService {
     return `https://t.me/${botUsername}?start=join_${shareCode}`;
   }
 
-  // A match enforces a level range when the host set a min and/or max. Padel
-  // uses the 0.0–7.0 padelLevel; football normalizes eloRating to the same scale.
-  private async assertWithinLevelRange(
+  // Join eligibility gate. Padel requires an assessed level (padelInitialSet)
+  // before joining any match, plus a level-range check when the host set one
+  // (presence of min/max == "level required"). Football keeps a normalized
+  // eloRating range check. Errors carry a `code` the TMA branches on.
+  private async assertJoinEligibility(
     match: { sport: Sport; minLevel: number | null; maxLevel: number | null },
     userId: string,
   ) {
-    if (match.minLevel == null && match.maxLevel == null) return;
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { padelLevel: true, eloRating: true },
+      select: { padelLevel: true, padelInitialSet: true, eloRating: true },
     });
     if (!user) return;
-    const userLevel =
-      match.sport === Sport.PADEL ? user.padelLevel : user.eloRating / 1000;
+
+    if (match.sport === Sport.PADEL) {
+      if (!user.padelInitialSet) {
+        throw new BadRequestException({
+          code: 'PADEL_LEVEL_REQUIRED',
+          message: 'Please set your padel level before joining a match.',
+        });
+      }
+      const lvl = user.padelLevel;
+      if (match.minLevel != null && lvl < match.minLevel) {
+        throw new BadRequestException({
+          code: 'LEVEL_TOO_LOW',
+          message: `This match is for level ${match.minLevel}–${match.maxLevel}. Your level is ${lvl.toFixed(2)}.`,
+        });
+      }
+      if (match.maxLevel != null && lvl > match.maxLevel) {
+        throw new BadRequestException({
+          code: 'LEVEL_TOO_HIGH',
+          message: `This match is for level ${match.minLevel}–${match.maxLevel}. Your level is ${lvl.toFixed(2)}.`,
+        });
+      }
+      return;
+    }
+
+    // Football: optional normalized-elo range, no level-set requirement.
+    if (match.minLevel == null && match.maxLevel == null) return;
+    const userLevel = user.eloRating / 1000;
     if (match.minLevel != null && userLevel < match.minLevel) {
       throw new BadRequestException(
         `Your level (${userLevel.toFixed(2)}) is below this match's minimum (${match.minLevel}).`,
@@ -691,8 +717,8 @@ export class MatchesService {
       throw new ConflictException('Match is full');
     }
 
-    // Host-set level range is a hard wall (padel level / normalized football elo).
-    await this.assertWithinLevelRange(match, userId);
+    // Padel level-set requirement + host level range (hard wall, server-side).
+    await this.assertJoinEligibility(match, userId);
 
     const existingBooking = await this.prisma.booking.findFirst({
       where: {
