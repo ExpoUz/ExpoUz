@@ -156,12 +156,12 @@ export class ClickService {
     if (transaction.bookingId) {
       await this.prisma.booking.update({
         where: { id: transaction.bookingId },
-        data: { status: bookingStatus },
+        data: { status: bookingStatus as any },
       });
     } else if (transaction.pitchBookingId) {
       await this.prisma.pitchBooking.update({
         where: { id: transaction.pitchBookingId },
-        data: { status: bookingStatus },
+        data: { status: bookingStatus as any },
       });
     }
   }

@@ -131,7 +131,6 @@ export class PaymentsService {
             status: true,
             title: true,
             startTime: true,
-            conversationId: true,
           },
         },
       },

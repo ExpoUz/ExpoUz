@@ -143,6 +143,24 @@ export class AdminController {
     return this.adminService.getPadelAnalytics();
   }
 
+  @Get('analytics/football')
+  @ApiOperation({ summary: 'Football match count + fill rate per format' })
+  getFootballAnalytics() {
+    return this.adminService.getFootballAnalytics();
+  }
+
+  @Get('disputes')
+  @ApiOperation({ summary: 'List disputed padel match results awaiting moderation' })
+  getDisputes() {
+    return this.adminService.getDisputedResults();
+  }
+
+  @Post('disputes/:matchId/resolve')
+  @ApiOperation({ summary: 'Resolve a disputed result: confirm (applies levels) or dismiss' })
+  resolveDispute(@Param('matchId') matchId: string, @Body('confirm') confirm: boolean) {
+    return this.adminService.resolveDispute(matchId, !!confirm);
+  }
+
   @Patch('settings/commission')
   @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update commission rate (SUPER_ADMIN only)' })
