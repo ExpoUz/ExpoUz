@@ -41,7 +41,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const fullPhone = phone.startsWith("+") ? phone : `+998${phone}`;
-      const { data } = await authApi.post("/auth/verify-otp", { phone: fullPhone, code: otp });
+      const { data } = await authApi.post("/auth/verify-otp", { phone: fullPhone, otp });
       const { accessToken, refreshToken, user } = data;
 
       if (!ALLOWED_ROLES.includes(user?.role)) {
