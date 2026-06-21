@@ -21,6 +21,8 @@ import { LevelService } from '../level/level.service';
 import { SubmitResultDto } from './dto/submit-result.dto';
 import { BookingType } from '@prisma/client';
 import { getMaxPlayers } from './format-caps';
+import { EscrowService } from '../escrow/escrow.service';
+import { MatchGateway } from '../gateway/match.gateway';
 import { randomBytes } from 'crypto';
 
 @Injectable()
@@ -35,6 +37,8 @@ export class MatchesService {
     private notifications: NotificationsService,
     private ranking: RankingService,
     private level: LevelService,
+    private escrow: EscrowService,
+    private matchGateway: MatchGateway,
   ) {}
 
   private generateShareCode(): string {
@@ -792,6 +796,22 @@ export class MatchesService {
       }
     }
 
+    // Schedule auto-release of escrow after the match ends (idempotent per
+    // match) and broadcast the join to anyone viewing this match live.
+    await this.escrow
+      .scheduleMatchRelease({
+        id: match.id,
+        startTime: match.startTime,
+        durationMinutes: match.durationMinutes,
+      })
+      .catch(() => {});
+    this.matchGateway.emitPlayerJoined(matchId, {
+      userId,
+      teamSide: teamSide ?? null,
+      currentPlayers: match.currentPlayers + 1,
+      maxPlayers: match.maxPlayers,
+    });
+
     return {
       booking,
       paymentInstructions: {
@@ -860,6 +880,8 @@ export class MatchesService {
         });
       }
     });
+
+    this.matchGateway.emitPlayerLeft(matchId, { userId });
 
     return { message: 'Left match', refundAmount };
   }

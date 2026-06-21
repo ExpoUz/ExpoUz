@@ -187,6 +187,7 @@ export class UsersService {
         skillLevel: true,
         padelLevel: true,
         padelReliability: true,
+        padelInitialSet: true,
         padelMatchesPlayed: true,
         padelMatchesWon: true,
         currentStreak: true,

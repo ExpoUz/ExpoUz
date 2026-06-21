@@ -10,4 +10,9 @@ export class EscrowProcessor {
   async handleReleaseEscrow(job: Job<{ transactionId: string }>) {
     await this.escrowService.releaseEscrow(job.data.transactionId);
   }
+
+  @Process('release-match')
+  async handleReleaseMatch(job: Job<{ matchId: string }>) {
+    await this.escrowService.releaseMatchEscrow(job.data.matchId);
+  }
 }

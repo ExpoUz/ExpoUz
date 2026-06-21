@@ -1,11 +1,17 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getRevenue, getPadelAnalytics } from "@/lib/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getRevenue, getPadelAnalytics, getFootballAnalytics, getDisputes, resolveDispute } from "@/lib/api";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import dayjs from "dayjs";
+import { useSportFilter } from "@/lib/sport-store";
 
 export default function AnalyticsPage() {
+  const sport = useSportFilter();
+  const qc = useQueryClient();
+  const showPadel = sport !== "FOOTBALL";
+  const showFootball = sport !== "PADEL";
+
   const { data: dailyData, isLoading } = useQuery({
     queryKey: ["admin-revenue", "month"],
     queryFn: () => getRevenue("month"),
@@ -19,6 +25,24 @@ export default function AnalyticsPage() {
   const { data: padel } = useQuery({
     queryKey: ["admin-padel-analytics"],
     queryFn: getPadelAnalytics,
+    enabled: showPadel,
+  });
+
+  const { data: football } = useQuery({
+    queryKey: ["admin-football-analytics"],
+    queryFn: getFootballAnalytics,
+    enabled: showFootball,
+  });
+
+  const { data: disputes } = useQuery({
+    queryKey: ["admin-disputes"],
+    queryFn: getDisputes,
+    enabled: showPadel,
+  });
+
+  const resolve = useMutation({
+    mutationFn: ({ matchId, confirm }: { matchId: string; confirm: boolean }) => resolveDispute(matchId, confirm),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-disputes"] }),
   });
 
   const daily: any[] = dailyData ?? [];
@@ -114,7 +138,28 @@ export default function AnalyticsPage() {
         </div>
       )}
 
+      {/* Football — match count + fill rate per format */}
+      {showFootball && (
+        <div className="mt-8">
+          <h2 className="text-lg font-bold text-gray-900 mb-1">⚽ Football Insights</h2>
+          <p className="text-gray-500 text-sm mb-4">{football?.totalMatches ?? 0} football matches</p>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Capacity Fill Rate by Format</h3>
+            {(football?.formats ?? []).length > 0 ? (
+              <div className="space-y-4">
+                {football!.formats.map((f) => (
+                  <SplitRow key={f.format} label={`${f.format} · ${f.matches} matches`} value={f.fillRate} total={100} color="#00C853" suffix="%" />
+                ))}
+              </div>
+            ) : (
+              <div className="h-24 flex items-center justify-center text-sm text-gray-400">No football matches yet</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Padel — level distribution + match-type split */}
+      {showPadel && (
       <div className="mt-8">
         <h2 className="text-lg font-bold text-gray-900 mb-1">🎾 Padel Insights</h2>
         <p className="text-gray-500 text-sm mb-4">
@@ -159,6 +204,45 @@ export default function AnalyticsPage() {
           </div>
         </div>
       </div>
+      )}
+
+      {/* Disputed padel results — moderation */}
+      {showPadel && (disputes ?? []).length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-bold text-gray-900 mb-1">⚖️ Disputed Results</h2>
+          <p className="text-gray-500 text-sm mb-4">{(disputes ?? []).length} awaiting moderation</p>
+          <div className="space-y-3">
+            {(disputes ?? []).map((d: any) => (
+              <div key={d.matchId} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-medium text-gray-900 truncate">{d.match?.title ?? "Match"}</div>
+                  <div className="text-xs text-gray-500 truncate">
+                    {d.match?.format} · sets {d.team1Set1}-{d.team2Set1}
+                    {d.team1Set2 != null ? `, ${d.team1Set2}-${d.team2Set2}` : ""} ·{" "}
+                    {(d.players ?? []).map((p: any) => p.firstName).join(", ")}
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => resolve.mutate({ matchId: d.matchId, confirm: true })}
+                    disabled={resolve.isPending}
+                    className="px-3 py-1.5 rounded-lg bg-green-500 text-white text-xs font-semibold disabled:opacity-50"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    onClick={() => resolve.mutate({ matchId: d.matchId, confirm: false })}
+                    disabled={resolve.isPending}
+                    className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 text-xs font-semibold disabled:opacity-50"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!isLoading && daily.length === 0 && monthly.length === 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center mt-6">
@@ -170,14 +254,14 @@ export default function AnalyticsPage() {
   );
 }
 
-function SplitRow({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
+function SplitRow({ label, value, total, color, suffix }: { label: string; value: number; total: number; color: string; suffix?: string }) {
   const pct = total > 0 ? Math.round((value / total) * 100) : 0;
   return (
     <div>
       <div className="flex items-center justify-between text-sm mb-1">
         <span className="text-gray-700 font-medium">{label}</span>
         <span className="text-gray-500">
-          {value} ({pct}%)
+          {suffix ? `${value}${suffix}` : `${value} (${pct}%)`}
         </span>
       </div>
       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">

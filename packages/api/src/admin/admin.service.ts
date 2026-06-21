@@ -1,12 +1,14 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { LevelService } from '../level/level.service';
 
 @Injectable()
 export class AdminService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
+    private level: LevelService,
   ) {}
 
   async linkTelegram(userId: string, telegramId: string) {
@@ -327,6 +329,64 @@ export class AdminService {
       distribution,
       matchTypeSplit: { casual, competitive },
     };
+  }
+
+  // Football analytics: match count + capacity fill rate per format (5v5/6v6).
+  async getFootballAnalytics() {
+    const matches = await this.prisma.match.findMany({
+      where: { sport: 'FOOTBALL' },
+      select: { format: true, currentPlayers: true, maxPlayers: true },
+    });
+    const byFormat: Record<string, { matches: number; filled: number; capacity: number }> = {};
+    for (const m of matches) {
+      const f = m.format || 'other';
+      if (!byFormat[f]) byFormat[f] = { matches: 0, filled: 0, capacity: 0 };
+      byFormat[f].matches++;
+      byFormat[f].filled += m.currentPlayers;
+      byFormat[f].capacity += m.maxPlayers || 0;
+    }
+    const formats = Object.entries(byFormat).map(([format, v]) => ({
+      format,
+      matches: v.matches,
+      fillRate: v.capacity > 0 ? Math.round((v.filled / v.capacity) * 100) : 0,
+    }));
+    return { totalMatches: matches.length, formats };
+  }
+
+  // ─── Disputed padel-result moderation ──────────────────────────────────────
+  async getDisputedResults() {
+    return this.prisma.matchResult.findMany({
+      where: { isDisputed: true },
+      include: {
+        match: { select: { id: true, title: true, sport: true, format: true, startTime: true } },
+        players: { select: { id: true, firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // Confirm a disputed result (applies level changes) or dismiss the dispute.
+  async resolveDispute(matchId: string, confirm: boolean) {
+    const result = await this.prisma.matchResult.findUnique({ where: { matchId } });
+    if (!result) throw new NotFoundException('No result for this match');
+
+    if (confirm) {
+      await this.prisma.matchResult.update({
+        where: { matchId },
+        data: { isConfirmed: true, isDisputed: false },
+      });
+      await this.prisma.match.update({
+        where: { id: matchId },
+        data: { resultSubmitted: true, status: 'COMPLETED' },
+      });
+      await this.level.processMatchResult(matchId);
+    } else {
+      await this.prisma.matchResult.update({
+        where: { matchId },
+        data: { isDisputed: false },
+      });
+    }
+    return { resolved: true, confirmed: confirm };
   }
 
   async updateCommission(rate: number) {

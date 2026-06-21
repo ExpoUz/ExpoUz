@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { getPlayerProfile, getPlayerRanking, LEVEL_META } from "@/lib/api";
+import { getPlayerProfile, getPlayerRanking, LEVEL_META, getSkillBand, formatLevel } from "@/lib/api";
 import { showBackButton } from "@/lib/telegram";
 
 export default function PlayerProfilePage() {
@@ -58,13 +58,43 @@ export default function PlayerProfilePage() {
         </p>
       </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-4 gap-2 mt-5">
+      {/* Football stats */}
+      <div className="text-xs font-semibold mt-5 mb-2 px-1" style={{ color: "var(--tg-hint)" }}>⚽ Football</div>
+      <div className="grid grid-cols-4 gap-2">
         <Stat label="Games" value={p.gamesAttended ?? 0} />
         <Stat label="This mo." value={p.gamesThisMonth ?? 0} />
         <Stat label="ELO" value={p.eloRating ?? 1000} />
         <Stat label="Rated 👍" value={p.ratings?.thumbsUp ?? 0} />
       </div>
+
+      {/* Padel stats (independent track) */}
+      {(() => {
+        const padelLevel = Number(p.padelLevel ?? 0);
+        const assessed = !!p.padelInitialSet || padelLevel > 0;
+        const band = getSkillBand(padelLevel);
+        return (
+          <>
+            <div className="text-xs font-semibold mt-4 mb-2 px-1" style={{ color: "var(--tg-hint)" }}>🎾 Padel</div>
+            {assessed ? (
+              <div className="rounded-2xl p-4 flex items-center gap-4" style={{ background: "var(--tg-card)" }}>
+                <div className="text-center">
+                  <div className="text-3xl font-black" style={{ color: band.color }}>{formatLevel(padelLevel)}</div>
+                  <div className="text-[11px] font-semibold" style={{ color: band.color }}>{band.label}</div>
+                </div>
+                <div className="flex-1 grid grid-cols-3 gap-2 text-center">
+                  <Stat label="Played" value={p.padelMatchesPlayed ?? 0} />
+                  <Stat label="Won" value={p.padelMatchesWon ?? 0} />
+                  <Stat label="Reliable" value={`${p.padelReliability ?? 0}%`} />
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl p-4 text-sm text-center" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
+                Not assessed at padel yet
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* Level progress */}
       {ranking && ranking.levelInfo?.nextAt != null && (

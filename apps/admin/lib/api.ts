@@ -199,6 +199,25 @@ export async function getPadelAnalytics(): Promise<{
   return data;
 }
 
+export async function getFootballAnalytics(): Promise<{
+  totalMatches: number;
+  formats: { format: string; matches: number; fillRate: number }[];
+}> {
+  const { data } = await adminApi.get("/admin/analytics/football");
+  return data;
+}
+
+// ─── Disputed result moderation ───────────────────────────────
+export async function getDisputes(): Promise<any[]> {
+  const { data } = await adminApi.get("/admin/disputes");
+  return Array.isArray(data) ? data : data?.data ?? [];
+}
+
+export async function resolveDispute(matchId: string, confirm: boolean) {
+  const { data } = await adminApi.post(`/admin/disputes/${matchId}/resolve`, { confirm });
+  return data;
+}
+
 // ─── Settings ─────────────────────────────────────────────────
 export async function getSettings() {
   const { data } = await adminApi.get("/admin/settings");

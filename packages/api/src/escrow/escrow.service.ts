@@ -89,6 +89,41 @@ export class EscrowService {
     );
   }
 
+  /**
+   * Schedule auto-release of a match's held escrow shortly after it ends.
+   * Idempotent — a deterministic jobId means calling this on every join does
+   * not create duplicate jobs.
+   */
+  async scheduleMatchRelease(match: {
+    id: string;
+    startTime: Date;
+    durationMinutes: number;
+  }): Promise<void> {
+    const end = new Date(match.startTime);
+    end.setMinutes(end.getMinutes() + (match.durationMinutes ?? 60) + 30);
+    const delay = Math.max(end.getTime() - Date.now(), 0);
+    try {
+      await this.escrowQueue.add(
+        'release-match',
+        { matchId: match.id },
+        { delay, jobId: `release-match:${match.id}`, removeOnComplete: true, removeOnFail: true },
+      );
+    } catch {
+      // Queue/Redis unavailable — non-fatal; the host's complete() still releases.
+    }
+  }
+
+  /** Release every HELD transaction tied to a match's bookings. */
+  async releaseMatchEscrow(matchId: string): Promise<void> {
+    const held = await this.prisma.transaction.findMany({
+      where: { status: 'HELD', booking: { matchId } },
+      select: { id: true },
+    });
+    for (const t of held) {
+      await this.releaseEscrow(t.id);
+    }
+  }
+
   async handleCancellation(bookingId: string, hoursBeforeMatch: number): Promise<void> {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
