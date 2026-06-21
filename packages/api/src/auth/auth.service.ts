@@ -62,7 +62,14 @@ export class AuthService {
       phone === '+998900000000' &&
       otp === '000000';
 
-    if (!isDevBypass) {
+    // Env-gated reusable test OTP. When TEST_OTP_CODE is set, this code logs in
+    // any EXISTING account without consuming a real OTP. Unset the env to
+    // disable. SECURITY: this is a deliberate login bypass — keep it secret and
+    // remove it outside of testing.
+    const isTestOtp =
+      !!process.env.TEST_OTP_CODE && otp === process.env.TEST_OTP_CODE;
+
+    if (!isDevBypass && !isTestOtp) {
       const otpRecord = await this.prisma.otpCode.findFirst({
         where: {
           phone,
@@ -87,6 +94,10 @@ export class AuthService {
     let isNewUser = false;
 
     if (!user) {
+      // The test OTP must never create accounts — only log into existing ones.
+      if (isTestOtp) {
+        throw new UnauthorizedException('Test login is only available for existing accounts');
+      }
       isNewUser = true;
       user = await this.prisma.user.create({
         data: {
