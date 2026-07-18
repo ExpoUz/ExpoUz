@@ -14,14 +14,14 @@
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.expouz.app"
+      "bundleIdentifier": "uz.expouz.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1A3A2E"
       },
-      "package": "com.expouz.app"
+      "package": "uz.expouz.app"
     },
     "plugins": [
       "expo-router",

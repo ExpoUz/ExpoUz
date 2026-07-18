@@ -274,8 +274,11 @@ function Sheet({
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={onClose}>
       <div
-        className="w-full max-h-[70vh] overflow-y-auto rounded-t-3xl p-4 pb-8"
-        style={{ background: "var(--tg-bg)" }}
+        className="w-full max-h-[70vh] overflow-y-auto rounded-t-3xl p-4 animate-sheet-up"
+        style={{
+          background: "var(--tg-bg)",
+          paddingBottom: "calc(72px + env(safe-area-inset-bottom))",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="font-bold text-base mb-3">{title}</div>

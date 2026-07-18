@@ -2,18 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search, Trophy, User } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Home, Search, MessageCircle, Trophy, User } from "lucide-react";
 import { hapticImpact } from "@/lib/telegram";
+import { getConversations } from "@/lib/api";
 
 const ITEMS = [
   { href: "/", label: "Games", icon: Home },
   { href: "/players", label: "Players", icon: Search },
+  { href: "/messages", label: "Chat", icon: MessageCircle },
   { href: "/leaderboard", label: "Ranks", icon: Trophy },
   { href: "/profile", label: "Profile", icon: User },
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
+
+  const { data: conversations } = useQuery({
+    queryKey: ["conversations"],
+    queryFn: getConversations,
+    refetchInterval: 20000,
+    staleTime: 10000,
+  });
+  const unreadTotal = (conversations ?? []).reduce((sum, c) => sum + (c.unreadCount || 0), 0);
 
   return (
     <nav
@@ -26,6 +37,7 @@ export function BottomNav() {
     >
       {ITEMS.map(({ href, label, icon: Icon }) => {
         const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+        const showBadge = href === "/messages" && unreadTotal > 0;
         return (
           <Link
             key={href}
@@ -34,7 +46,14 @@ export function BottomNav() {
             className="flex-1 flex flex-col items-center gap-0.5 py-2.5"
             style={{ color: active ? "#00C853" : "var(--tg-hint)" }}
           >
-            <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
+            <span className="relative">
+              <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
+              {showBadge && (
+                <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-[#FF3B30] text-white text-[10px] font-bold flex items-center justify-center">
+                  {unreadTotal > 9 ? "9+" : unreadTotal}
+                </span>
+              )}
+            </span>
             <span className="text-[11px] font-medium">{label}</span>
           </Link>
         );

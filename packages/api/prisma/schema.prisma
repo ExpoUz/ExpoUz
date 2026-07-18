@@ -87,6 +87,36 @@ model User {
   session                    UserSession?
   levelHistory               LevelHistory[]
   matchResults               MatchResult[]             @relation("PlayerResults")
+  walletTransactions         WalletTransaction[]
+}
+
+// ============ WALLET LEDGER ============
+// Immutable, append-only ledger of every wallet movement. `balanceAfter` is the
+// running balance at the time of the entry — never update or delete these rows;
+// corrections are new ADMIN_ADJUSTMENT entries.
+model WalletTransaction {
+  id           String       @id @default(cuid())
+  userId       String
+  user         User         @relation(fields: [userId], references: [id])
+  type         WalletTxType
+  amount       Decimal      @db.Decimal(12, 2) // + = credit in, - = debit out
+  balanceAfter Decimal      @db.Decimal(12, 2)
+  reference    String? // matchId, bookingId, topup id, etc.
+  description  String
+  createdAt    DateTime     @default(now())
+
+  @@index([userId])
+}
+
+enum WalletTxType {
+  TOPUP
+  MATCH_PAYMENT
+  REFUND
+  CANCELLATION_FEE
+  PAYOUT
+  ADMIN_ADJUSTMENT
+  REFERRAL_BONUS
+  WELCOME_BONUS
 }
 
 enum BestHand {

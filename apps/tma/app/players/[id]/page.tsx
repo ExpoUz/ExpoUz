@@ -1,19 +1,42 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { getPlayerProfile, getPlayerRanking, LEVEL_META, getSkillBand, formatLevel } from "@/lib/api";
-import { showBackButton } from "@/lib/telegram";
+import { MessageCircle } from "lucide-react";
+import {
+  getPlayerProfile,
+  getPlayerRanking,
+  getMe,
+  startDirectConversation,
+  LEVEL_META,
+  getSkillBand,
+  formatLevel,
+} from "@/lib/api";
+import { showBackButton, hapticImpact } from "@/lib/telegram";
 
 export default function PlayerProfilePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = params.id;
+  const [opening, setOpening] = useState(false);
 
   const { data: p, isLoading } = useQuery({ queryKey: ["player", id], queryFn: () => getPlayerProfile(id) });
   const { data: ranking } = useQuery({ queryKey: ["player-rank", id], queryFn: () => getPlayerRanking(id) });
+  const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
+
+  const openChat = async () => {
+    if (opening) return;
+    setOpening(true);
+    hapticImpact("light");
+    try {
+      const convo = await startDirectConversation(id);
+      router.push(`/messages/${convo.id}`);
+    } catch {
+      setOpening(false);
+    }
+  };
 
   useEffect(() => {
     const cleanup = showBackButton(() => router.back());
@@ -56,6 +79,18 @@ export default function PlayerProfilePage() {
           Member since {dayjs(p.createdAt).format("MMM YYYY")}
           {p.city ? ` · ${p.district ?? p.city}` : ""}
         </p>
+
+        {me && me.id !== id && (
+          <button
+            onClick={openChat}
+            disabled={opening}
+            className="mt-3 inline-flex items-center gap-2 px-5 py-2 rounded-full font-semibold text-sm disabled:opacity-50"
+            style={{ background: "#00C853", color: "#fff" }}
+          >
+            <MessageCircle size={16} />
+            {opening ? "Opening…" : "Message"}
+          </button>
+        )}
       </div>
 
       {/* Football stats */}

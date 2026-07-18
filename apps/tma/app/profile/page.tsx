@@ -73,6 +73,25 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* Wallet quick-link */}
+      <div className="px-4 mt-3">
+        <Link
+          href="/wallet"
+          onClick={() => hapticImpact("light")}
+          className="flex items-center gap-3 rounded-2xl p-4 active:opacity-80"
+          style={{ background: "var(--tg-card)" }}
+        >
+          <div className="text-xl">👛</div>
+          <div className="flex-1">
+            <div className="text-sm font-semibold">Wallet</div>
+            <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
+              Balance &amp; transaction history
+            </div>
+          </div>
+          <span style={{ color: "var(--tg-hint)" }}>›</span>
+        </Link>
+      </div>
+
       {/* Sport tabs */}
       <div className="px-4 mt-4">
         <div className="flex gap-2 rounded-2xl p-1" style={{ background: "var(--tg-card)" }}>

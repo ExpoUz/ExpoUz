@@ -23,6 +23,7 @@ import { BookingType } from '@prisma/client';
 import { getMaxPlayers } from './format-caps';
 import { EscrowService } from '../escrow/escrow.service';
 import { MatchGateway } from '../gateway/match.gateway';
+import { WalletService } from '../payments/wallet/wallet.service';
 import { randomBytes } from 'crypto';
 
 @Injectable()
@@ -39,6 +40,7 @@ export class MatchesService {
     private level: LevelService,
     private escrow: EscrowService,
     private matchGateway: MatchGateway,
+    private wallet: WalletService,
   ) {}
 
   private generateShareCode(): string {
@@ -630,24 +632,30 @@ export class MatchesService {
     const hoursUntil =
       (new Date(match.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
 
-    await this.prisma.match.update({ where: { id }, data: { status: 'CANCELLED' } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.match.update({ where: { id }, data: { status: 'CANCELLED' } });
 
-    for (const booking of match.bookings) {
-      await this.prisma.booking.update({
-        where: { id: booking.id },
-        data: { status: 'CANCELLED_REFUND' },
-      });
-      if (booking.transaction) {
-        await this.prisma.transaction.update({
-          where: { id: booking.transaction.id },
-          data: { status: 'REFUNDED', refundedAt: new Date() },
+      for (const booking of match.bookings) {
+        await tx.booking.update({
+          where: { id: booking.id },
+          data: { status: 'CANCELLED_REFUND' },
         });
-        await this.prisma.user.update({
-          where: { id: booking.userId },
-          data: { credit: { increment: booking.transaction.amount } },
-        });
+        if (booking.transaction) {
+          await tx.transaction.update({
+            where: { id: booking.transaction.id },
+            data: { status: 'REFUNDED', refundedAt: new Date() },
+          });
+          // Host/admin cancellation refunds the full amount to the wallet.
+          await this.wallet.adjust(
+            booking.userId,
+            Number(booking.transaction.amount),
+            'REFUND',
+            { reference: id, description: 'Match cancelled — full refund' },
+            tx,
+          );
+        }
       }
-    }
+    });
 
     // Close the Telegram topic
     const conversation = await this.prisma.conversation.findFirst({
@@ -747,38 +755,55 @@ export class MatchesService {
       if (!locked) throw new ConflictException('Position already being reserved');
     }
 
-    const booking = await this.prisma.$transaction(async (tx) => {
-      const b = await tx.booking.create({
-        data: {
-          userId,
-          matchId,
-          status: 'PENDING_PAYMENT',
-          teamSide: teamSide as any,
-          qrCode: `${matchId}_${userId}_${Date.now()}`,
-        },
-      });
-
-      if (positionId) {
-        await tx.matchPosition.update({
-          where: { id: positionId },
-          data: { bookingId: b.id, isLocked: true },
+    let booking;
+    try {
+      booking = await this.prisma.$transaction(async (tx) => {
+        const b = await tx.booking.create({
+          data: {
+            userId,
+            matchId,
+            status: 'PENDING_PAYMENT',
+            teamSide: teamSide as any,
+            qrCode: `${matchId}_${userId}_${Date.now()}`,
+          },
         });
-      }
 
-      const updatedMatch = await tx.match.update({
-        where: { id: matchId },
-        data: { currentPlayers: { increment: 1 } },
+        if (positionId) {
+          await tx.matchPosition.update({
+            where: { id: positionId },
+            data: { bookingId: b.id, isLocked: true },
+          });
+        }
+
+        // Atomic, race-safe cap enforcement: the conditional WHERE only increments
+        // while a spot is free. Concurrent joins on the last spot serialize on the
+        // row lock; the loser matches 0 rows and we reject. Prevents overshooting
+        // maxPlayers (the pre-tx status guard alone cannot, under concurrency).
+        const incremented = await tx.$executeRaw`
+          UPDATE "Match"
+          SET "currentPlayers" = "currentPlayers" + 1
+          WHERE "id" = ${matchId} AND "currentPlayers" < "maxPlayers"
+        `;
+        if (incremented === 0) {
+          throw new ConflictException('Match is full');
+        }
+
+        const updatedMatch = await tx.match.findUniqueOrThrow({
+          where: { id: matchId },
+          select: { currentPlayers: true, maxPlayers: true },
+        });
+        if (updatedMatch.currentPlayers >= updatedMatch.maxPlayers) {
+          await tx.match.update({ where: { id: matchId }, data: { status: 'FULL' } });
+        }
+
+        return b;
       });
-
-      if (updatedMatch.currentPlayers >= updatedMatch.maxPlayers) {
-        await tx.match.update({ where: { id: matchId }, data: { status: 'FULL' } });
+    } finally {
+      // Release the position reservation whether the join committed or rolled
+      // back, so a rejected join doesn't hold the slot until the lock's TTL.
+      if (positionId) {
+        await this.redis.releasePosition(positionId);
       }
-
-      return b;
-    });
-
-    if (positionId) {
-      await this.redis.releasePosition(positionId);
     }
 
     // Add player to the match group conversation
@@ -862,10 +887,19 @@ export class MatchesService {
       }
 
       if (refundAmount) {
-        await tx.user.update({
-          where: { id: userId },
-          data: { credit: { increment: refundAmount } },
-        });
+        await this.wallet.adjust(
+          userId,
+          refundAmount,
+          'REFUND',
+          {
+            reference: matchId,
+            description:
+              newStatus === 'CANCELLED_PENALTY'
+                ? 'Left match (late) — 50% refund'
+                : 'Left match — full refund',
+          },
+          tx,
+        );
       }
 
       await tx.match.update({

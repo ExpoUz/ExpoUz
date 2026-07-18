@@ -42,6 +42,19 @@ body {
   animation: pulse-dot 1.6s infinite;
 }
 
+/* Bottom-sheet slide-up (used by sport/city/time pickers) */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.animate-sheet-up {
+  animation: sheet-up 0.22s ease-out;
+}
+
 ::-webkit-scrollbar {
   width: 0;
   height: 0;
