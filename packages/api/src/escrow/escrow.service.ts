@@ -3,6 +3,7 @@ import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WalletService } from '../payments/wallet/wallet.service';
 import Decimal from 'decimal.js';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class EscrowService {
     private prisma: PrismaService,
     @InjectQueue('escrow') private escrowQueue: Queue,
     private notificationsService: NotificationsService,
+    private wallet: WalletService,
   ) {}
 
   async initiatePayment(bookingId: string, gateway: string): Promise<any> {
@@ -185,9 +187,8 @@ export class EscrowService {
   }
 
   async refundToWallet(userId: string, amount: Decimal): Promise<void> {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { credit: { increment: amount } },
+    await this.wallet.adjust(userId, Number(amount), 'REFUND', {
+      description: 'Booking refund',
     });
   }
 

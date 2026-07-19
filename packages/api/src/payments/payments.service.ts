@@ -5,10 +5,14 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { WalletService } from './wallet/wallet.service';
 
 @Injectable()
 export class PaymentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private wallet: WalletService,
+  ) {}
 
   // ─── Build Payment URL ─────────────────────────────────────────────────────
   buildPaymentUrl(transactionId: string, amount: number, gateway: string): string {
@@ -180,11 +184,19 @@ export class PaymentsService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // Deduct wallet balance
-      await tx.user.update({
-        where: { id: userId },
-        data: { credit: { decrement: amount } },
-      });
+      // Deduct wallet balance through the ledger (single source of truth)
+      await this.wallet.adjust(
+        userId,
+        -amount,
+        'MATCH_PAYMENT',
+        {
+          reference: transaction.bookingId ?? transaction.pitchBookingId ?? transactionId,
+          description: transaction.bookingId
+            ? 'Match payment'
+            : 'Pitch booking payment',
+        },
+        tx,
+      );
 
       // Mark transaction as released (instant, no hold period for wallet)
       await tx.transaction.update({

@@ -268,6 +268,108 @@ export async function getMyBookings(): Promise<any[]> {
   return Array.isArray(data) ? data : data?.data ?? [];
 }
 
+// ─── Wallet ───────────────────────────────────────────────────
+export interface WalletTransaction {
+  id: string;
+  type:
+    | "TOPUP"
+    | "MATCH_PAYMENT"
+    | "REFUND"
+    | "CANCELLATION_FEE"
+    | "PAYOUT"
+    | "ADMIN_ADJUSTMENT"
+    | "REFERRAL_BONUS"
+    | "WELCOME_BONUS";
+  amount: string;
+  balanceAfter: string;
+  reference: string | null;
+  description: string;
+  createdAt: string;
+}
+
+export async function getWalletBalance(): Promise<{ balance: number }> {
+  const { data } = await api.get("/payments/wallet/balance");
+  return data;
+}
+
+export async function getWalletHistory(): Promise<WalletTransaction[]> {
+  const { data } = await api.get("/payments/wallet/history");
+  return Array.isArray(data) ? data : [];
+}
+
+export const WALLET_TX_META: Record<
+  WalletTransaction["type"],
+  { label: string; icon: string }
+> = {
+  TOPUP: { label: "Top-up", icon: "💳" },
+  MATCH_PAYMENT: { label: "Match payment", icon: "⚽" },
+  REFUND: { label: "Refund", icon: "↩️" },
+  CANCELLATION_FEE: { label: "Cancellation fee", icon: "⚠️" },
+  PAYOUT: { label: "Payout", icon: "💰" },
+  ADMIN_ADJUSTMENT: { label: "Adjustment", icon: "🛠️" },
+  REFERRAL_BONUS: { label: "Referral bonus", icon: "🎁" },
+  WELCOME_BONUS: { label: "Welcome bonus", icon: "✨" },
+};
+
+// ─── Messaging / chat ─────────────────────────────────────────
+export interface ChatUser {
+  id: string;
+  firstName: string;
+  lastName?: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  readBy: string[];
+  createdAt: string;
+  sender?: ChatUser;
+}
+
+export interface Conversation {
+  id: string;
+  type: "DIRECT" | "MATCH_GROUP" | "PITCH_HIRE" | "SUPPORT";
+  matchId?: string | null;
+  lastMessage: ChatMessage | null;
+  unreadCount: number;
+  otherMember: ChatUser | null;
+  createdAt: string;
+}
+
+export async function getConversations(): Promise<Conversation[]> {
+  const { data } = await api.get("/messages/conversations");
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getConversationMessages(
+  id: string,
+  page = 1,
+  limit = 50,
+): Promise<{ data: ChatMessage[]; total: number; page: number; limit: number }> {
+  const { data } = await api.get(`/messages/conversations/${id}`, {
+    params: { page, limit },
+  });
+  return data;
+}
+
+export async function sendChatMessage(id: string, content: string): Promise<ChatMessage> {
+  const { data } = await api.post(`/messages/conversations/${id}`, { content });
+  return data;
+}
+
+export async function startDirectConversation(userId: string): Promise<Conversation> {
+  const { data } = await api.post(`/messages/direct/${userId}`);
+  return data;
+}
+
+export function chatUserName(u: ChatUser | null | undefined): string {
+  if (!u) return "Conversation";
+  return `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Player";
+}
+
 // ─── Helpers ──────────────────────────────────────────────────
 export function formatUZS(value: number | string | null | undefined): string {
   const n = Number(value ?? 0);

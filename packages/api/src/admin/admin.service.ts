@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LevelService } from '../level/level.service';
+import { WalletService } from '../payments/wallet/wallet.service';
 
 @Injectable()
 export class AdminService {
@@ -9,7 +10,33 @@ export class AdminService {
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
     private level: LevelService,
+    private wallet: WalletService,
   ) {}
+
+  /**
+   * Manual wallet top-up / correction by an admin. Used during the
+   * gateway-pending launch period to credit users who paid via offline bank
+   * transfer, and to resolve disputes. Always ledgered.
+   */
+  async adjustWallet(
+    targetUserId: string,
+    amount: number,
+    description: string,
+    type: 'TOPUP' | 'ADMIN_ADJUSTMENT' = 'TOPUP',
+  ) {
+    if (!amount || Number.isNaN(amount)) {
+      throw new BadRequestException('A non-zero amount is required');
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const balance = await this.wallet.adjust(targetUserId, amount, type, {
+      description: description || (amount > 0 ? 'Admin top-up' : 'Admin adjustment'),
+      // Admin corrections may push a balance negative (e.g. clawing back a bonus).
+      allowOverdraft: type === 'ADMIN_ADJUSTMENT',
+    });
+    return { userId: targetUserId, balance };
+  }
 
   async linkTelegram(userId: string, telegramId: string) {
     if (!telegramId) throw new BadRequestException('telegramId is required');

@@ -10,7 +10,9 @@
     "test": "jest",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "ts-node --transpile-only prisma/seed.ts"
+    "db:seed": "ts-node --transpile-only prisma/seed.ts",
+    "db:cleanup-demo": "ts-node --transpile-only prisma/cleanup-demo.ts",
+    "db:seed-launch": "ts-node --transpile-only prisma/seed-launch.ts"
   },
   "prisma": {
     "seed": "ts-node --transpile-only prisma/seed.ts"

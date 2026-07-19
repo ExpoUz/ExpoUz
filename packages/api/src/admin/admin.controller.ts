@@ -76,6 +76,17 @@ export class AdminController {
     return this.adminService.banUser(id, reason);
   }
 
+  @Post('users/:id/wallet')
+  @ApiOperation({ summary: "Manually credit/adjust a user's wallet (ledgered)" })
+  adjustWallet(
+    @Param('id') id: string,
+    @Body('amount') amount: number,
+    @Body('description') description: string,
+    @Body('type') type?: 'TOPUP' | 'ADMIN_ADJUSTMENT',
+  ) {
+    return this.adminService.adjustWallet(id, Number(amount), description, type);
+  }
+
   @Get('pitches/pending')
   @ApiOperation({ summary: 'Get pending pitch verifications' })
   getPendingPitches() {

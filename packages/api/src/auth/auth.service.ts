@@ -12,6 +12,7 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { WalletService } from '../payments/wallet/wallet.service';
 import axios from 'axios';
 import * as crypto from 'crypto';
 
@@ -21,6 +22,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private config: ConfigService,
+    private wallet: WalletService,
   ) {}
 
   async sendOtp(dto: SendOtpDto): Promise<{ maskedPhone: string; expiresIn: number }> {
@@ -145,6 +147,11 @@ export class AuthService {
       data: updateData,
     });
 
+    // One-time welcome bonus so new users can transact immediately (idempotent).
+    await this.wallet.grantWelcomeBonus(userId).catch(() => {
+      // Welcome bonus failure is non-critical to registration.
+    });
+
     if (dto.referralCode) {
       try {
         const referrer = await this.prisma.user.findFirst({
@@ -153,19 +160,27 @@ export class AuthService {
         if (referrer && referrer.id !== userId) {
           const currentUser = await this.prisma.user.findUnique({ where: { id: userId } });
           if (!currentUser.referredBy) {
-            await this.prisma.$transaction([
-              this.prisma.user.update({
+            const bonus = Number(process.env.REFERRAL_BONUS_AMOUNT ?? 50000);
+            await this.prisma.$transaction(async (tx) => {
+              await tx.user.update({
                 where: { id: userId },
-                data: {
-                  referredBy: referrer.id,
-                  credit: { increment: 50000 },
-                },
-              }),
-              this.prisma.user.update({
-                where: { id: referrer.id },
-                data: { credit: { increment: 50000 } },
-              }),
-            ]);
+                data: { referredBy: referrer.id },
+              });
+              await this.wallet.adjust(
+                userId,
+                bonus,
+                'REFERRAL_BONUS',
+                { reference: referrer.id, description: 'Referral bonus (joined via invite)' },
+                tx,
+              );
+              await this.wallet.adjust(
+                referrer.id,
+                bonus,
+                'REFERRAL_BONUS',
+                { reference: userId, description: 'Referral bonus (invited a friend)' },
+                tx,
+              );
+            });
           }
         }
       } catch {
