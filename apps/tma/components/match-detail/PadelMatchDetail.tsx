@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { MapPin, Clock } from "lucide-react";
-import { joinMatch, leaveMatch, formatUZS, formatLevel, getSkillBand } from "@/lib/api";
+import {
+  joinMatchAndPay,
+  leaveMatch,
+  isInsufficientBalanceError,
+  formatUZS,
+  formatLevel,
+  getSkillBand,
+} from "@/lib/api";
 import {
   showMainButton,
   hideMainButton,
@@ -106,17 +113,28 @@ export function PadelMatchDetail({ match }: { match: any }) {
     (match.maxLevel != null && myPadelLevel > match.maxLevel);
 
   const join = useMutation({
-    mutationFn: (side: Side) => joinMatch(id, { teamSide: side === "A" ? "HOME" : "AWAY" }),
+    mutationFn: (side: Side) =>
+      joinMatchAndPay(
+        id,
+        { teamSide: side === "A" ? "HOME" : "AWAY" },
+        match.pricePerPlayer,
+      ),
     onMutate: () => setMainButtonLoading(true),
     onSuccess: () => {
       hapticSuccess();
       qc.invalidateQueries({ queryKey: ["tma-match", id] });
+      qc.invalidateQueries({ queryKey: ["wallet"] });
     },
     onError: (e: any) => {
       hapticError();
       const code = e?.response?.data?.code;
       if (code === "PADEL_LEVEL_REQUIRED") {
         router.push(`/onboarding?next=/match/${id}`);
+        return;
+      }
+      if (isInsufficientBalanceError(e)) {
+        showAlert("Not enough wallet balance — top up to reserve your place.");
+        router.push("/wallet");
         return;
       }
       showAlert(e?.response?.data?.message ?? "Could not join this match.");

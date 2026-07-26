@@ -172,11 +172,38 @@ export class AdminController {
     return this.adminService.resolveDispute(matchId, !!confirm);
   }
 
+  @Get('settings')
+  @ApiOperation({ summary: 'Get platform settings' })
+  getSettings() {
+    return this.adminService.getSettings();
+  }
+
+  @Patch('settings')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Update platform settings (SUPER_ADMIN only)' })
+  updateSettings(
+    @Body()
+    dto: {
+      commissionRate?: number;
+      platformFeeRate?: number;
+      cancellationFeeRate?: number;
+      cancellationWindowHours?: number;
+    },
+  ) {
+    return this.adminService.updateSettings(dto);
+  }
+
   @Patch('settings/commission')
   @Roles('SUPER_ADMIN')
   @ApiOperation({ summary: 'Update commission rate (SUPER_ADMIN only)' })
   updateCommission(@Body('rate') rate: number) {
     return this.adminService.updateCommission(rate);
+  }
+
+  @Get('announcements')
+  @ApiOperation({ summary: 'Announcement history' })
+  getAnnouncements() {
+    return this.adminService.getAnnouncements();
   }
 
   @Post('announcements')

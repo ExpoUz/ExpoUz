@@ -32,14 +32,20 @@ export class TelegramService implements OnModuleInit {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const groupId = process.env.TELEGRAM_FORUM_GROUP_ID;
 
-    if (!token || !groupId) {
-      this.logger.warn(
-        'TELEGRAM_BOT_TOKEN or TELEGRAM_FORUM_GROUP_ID not set — Telegram integration disabled',
-      );
+    if (!token) {
+      this.logger.warn('TELEGRAM_BOT_TOKEN not set — Telegram integration disabled');
       return;
     }
 
-    this.forumGroupId = parseInt(groupId, 10);
+    // The forum group is only needed for match group-chat topics. The bot
+    // itself (deep-link /start handling, DMs) works with just the token.
+    if (groupId) {
+      this.forumGroupId = parseInt(groupId, 10);
+    } else {
+      this.logger.warn(
+        'TELEGRAM_FORUM_GROUP_ID not set — match group-chat topics disabled (deep links still work)',
+      );
+    }
 
     // Use polling in dev, webhook in production
     const useWebhook = process.env.NODE_ENV === 'production' && !!process.env.APP_WEBHOOK_URL;

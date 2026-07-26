@@ -198,15 +198,18 @@ export class PaymentsService {
         tx,
       );
 
-      // Mark transaction as released (instant, no hold period for wallet)
+      // Match payments enter escrow (HELD) and are released — with the pitch
+      // owner's payout — after the match ends. Pitch bookings settle instantly.
       await tx.transaction.update({
         where: { id: transactionId },
-        data: {
-          status: 'RELEASED',
-          gateway: 'WALLET',
-          heldAt: new Date(),
-          releasedAt: new Date(),
-        },
+        data: transaction.bookingId
+          ? { status: 'HELD', gateway: 'WALLET', heldAt: new Date() }
+          : {
+              status: 'RELEASED',
+              gateway: 'WALLET',
+              heldAt: new Date(),
+              releasedAt: new Date(),
+            },
       });
 
       // Confirm the linked booking

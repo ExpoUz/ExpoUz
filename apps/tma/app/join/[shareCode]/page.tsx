@@ -4,7 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { getMatchByShareCode, joinByShareCode, formatUZS } from "@/lib/api";
+import {
+  getMatchByShareCode,
+  joinByShareCode,
+  payForBookingWithWallet,
+  leaveMatch,
+  isInsufficientBalanceError,
+  formatUZS,
+} from "@/lib/api";
 import {
   showMainButton,
   hideMainButton,
@@ -34,12 +41,26 @@ export default function JoinViaInvitePage() {
     setJoining(true);
     setMainButtonLoading(true);
     try {
-      await joinByShareCode(shareCode, {});
+      const res = await joinByShareCode(shareCode, {});
+      const bookingId = res?.booking?.id;
+      if (bookingId && Number(match.pricePerPlayer ?? 0) > 0) {
+        try {
+          await payForBookingWithWallet(bookingId);
+        } catch (payErr) {
+          await leaveMatch(match.id).catch(() => {});
+          throw payErr;
+        }
+      }
       hapticSuccess();
       router.replace(`/match/${match.id}`);
     } catch (e: any) {
       hapticError();
-      showAlert(e?.response?.data?.message ?? "Could not join this game.");
+      if (isInsufficientBalanceError(e)) {
+        showAlert("Not enough wallet balance — top up to join this game.");
+        router.push("/wallet");
+      } else {
+        showAlert(e?.response?.data?.message ?? "Could not join this game.");
+      }
       setJoining(false);
       setMainButtonLoading(false);
     }

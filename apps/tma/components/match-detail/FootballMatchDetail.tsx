@@ -6,7 +6,13 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { MapPin, Users, Clock, Shield, ChevronRight, Calendar, Share2, Copy } from "lucide-react";
-import { joinMatch, leaveMatch, getShareLink, formatUZS } from "@/lib/api";
+import {
+  joinMatchAndPay,
+  leaveMatch,
+  getShareLink,
+  isInsufficientBalanceError,
+  formatUZS,
+} from "@/lib/api";
 import {
   showMainButton,
   hideMainButton,
@@ -52,14 +58,20 @@ export function FootballMatchDetail({ match }: { match: any }) {
   const isFull = spotsLeft === 0 && !joined;
 
   const join = useMutation({
-    mutationFn: () => joinMatch(id, {}),
+    mutationFn: () => joinMatchAndPay(id, {}, match?.pricePerPlayer),
     onMutate: () => setMainButtonLoading(true),
     onSuccess: () => {
       hapticSuccess();
       qc.invalidateQueries({ queryKey: ["tma-match", id] });
+      qc.invalidateQueries({ queryKey: ["wallet"] });
     },
     onError: (e: any) => {
       hapticError();
+      if (isInsufficientBalanceError(e)) {
+        showAlert("Not enough wallet balance — top up to reserve your spot.");
+        router.push("/wallet");
+        return;
+      }
       showAlert(e?.response?.data?.message ?? "Could not join this game.");
     },
     onSettled: () => setMainButtonLoading(false),

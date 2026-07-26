@@ -11,6 +11,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -25,6 +26,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('send-otp')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'Send OTP to phone number' })
   @ApiResponse({ status: 200, description: 'OTP sent successfully' })
   @ApiResponse({ status: 400, description: 'Invalid phone number' })
@@ -33,6 +35,7 @@ export class AuthController {
   }
 
   @Post('verify-otp')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: 'Verify OTP and get tokens' })
   @ApiResponse({ status: 200, description: 'Tokens returned' })
   @ApiResponse({ status: 401, description: 'Invalid or expired OTP' })

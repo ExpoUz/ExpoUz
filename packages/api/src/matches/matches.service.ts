@@ -640,7 +640,9 @@ export class MatchesService {
           where: { id: booking.id },
           data: { status: 'CANCELLED_REFUND' },
         });
-        if (booking.transaction) {
+        // Refund only money that was actually paid (HELD/RELEASED) — a PENDING
+        // transaction never debited the wallet.
+        if (booking.transaction && ['HELD', 'RELEASED'].includes(booking.transaction.status)) {
           await tx.transaction.update({
             where: { id: booking.transaction.id },
             data: { status: 'REFUNDED', refundedAt: new Date() },
@@ -862,27 +864,36 @@ export class MatchesService {
     const hoursBeforeMatch =
       (new Date(booking.match.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
 
+    // Only money that actually left the wallet can come back: a PENDING
+    // transaction was never paid, so it must never produce a refund credit.
+    const paidTransaction =
+      booking.transaction && ['HELD', 'RELEASED'].includes(booking.transaction.status)
+        ? booking.transaction
+        : null;
+
     let newStatus: any = 'CANCELLED_REFUND';
-    let refundAmount: number | null | undefined = booking.transaction?.amount?.toNumber();
+    let refundAmount: number | null | undefined = paidTransaction?.amount?.toNumber();
 
     if (hoursBeforeMatch <= 0) {
       newStatus = 'NO_SHOW';
       refundAmount = null;
     } else if (hoursBeforeMatch <= booking.match.cancellationDeadlineHours) {
       newStatus = 'CANCELLED_PENALTY';
-      refundAmount = booking.transaction
-        ? Number(booking.transaction.amount) * 0.5
-        : null;
+      refundAmount = paidTransaction ? Number(paidTransaction.amount) * 0.5 : null;
     }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.booking.update({ where: { id: booking.id }, data: { status: newStatus } });
 
       if (booking.transaction) {
-        const txStatus = newStatus === 'CANCELLED_REFUND' ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
+        const txStatus = !paidTransaction
+          ? 'FAILED' // never paid — close it out, nothing to refund
+          : newStatus === 'CANCELLED_REFUND'
+            ? 'REFUNDED'
+            : 'PARTIALLY_REFUNDED';
         await tx.transaction.update({
           where: { id: booking.transaction.id },
-          data: { status: txStatus, refundedAt: new Date() },
+          data: { status: txStatus, refundedAt: paidTransaction ? new Date() : null },
         });
       }
 
@@ -952,17 +963,15 @@ export class MatchesService {
 
     await this.prisma.match.update({ where: { id: matchId }, data: { status: 'COMPLETED' } });
 
+    // Release held escrow through the escrow service so the pitch owner's
+    // payout is credited (ledgered) — never flip transactions RELEASED here.
+    await this.escrow.releaseMatchEscrow(matchId);
+
     for (const booking of match.bookings) {
       await this.prisma.booking.update({
         where: { id: booking.id },
         data: { status: 'COMPLETED' },
       });
-      if (booking.transaction) {
-        await this.prisma.transaction.update({
-          where: { id: booking.transaction.id },
-          data: { status: 'RELEASED', releasedAt: new Date() },
-        });
-      }
     }
 
     // Ranking: credit a game played to each participant and re-derive levels.

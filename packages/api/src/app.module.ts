@@ -1,6 +1,7 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bull';
 import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from './prisma/prisma.module';
@@ -33,10 +34,13 @@ import { HealthController } from './health.controller';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    // Global rate limit (enforced by the APP_GUARD below). Generous default so
+    // normal app usage never trips it; sensitive endpoints (OTP, join, payments)
+    // carry tighter per-route @Throttle overrides.
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
-        limit: 10,
+        limit: 120,
       },
     ]),
     BullModule.forRootAsync({
@@ -78,6 +82,7 @@ import { HealthController } from './health.controller';
     GatewayModule,
   ],
   controllers: [HealthController],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
