@@ -118,6 +118,13 @@ export class AuthService {
       throw new UnauthorizedException('Your account has been banned');
     }
 
+    // One-time welcome bonus so new users can transact immediately. Idempotent
+    // (only one WELCOME_BONUS ledger entry per user ever), so it's also safe for
+    // pre-existing users who signed up before this path granted it.
+    await this.wallet.grantWelcomeBonus(user.id).catch(() => {
+      // Non-critical to login.
+    });
+
     const tokens = await this.generateTokens(user.id, user.role);
 
     const refreshExpiry = new Date();
@@ -295,6 +302,13 @@ export class AuthService {
     if (user.isBanned) {
       throw new UnauthorizedException('Your account has been banned');
     }
+
+    // One-time welcome bonus so new users can transact immediately. Idempotent
+    // (only one WELCOME_BONUS ledger entry per user ever), so it's also safe for
+    // pre-existing users who signed up before this path granted it.
+    await this.wallet.grantWelcomeBonus(user.id).catch(() => {
+      // Non-critical to login.
+    });
 
     const tokens = await this.generateTokens(user.id, user.role);
 
