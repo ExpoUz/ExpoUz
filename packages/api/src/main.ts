@@ -10,6 +10,12 @@ async function bootstrap() {
   });
 
   app.setGlobalPrefix('v1');
+
+  // Behind Railway's proxy, trust X-Forwarded-For so req.ip is the real client
+  // IP. Without this the rate limiter keys every request under the proxy's
+  // (varying) address and never accumulates, making throttling a no-op.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   app.useWebSocketAdapter(new IoAdapter(app));
   app.useGlobalPipes(
     new ValidationPipe({
