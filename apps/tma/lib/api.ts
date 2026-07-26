@@ -74,6 +74,57 @@ export async function joinMatch(id: string, body: { positionId?: string; teamSid
   return data;
 }
 
+// ── Wallet checkout ─────────────────────────────────────────────────────────
+export async function initiatePayment(body: {
+  bookingId?: string;
+  pitchBookingId?: string;
+  gateway?: string;
+}) {
+  const { data } = await api.post("/payments/initiate", { gateway: "WALLET", ...body });
+  return data as { transactionId: string; amount: number };
+}
+
+export async function payWithWallet(transactionId: string) {
+  const { data } = await api.post("/payments/wallet/pay", { transactionId });
+  return data;
+}
+
+export function isInsufficientBalanceError(e: any): boolean {
+  return /insufficient wallet balance/i.test(e?.response?.data?.message ?? "");
+}
+
+/**
+ * Wallet checkout for a fresh match booking: create the transaction, then pay
+ * it from the wallet. Throws (with the API's message) on insufficient balance.
+ */
+export async function payForBookingWithWallet(bookingId: string) {
+  const { transactionId } = await initiatePayment({ bookingId });
+  return payWithWallet(transactionId);
+}
+
+/**
+ * Join a match and immediately settle it from the wallet. If the wallet can't
+ * cover it, the booking is released again (so an unpaid booking never holds a
+ * slot) and the payment error is rethrown for the UI to handle.
+ */
+export async function joinMatchAndPay(
+  id: string,
+  body: { positionId?: string; teamSide?: string },
+  pricePerPlayer?: number | string,
+) {
+  const res = await joinMatch(id, body);
+  const bookingId = res?.booking?.id;
+  if (bookingId && Number(pricePerPlayer ?? 0) > 0) {
+    try {
+      await payForBookingWithWallet(bookingId);
+    } catch (e) {
+      await leaveMatch(id).catch(() => {});
+      throw e;
+    }
+  }
+  return res;
+}
+
 export async function leaveMatch(id: string) {
   const { data } = await api.post(`/matches/${id}/leave`);
   return data;

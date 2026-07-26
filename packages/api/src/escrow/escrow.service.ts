@@ -83,6 +83,17 @@ export class EscrowService {
       data: { status: 'COMPLETED' },
     });
 
+    // Pay the venue: credit the pitch owner's wallet with the player's payment
+    // minus the platform fee. Ledgered as PAYOUT, keyed to the transaction so a
+    // re-run cannot double-pay (releaseEscrow already no-ops on RELEASED).
+    const ownerId = transaction.booking?.match?.pitch?.ownerId;
+    if (ownerId) {
+      await this.wallet.adjust(ownerId, amount.minus(platformFee).toNumber(), 'PAYOUT', {
+        reference: transactionId,
+        description: `Match payout — ${transaction.booking.match.title ?? 'match'}`,
+      });
+    }
+
     await this.notificationsService.send(
       transaction.userId,
       'PAYMENT_RELEASED',

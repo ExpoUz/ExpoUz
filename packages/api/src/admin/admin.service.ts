@@ -232,10 +232,41 @@ export class AdminService {
   }
 
   async cancelMatch(id: string) {
-    return this.prisma.match.update({
+    const match = await this.prisma.match.findUnique({
       where: { id },
-      data: { status: 'CANCELLED' },
+      include: {
+        bookings: { where: { status: 'CONFIRMED' }, include: { transaction: true } },
+      },
     });
+    if (!match) throw new NotFoundException('Match not found');
+    if (match.status === 'CANCELLED') return match;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.match.update({ where: { id }, data: { status: 'CANCELLED' } });
+
+      for (const booking of match.bookings) {
+        await tx.booking.update({
+          where: { id: booking.id },
+          data: { status: 'CANCELLED_REFUND' },
+        });
+        // Admin force-cancel refunds every paid player in full, to the wallet.
+        if (booking.transaction && ['HELD', 'RELEASED'].includes(booking.transaction.status)) {
+          await tx.transaction.update({
+            where: { id: booking.transaction.id },
+            data: { status: 'REFUNDED', refundedAt: new Date() },
+          });
+          await this.wallet.adjust(
+            booking.userId,
+            Number(booking.transaction.amount),
+            'REFUND',
+            { reference: id, description: 'Match cancelled by admin — full refund' },
+            tx,
+          );
+        }
+      }
+    });
+
+    return { id, status: 'CANCELLED', refunded: match.bookings.length };
   }
 
   async getTransactions(filters: { status?: string; page?: number; limit?: number }) {
@@ -424,6 +455,39 @@ export class AdminService {
     });
   }
 
+  /** Read platform settings, creating the singleton row with defaults if absent. */
+  async getSettings() {
+    return this.prisma.appSettings.upsert({
+      where: { id: 'singleton' },
+      update: {},
+      create: { id: 'singleton' },
+    });
+  }
+
+  /** Patch platform settings (commission, platform fee, cancellation window/fee). */
+  async updateSettings(dto: {
+    commissionRate?: number;
+    platformFeeRate?: number;
+    cancellationFeeRate?: number;
+    cancellationWindowHours?: number;
+  }) {
+    const data: any = {};
+    if (dto.commissionRate != null) data.commissionRate = Number(dto.commissionRate);
+    if (dto.platformFeeRate != null) data.platformFeeRate = Number(dto.platformFeeRate);
+    if (dto.cancellationFeeRate != null)
+      data.cancellationFeeRate = Number(dto.cancellationFeeRate);
+    if (dto.cancellationWindowHours != null)
+      data.cancellationWindowHours = Math.round(Number(dto.cancellationWindowHours));
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException('No valid settings provided');
+    }
+    return this.prisma.appSettings.upsert({
+      where: { id: 'singleton' },
+      update: data,
+      create: { id: 'singleton', ...data },
+    });
+  }
+
   async createAnnouncement(dto: {
     title: string;
     body: string;
@@ -449,6 +513,24 @@ export class AdminService {
     }
 
     return { message: `Announcement sent to ${sent} users` };
+  }
+
+  /** Announcement history, reconstructed from the notifications that were sent. */
+  async getAnnouncements() {
+    const groups = await this.prisma.notification.groupBy({
+      by: ['title', 'body'],
+      where: { type: 'ADMIN_ANNOUNCEMENT' },
+      _count: { _all: true },
+      _max: { createdAt: true },
+      orderBy: { _max: { createdAt: 'desc' } },
+      take: 50,
+    });
+    return groups.map((g) => ({
+      title: g.title,
+      body: g.body,
+      recipients: g._count._all,
+      sentAt: g._max.createdAt,
+    }));
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -665,6 +747,10 @@ export class AdminService {
         transactions: {
           orderBy: { createdAt: 'desc' },
           take: 20,
+        },
+        walletTransactions: {
+          orderBy: { createdAt: 'desc' },
+          take: 50,
         },
         pitchBookings: {
           orderBy: { createdAt: 'desc' },

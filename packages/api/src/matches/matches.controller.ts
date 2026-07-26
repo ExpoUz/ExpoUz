@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { MatchesService } from './matches.service';
 import { CreateMatchDto } from './dto/create-match.dto';
 import { QueryMatchesDto } from './dto/query-matches.dto';
@@ -56,6 +57,7 @@ export class MatchesController {
   }
 
   @Post('join/code/:shareCode')
+  @Throttle({ default: { ttl: 60000, limit: 20 } })
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Join a match via invite/share code' })
@@ -120,6 +122,7 @@ export class MatchesController {
   }
 
   @Post(':id/join')
+  @Throttle({ default: { ttl: 60000, limit: 20 } })
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Join a match' })
