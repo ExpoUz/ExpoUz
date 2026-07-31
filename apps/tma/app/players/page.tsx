@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { Search } from "lucide-react";
 import { searchPlayers, LEVEL_META } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
@@ -10,6 +11,8 @@ import { hapticImpact } from "@/lib/telegram";
 
 export default function PlayersPage() {
   const router = useRouter();
+  const t = useTranslations("players");
+  const tRanks = useTranslations("levels.ranks");
   const [q, setQ] = useState("");
 
   const { data: players, isFetching } = useQuery({
@@ -21,13 +24,13 @@ export default function PlayersPage() {
   return (
     <div className="min-h-screen pb-24">
       <header className="px-4 pt-5 pb-3 sticky top-0 z-30" style={{ background: "var(--tg-bg)" }}>
-        <h1 className="text-xl font-bold mb-3">Players</h1>
+        <h1 className="text-xl font-bold mb-3">{t("title")}</h1>
         <div className="flex items-center gap-2 rounded-2xl px-3 py-2.5" style={{ background: "var(--tg-card)" }}>
           <Search size={18} style={{ color: "var(--tg-hint)" }} />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search players by name…"
+            placeholder={t("search")}
             className="flex-1 bg-transparent outline-none text-sm"
           />
         </div>
@@ -36,7 +39,7 @@ export default function PlayersPage() {
       <div className="px-4 pt-2 space-y-2">
         {q.trim().length < 2 && (
           <p className="text-center text-sm py-16" style={{ color: "var(--tg-hint)" }}>
-            Type at least 2 letters to search.
+            {t("typeToSearch")}
           </p>
         )}
         {q.trim().length >= 2 && isFetching && (
@@ -46,7 +49,7 @@ export default function PlayersPage() {
         )}
         {q.trim().length >= 2 && !isFetching && (players ?? []).length === 0 && (
           <p className="text-center text-sm py-16" style={{ color: "var(--tg-hint)" }}>
-            No players found.
+            {t("noResults")}
           </p>
         )}
         {(players ?? []).map((p: any) => {
@@ -67,7 +70,7 @@ export default function PlayersPage() {
                   {p.firstName} {p.lastName}
                 </div>
                 <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-                  {lvl.icon} {lvl.label} · {p.gamesAttended} games
+                  {lvl.icon} {tRanks(p.playerLevel ?? "NEW")} · {p.gamesAttended}
                 </div>
               </div>
               {p.district || p.city ? (

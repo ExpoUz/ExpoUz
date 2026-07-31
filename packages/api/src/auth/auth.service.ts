@@ -13,6 +13,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { WalletService } from '../payments/wallet/wallet.service';
+import { normalizeLocale } from '../i18n/locales';
 import axios from 'axios';
 import * as crypto from 'crypto';
 
@@ -283,6 +284,8 @@ export class AuthService {
           telegramId: String(tgUser.id),
           telegramUsername: tgUser.username,
           avatarUrl: tgUser.photo_url,
+          // Auto-detect UI language from Telegram (uz/ru supported, else en).
+          language: normalizeLocale(tgUser.language_code),
           role: 'PLAYER',
           skillLevel: 'AMATEUR',
           eloRating: 1000,

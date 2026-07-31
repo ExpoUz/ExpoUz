@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { Calendar, Clock, Check } from "lucide-react";
 import dayjs from "dayjs";
 import { getMatches, getCities } from "@/lib/api";
@@ -12,17 +13,20 @@ import { BottomNav } from "@/components/BottomNav";
 import { useSportStore, setSport, sportMeta } from "@/lib/sport-store";
 import { showMainButton, hideMainButton, hapticImpact } from "@/lib/telegram";
 
-const TIMES = [
-  { key: "", label: "Any time" },
-  { key: "MORNING", label: "🌅 Morning" },
-  { key: "AFTERNOON", label: "☀️ Afternoon" },
-  { key: "EVENING", label: "🌆 Evening" },
-];
+const TIME_KEYS = [
+  { key: "", label: "anyTime" },
+  { key: "MORNING", label: "morning" },
+  { key: "AFTERNOON", label: "afternoon" },
+  { key: "EVENING", label: "evening" },
+] as const;
 
 export default function HomePage() {
   const router = useRouter();
+  const t = useTranslations("home");
+  const tSports = useTranslations("sports");
   const { sport } = useSportStore();
   const meta = sportMeta(sport);
+  const sportLabel = tSports(sport === "PADEL" ? "padel" : "football");
   const isPadel = sport === "PADEL";
   const [city, setCity] = useState("Tashkent");
   const [district, setDistrict] = useState("");
@@ -52,7 +56,7 @@ export default function HomePage() {
   });
 
   useEffect(() => {
-    const cleanup = showMainButton(`${meta.icon} Host a Game`, () => {
+    const cleanup = showMainButton(`${meta.icon} ${t("hostGame")}`, () => {
       hapticImpact("medium");
       router.push("/create");
     });
@@ -83,7 +87,7 @@ export default function HomePage() {
         <div className="flex gap-2 overflow-x-auto mt-3 -mx-4 px-4 pb-1">
           <label className={`pill ${date ? "pill-active" : ""}`}>
             <Calendar size={15} />
-            <span>{date ? dayjs(date).format("MMM D") : "Date"}</span>
+            <span>{date ? dayjs(date).format("MMM D") : t("date")}</span>
             <input
               type="date"
               value={date}
@@ -100,7 +104,12 @@ export default function HomePage() {
             }}
           >
             <Clock size={15} />
-            <span>{TIMES.find((t) => t.key === timeOfDay)?.label ?? "Time"}</span>
+            <span>
+              {(() => {
+                const found = TIME_KEYS.find((x) => x.key === timeOfDay);
+                return found ? t(found.label) : t("time");
+              })()}
+            </span>
           </button>
           {/* Match type is padel-only */}
           {isPadel && (
@@ -112,7 +121,7 @@ export default function HomePage() {
                   setMatchType((v) => (v === "COMPETITIVE" ? "" : "COMPETITIVE"));
                 }}
               >
-                <span>⚔️ Competitive</span>
+                <span>{t("competitive")}</span>
               </button>
               <button
                 className={`pill ${matchType === "CASUAL" ? "pill-active" : ""}`}
@@ -121,7 +130,7 @@ export default function HomePage() {
                   setMatchType((v) => (v === "CASUAL" ? "" : "CASUAL"));
                 }}
               >
-                <span>😎 Casual</span>
+                <span>{t("casual")}</span>
               </button>
             </>
           )}
@@ -132,7 +141,7 @@ export default function HomePage() {
               setSpotsOnly((v) => !v);
             }}
           >
-            <span>Spots available</span>
+            <span>{t("spotsAvailable")}</span>
           </button>
           {(date || timeOfDay || spotsOnly || district || matchType) && (
             <button
@@ -145,7 +154,7 @@ export default function HomePage() {
                 setMatchType("");
               }}
             >
-              ✕ Clear
+              {t("clear")}
             </button>
           )}
         </div>
@@ -160,9 +169,9 @@ export default function HomePage() {
         ) : matches.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-4xl mb-2">{meta.icon}</div>
-            <p className="font-medium">No {meta.label.toLowerCase()} games match your filters</p>
+            <p className="font-medium">{t("noGames", { sport: sportLabel })}</p>
             <p className="text-sm mt-1" style={{ color: "var(--tg-hint)" }}>
-              Try clearing filters — or host one!
+              {t("tryClearing")}
             </p>
           </div>
         ) : (
@@ -172,7 +181,7 @@ export default function HomePage() {
 
       {/* City bottom sheet */}
       {cityOpen && (
-        <Sheet title="Select location" onClose={() => setCityOpen(false)}>
+        <Sheet title={t("selectLocation")} onClose={() => setCityOpen(false)}>
           {(cities ?? []).map((c) => (
             <div key={c.city} className="mb-2">
               <SheetRow
@@ -203,7 +212,7 @@ export default function HomePage() {
           ))}
           {(cities ?? []).length === 0 && (
             <p className="text-sm text-center py-6" style={{ color: "var(--tg-hint)" }}>
-              No locations yet.
+              {t("noLocations")}
             </p>
           )}
         </Sheet>
@@ -211,14 +220,14 @@ export default function HomePage() {
 
       {/* Time-of-day bottom sheet */}
       {timeOpen && (
-        <Sheet title="Time of day" onClose={() => setTimeOpen(false)}>
-          {TIMES.map((t) => (
+        <Sheet title={t("timeOfDay")} onClose={() => setTimeOpen(false)}>
+          {TIME_KEYS.map((x) => (
             <SheetRow
-              key={t.key}
-              label={t.label}
-              selected={timeOfDay === t.key}
+              key={x.key}
+              label={t(x.label)}
+              selected={timeOfDay === x.key}
               onClick={() => {
-                setTimeOfDay(t.key);
+                setTimeOfDay(x.key);
                 setTimeOpen(false);
               }}
             />

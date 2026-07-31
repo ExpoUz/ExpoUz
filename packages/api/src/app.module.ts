@@ -25,6 +25,7 @@ import { ActivityModule } from './activity/activity.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { RankingModule } from './ranking/ranking.module';
 import { LevelModule } from './level/level.module';
+import { I18nModule } from './i18n/i18n.module';
 import { OnlineStatusMiddleware } from './admin/online-status.middleware';
 import { HealthController } from './health.controller';
 
@@ -61,6 +62,7 @@ import { HealthController } from './health.controller';
     }),
     PrismaModule,
     RedisModule,
+    I18nModule,
     ActivityModule,
     RankingModule,
     LevelModule,

@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import TelegramBot from 'node-telegram-bot-api';
+import { I18nService } from '../i18n/i18n.service';
+import { normalizeLocale, SUPPORTED_LOCALES } from '../i18n/locales';
 
 /**
  * TelegramService
@@ -26,7 +28,25 @@ export class TelegramService implements OnModuleInit {
   private bot: TelegramBot | null = null;
   private forumGroupId: number | null = null;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private i18n: I18nService,
+  ) {}
+
+  /**
+   * Resolve the locale to reply in for a Telegram user: their saved preference
+   * if we know them, else auto-detect from Telegram's language_code.
+   */
+  private async resolveLocale(tgUserId?: number, languageCode?: string): Promise<string> {
+    if (tgUserId) {
+      const user = await this.prisma.user.findUnique({
+        where: { telegramId: String(tgUserId) },
+        select: { language: true },
+      });
+      if (user?.language) return user.language;
+    }
+    return normalizeLocale(languageCode);
+  }
 
   async onModuleInit() {
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -60,6 +80,26 @@ export class TelegramService implements OnModuleInit {
     }
 
     this.registerHandlers();
+    this.registerCommands().catch((e) =>
+      this.logger.warn(`Failed to register bot commands: ${e?.message ?? e}`),
+    );
+  }
+
+  /**
+   * Register the localized command list with BotFather. Telegram shows the list
+   * matching the client's language_code; the default (no language_code) is en.
+   */
+  private async registerCommands() {
+    if (!this.bot) return;
+    const cmds = (locale: string) => [
+      { command: 'start', description: this.i18n.t('bot.commands.start', locale) },
+      { command: 'help', description: this.i18n.t('bot.commands.help', locale) },
+    ];
+    // Default (fallback) list in English, then per-supported-language overrides.
+    await this.bot.setMyCommands(cmds('en'));
+    for (const loc of SUPPORTED_LOCALES) {
+      await this.bot.setMyCommands(cmds(loc), { language_code: loc } as any);
+    }
   }
 
   get isEnabled(): boolean {
@@ -204,7 +244,7 @@ export class TelegramService implements OnModuleInit {
     this.bot.on('message', async (msg) => {
       if (msg.chat?.type !== 'private') return;
       const text = msg.text || '';
-      if (!text.startsWith('/start')) return;
+      if (!text.startsWith('/start') && !text.startsWith('/help')) return;
 
       const chatId = msg.chat.id;
       const miniAppUrl =
@@ -212,20 +252,22 @@ export class TelegramService implements OnModuleInit {
         process.env.TELEGRAM_MINI_APP_URL ||
         '';
       const arg = text.replace('/start', '').trim();
+      const locale = await this.resolveLocale(msg.from?.id, msg.from?.language_code);
+      const t = (k: string) => this.i18n.t(`bot.${k}`, locale);
 
       try {
         if (arg.startsWith('join_')) {
           const shareCode = arg.replace('join_', '').trim();
           await this.bot!.sendMessage(
             chatId,
-            `🔗 <b>You were invited to join a game!</b>\n\nTap below to view the match and join:`,
+            `<b>${t('inviteTitle')}</b>\n\n${t('inviteBody')}`,
             {
               parse_mode: 'HTML',
               reply_markup: {
                 inline_keyboard: [
                   [
                     {
-                      text: '⚽ View & Join Match',
+                      text: t('viewAndJoin'),
                       web_app: { url: `${miniAppUrl}/join/${shareCode}` },
                     },
                   ],
@@ -233,15 +275,20 @@ export class TelegramService implements OnModuleInit {
               },
             },
           );
+        } else if (arg === 'help' || text.startsWith('/help')) {
+          await this.bot!.sendMessage(chatId, `<b>${t('helpTitle')}</b>\n\n${t('helpBody')}`, {
+            parse_mode: 'HTML',
+            reply_markup: { inline_keyboard: [[{ text: t('openApp'), web_app: { url: miniAppUrl } }]] },
+          });
         } else {
           await this.bot!.sendMessage(
             chatId,
-            `👋 <b>Welcome to ExpoUz!</b>\n\nFind and join football games in Tashkent. Tap below to open the app.`,
+            `<b>${t('welcomeTitle')}</b>\n\n${t('welcomeBody')}`,
             {
               parse_mode: 'HTML',
               reply_markup: {
                 inline_keyboard: [
-                  [{ text: '⚽ Open ExpoUz', web_app: { url: miniAppUrl } }],
+                  [{ text: t('openApp'), web_app: { url: miniAppUrl } }],
                 ],
               },
             },

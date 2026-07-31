@@ -3,20 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { Home, Search, MessageCircle, Trophy, User } from "lucide-react";
 import { hapticImpact } from "@/lib/telegram";
 import { getConversations } from "@/lib/api";
 
 const ITEMS = [
-  { href: "/", label: "Games", icon: Home },
-  { href: "/players", label: "Players", icon: Search },
-  { href: "/messages", label: "Chat", icon: MessageCircle },
-  { href: "/leaderboard", label: "Ranks", icon: Trophy },
-  { href: "/profile", label: "Profile", icon: User },
-];
+  { href: "/", key: "games", icon: Home },
+  { href: "/players", key: "players", icon: Search },
+  { href: "/messages", key: "chat", icon: MessageCircle },
+  { href: "/leaderboard", key: "ranks", icon: Trophy },
+  { href: "/profile", key: "profile", icon: User },
+] as const;
 
 export function BottomNav() {
   const pathname = usePathname();
+  const t = useTranslations("nav");
 
   const { data: conversations } = useQuery({
     queryKey: ["conversations"],
@@ -35,7 +37,7 @@ export function BottomNav() {
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
-      {ITEMS.map(({ href, label, icon: Icon }) => {
+      {ITEMS.map(({ href, key, icon: Icon }) => {
         const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
         const showBadge = href === "/messages" && unreadTotal > 0;
         return (
@@ -54,7 +56,7 @@ export function BottomNav() {
                 </span>
               )}
             </span>
-            <span className="text-[11px] font-medium">{label}</span>
+            <span className="text-[11px] font-medium">{t(key)}</span>
           </Link>
         );
       })}

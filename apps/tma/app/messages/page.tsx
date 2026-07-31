@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
 import { getConversations, chatUserName, type Conversation } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
@@ -9,6 +10,7 @@ import { hapticImpact } from "@/lib/telegram";
 
 export default function MessagesPage() {
   const router = useRouter();
+  const t = useTranslations("chat");
   const { data, isLoading } = useQuery({
     queryKey: ["conversations"],
     queryFn: getConversations,
@@ -20,7 +22,7 @@ export default function MessagesPage() {
   return (
     <div className="min-h-screen pb-24">
       <header className="px-4 pt-5 pb-3 sticky top-0 z-30" style={{ background: "var(--tg-bg)" }}>
-        <h1 className="text-xl font-bold">Messages</h1>
+        <h1 className="text-xl font-bold">{t("title")}</h1>
       </header>
 
       <div className="px-4 pt-1">
@@ -31,9 +33,9 @@ export default function MessagesPage() {
         ) : conversations.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-4xl mb-2">💬</div>
-            <p className="font-medium">No messages yet</p>
+            <p className="font-medium">{t("noConversations")}</p>
             <p className="text-sm mt-1" style={{ color: "var(--tg-hint)" }}>
-              Start a conversation from a player&apos;s profile.
+              {t("startFromProfile")}
             </p>
           </div>
         ) : (
@@ -64,13 +66,14 @@ function ConversationRow({
   conversation: Conversation;
   onClick: () => void;
 }) {
-  const name = c.type === "MATCH_GROUP" ? "Match group" : chatUserName(c.otherMember);
+  const t = useTranslations("chat");
+  const name = c.type === "MATCH_GROUP" ? t("matchGroup") : chatUserName(c.otherMember);
   const initials =
     c.type === "MATCH_GROUP"
       ? "⚽"
       : `${c.otherMember?.firstName?.[0] ?? ""}${c.otherMember?.lastName?.[0] ?? ""}`
           .toUpperCase() || "?";
-  const preview = c.lastMessage?.content ?? "No messages yet";
+  const preview = c.lastMessage?.content ?? t("noMessagesShort");
   const time = c.lastMessage?.createdAt ? dayjs(c.lastMessage.createdAt).format("MMM D") : "";
   const unread = c.unreadCount > 0;
 

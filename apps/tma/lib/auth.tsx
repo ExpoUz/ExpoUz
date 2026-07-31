@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { api } from "./api";
 import { getInitData, getTelegramUser, initTelegram } from "./telegram";
+import { adoptServerLocale } from "./locale-store";
 
 interface TmaUser {
   id: string;
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!cancelled) {
             setUser(data);
             localStorage.setItem("tma_user", JSON.stringify(data));
+            adoptServerLocale(data.language); // saved preference wins (detection #1)
             setStatus("authenticated");
           }
           return;
@@ -93,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem("tma_access_token", data.accessToken);
         localStorage.setItem("tma_refresh_token", data.refreshToken);
         localStorage.setItem("tma_user", JSON.stringify(data.user));
+        adoptServerLocale(data.user?.language);
         setUser(data.user);
         setStatus("authenticated");
       } catch (err: any) {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
 import { MapPin, Users, Clock, Shield, ChevronRight, Calendar, Share2, Copy } from "lucide-react";
 import {
@@ -38,6 +39,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
   const id = String(match.id);
   const qc = useQueryClient();
   const { user } = useAuth();
+  const t = useTranslations("matches");
   const searchParams = useSearchParams();
   const justCreated = searchParams.get("created") === "1";
   const [showCancel, setShowCancel] = useState(false);
@@ -68,11 +70,11 @@ export function FootballMatchDetail({ match }: { match: any }) {
     onError: (e: any) => {
       hapticError();
       if (isInsufficientBalanceError(e)) {
-        showAlert("Not enough wallet balance — top up to reserve your spot.");
+        showAlert(t("insufficientJoin"));
         router.push("/wallet");
         return;
       }
-      showAlert(e?.response?.data?.message ?? "Could not join this game.");
+      showAlert(e?.response?.data?.message ?? t("couldNotJoinGame"));
     },
     onSettled: () => setMainButtonLoading(false),
   });
@@ -86,7 +88,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
     },
     onError: (e: any) => {
       hapticError();
-      showAlert(e?.response?.data?.message ?? "Could not leave this game.");
+      showAlert(e?.response?.data?.message ?? t("couldNotLeaveGame"));
     },
     onSettled: () => setMainButtonLoading(false),
   });
@@ -99,11 +101,11 @@ export function FootballMatchDetail({ match }: { match: any }) {
   useEffect(() => {
     let cleanup = () => {};
     if (joined) {
-      cleanup = showMainButton("Leave Game", () => setShowCancel(true), "#FF5252");
+      cleanup = showMainButton(t("leaveGame"), () => setShowCancel(true), "#FF5252");
     } else if (isFull) {
       hideMainButton();
     } else {
-      cleanup = showMainButton(`⚽ Join Game — ${formatUZS(match.pricePerPlayer)}`, () => join.mutate(), "#FF5252");
+      cleanup = showMainButton(`⚽ ${t("reserve", { price: formatUZS(match.pricePerPlayer) })}`, () => join.mutate(), "#FF5252");
     }
     return () => {
       cleanup();
@@ -145,7 +147,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
                 isFull ? "bg-[#FF5252]" : "bg-[#00C853]"
               }`}
             >
-              {isFull ? "Full" : `${spotsLeft} spots left`}
+              {isFull ? t("full") : t("spotsLeft", { count: spotsLeft })}
             </span>
           </div>
           <h1 className="text-lg font-bold leading-tight">{match.pitch?.name}</h1>

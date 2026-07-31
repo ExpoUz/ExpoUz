@@ -278,15 +278,17 @@ export interface SkillBand {
   range: string;
 }
 
-export function getSkillBand(level: number): SkillBand {
-  if (level < 1.0) return { label: "Initiation", color: "#9CA3AF", range: "0.0–1.0" };
-  if (level < 1.5) return { label: "Beginner", color: "#34D399", range: "1.0–1.5" };
-  if (level < 2.5) return { label: "Improver", color: "#10B981", range: "1.5–2.5" };
-  if (level < 3.5) return { label: "Intermediate", color: "#00B0FF", range: "2.5–3.5" };
-  if (level < 4.5) return { label: "Advanced Intermediate", color: "#8B5CF6", range: "3.5–4.5" };
-  if (level < 5.5) return { label: "Advanced", color: "#F59E0B", range: "4.5–5.5" };
-  if (level < 6.0) return { label: "Competitive", color: "#EF4444", range: "5.5–6.0" };
-  return { label: "Pro", color: "#FFD700", range: "6.0–7.0" };
+// `key` is stable across locales; translate via t(`levels.bands.${key}`). `label`
+// is the English fallback used if a translation is missing.
+export function getSkillBand(level: number): SkillBand & { key: string } {
+  if (level < 1.0) return { key: "initiation", label: "Initiation", color: "#9CA3AF", range: "0.0–1.0" };
+  if (level < 1.5) return { key: "beginner", label: "Beginner", color: "#34D399", range: "1.0–1.5" };
+  if (level < 2.5) return { key: "improver", label: "Improver", color: "#10B981", range: "1.5–2.5" };
+  if (level < 3.5) return { key: "intermediate", label: "Intermediate", color: "#00B0FF", range: "2.5–3.5" };
+  if (level < 4.5) return { key: "advancedIntermediate", label: "Advanced Intermediate", color: "#8B5CF6", range: "3.5–4.5" };
+  if (level < 5.5) return { key: "advanced", label: "Advanced", color: "#F59E0B", range: "4.5–5.5" };
+  if (level < 6.0) return { key: "competitive", label: "Competitive", color: "#EF4444", range: "5.5–6.0" };
+  return { key: "pro", label: "Pro", color: "#FFD700", range: "6.0–7.0" };
 }
 
 export function formatLevel(level: number | null | undefined): string {
@@ -422,7 +424,22 @@ export function chatUserName(u: ChatUser | null | undefined): string {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────
-export function formatUZS(value: number | string | null | undefined): string {
+import { getLocale, type Locale } from "./locale-store";
+
+// Currency is always UZS; only the thousands separator and unit word are
+// localized: "45 000 so'm" (uz) · "45 000 сум" (ru) · "45,000 UZS" (en).
+const CURRENCY_UNIT: Record<Locale, string> = { uz: "so'm", ru: "сум", en: "UZS" };
+
+export function formatCurrency(
+  value: number | string | null | undefined,
+  locale: Locale = getLocale(),
+): string {
   const n = Number(value ?? 0);
-  return `${n.toLocaleString("en-US")} UZS`;
+  const grouped = n.toLocaleString(locale === "en" ? "en-US" : "ru-RU"); // ru-RU = space groups
+  return `${grouped} ${CURRENCY_UNIT[locale]}`;
+}
+
+/** Back-compat wrapper — resolves the active locale at call time. */
+export function formatUZS(value: number | string | null | undefined): string {
+  return formatCurrency(value);
 }

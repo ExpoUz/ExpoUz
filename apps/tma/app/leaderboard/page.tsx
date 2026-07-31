@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { getLeaderboard, getCities, getMe, LEVEL_META } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { hapticImpact } from "@/lib/telegram";
@@ -11,6 +12,8 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 
 export default function LeaderboardPage() {
   const router = useRouter();
+  const t = useTranslations("leaderboard");
+  const tRanks = useTranslations("levels.ranks");
   const [city, setCity] = useState("");
 
   const { data: cities } = useQuery({ queryKey: ["cities"], queryFn: getCities });
@@ -25,9 +28,9 @@ export default function LeaderboardPage() {
   return (
     <div className="min-h-screen pb-24">
       <header className="px-4 pt-5 pb-3 sticky top-0 z-30" style={{ background: "var(--tg-bg)" }}>
-        <h1 className="text-xl font-bold mb-1">🏆 Leaderboard</h1>
+        <h1 className="text-xl font-bold mb-1">{t("title")}</h1>
         <p className="text-sm mb-3" style={{ color: "var(--tg-hint)" }}>
-          Ranked by games played
+          {t("rankedBy")}
         </p>
         <div className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1">
           {cityList.map((c) => (
@@ -42,7 +45,7 @@ export default function LeaderboardPage() {
               }`}
               style={city === c ? {} : { background: "var(--tg-card)", color: "var(--tg-hint)" }}
             >
-              {c || "All cities"}
+              {c || t("allCities")}
             </button>
           ))}
         </div>
@@ -55,7 +58,7 @@ export default function LeaderboardPage() {
           </div>
         ) : (board ?? []).length === 0 ? (
           <p className="text-center text-sm py-16" style={{ color: "var(--tg-hint)" }}>
-            No players ranked yet.
+            {t("empty")}
           </p>
         ) : (
           (board ?? []).map((p: any) => {
@@ -80,15 +83,15 @@ export default function LeaderboardPage() {
                 <Avatar user={p} />
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-sm truncate">
-                    {p.firstName} {p.lastName} {isMe && <span className="text-[#00C853]">(you)</span>}
+                    {p.firstName} {p.lastName} {isMe && <span className="text-[#00C853]">{t("you")}</span>}
                   </div>
                   <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-                    {lvl.icon} {lvl.label}
+                    {lvl.icon} {tRanks(p.playerLevel ?? "NEW")}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="font-bold text-sm">{p.gamesAttended}</div>
-                  <div className="text-[10px]" style={{ color: "var(--tg-hint)" }}>games</div>
+                  <div className="text-[10px]" style={{ color: "var(--tg-hint)" }}>{t("games")}</div>
                 </div>
               </button>
             );

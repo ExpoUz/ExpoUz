@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import dayjs from "dayjs";
+import { useTranslations } from "next-intl";
 import { MapPin, Clock } from "lucide-react";
 import { formatUZS, getSkillBand, formatLevel } from "@/lib/api";
 import { hapticImpact } from "@/lib/telegram";
@@ -14,6 +15,8 @@ interface SlotPlayer {
 }
 
 export function PadelMatchCard({ match }: { match: any }) {
+  const t = useTranslations("matches");
+  const tHome = useTranslations("home");
   const maxPlayers = match.maxPlayers ?? 0;
   const players: SlotPlayer[] = (match.bookings ?? [])
     .map((b: any) => b.user)
@@ -48,7 +51,7 @@ export function PadelMatchCard({ match }: { match: any }) {
               isFull ? "bg-[#FF5252] text-white" : "bg-[#00C853] text-white"
             }`}
           >
-            {isFull ? "Full" : `${spotsLeft} left`}
+            {isFull ? t("full") : t("spotsLeft", { count: spotsLeft })}
           </span>
         </div>
 
@@ -60,7 +63,7 @@ export function PadelMatchCard({ match }: { match: any }) {
               color: isCompetitive ? "#EF4444" : "#00B0FF",
             }}
           >
-            {isCompetitive ? "⚔️ Competitive" : "😎 Casual"}
+            {isCompetitive ? tHome("competitive") : tHome("casual")}
           </span>
           {hasRange && (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: "var(--tg-hint)" }}>
@@ -82,7 +85,7 @@ export function PadelMatchCard({ match }: { match: any }) {
           <div className="min-w-0">
             <div className="flex items-center gap-1 text-xs font-medium truncate">
               <MapPin size={12} className="shrink-0" />
-              <span className="truncate">{match.pitch?.name ?? "Court"}</span>
+              <span className="truncate">{match.pitch?.name ?? t("host")}</span>
             </div>
             <div className="text-[11px] mt-0.5" style={{ color: "var(--tg-hint)" }}>
               {match.pitch?.district ?? match.pitch?.city ?? "Tashkent"} · {match.durationMinutes ?? 60} min
@@ -96,6 +99,7 @@ export function PadelMatchCard({ match }: { match: any }) {
 }
 
 function PlayerSlot({ player }: { player: SlotPlayer | null }) {
+  const t = useTranslations("matches");
   if (!player) {
     return (
       <div className="flex flex-col items-center gap-1 w-12">
@@ -106,7 +110,7 @@ function PlayerSlot({ player }: { player: SlotPlayer | null }) {
           +
         </div>
         <span className="text-[9px]" style={{ color: "var(--tg-hint)" }}>
-          Open
+          {t("availableSlots")}
         </span>
       </div>
     );
@@ -132,7 +136,7 @@ function PlayerSlot({ player }: { player: SlotPlayer | null }) {
         </span>
       </div>
       <span className="text-[9px] truncate max-w-full" style={{ color: "var(--tg-hint)" }}>
-        {player.firstName ?? "Player"}
+        {player.firstName ?? t("players")}
       </span>
     </div>
   );

@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import dayjs from "dayjs";
+import { useTranslations } from "next-intl";
 import { MapPin, Users } from "lucide-react";
 import { formatUZS } from "@/lib/api";
 import { hapticImpact } from "@/lib/telegram";
 
 export function FootballMatchCard({ match }: { match: any }) {
+  const t = useTranslations("matches");
   const maxPlayers = match.maxPlayers ?? 0;
   const filled =
     match.currentPlayers ?? match._count?.bookings ?? (match.bookings?.length ?? 0);
@@ -15,7 +17,7 @@ export function FootballMatchCard({ match }: { match: any }) {
   const isIndoor = match.pitch?.isIndoor;
   const hostName = match.host
     ? `${match.host.firstName ?? ""} ${(match.host.lastName ?? "").charAt(0)}.`.trim()
-    : "Host";
+    : t("host");
 
   return (
     <Link
@@ -37,7 +39,7 @@ export function FootballMatchCard({ match }: { match: any }) {
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <div className="font-semibold text-sm truncate">{match.pitch?.name ?? "Pitch"}</div>
+            <div className="font-semibold text-sm truncate">{match.pitch?.name ?? t("venue")}</div>
             <span className="text-xs font-bold shrink-0" style={{ color: "var(--tg-hint)" }}>
               {dayjs(match.startTime).format("h:mm A")}
             </span>
@@ -45,10 +47,10 @@ export function FootballMatchCard({ match }: { match: any }) {
 
           <div className="flex items-center gap-1.5 mt-1 text-[11px] font-medium" style={{ color: "var(--tg-hint)" }}>
             {isIndoor && (
-              <span className="px-1.5 py-0.5 rounded bg-black/5 font-bold">INDOOR</span>
+              <span className="px-1.5 py-0.5 rounded bg-black/5 font-bold">{t("indoor")}</span>
             )}
             <span>⚽ {match.format}</span>
-            <span>with {hostName}</span>
+            <span>{t("withHost", { name: hostName })}</span>
           </div>
 
           <div className="flex items-center justify-between mt-2">
@@ -66,7 +68,7 @@ export function FootballMatchCard({ match }: { match: any }) {
                   isFull ? "bg-[#FF5252] text-white" : "bg-[#00C853] text-white"
                 }`}
               >
-                {isFull ? "Full" : `${spotsLeft} left`}
+                {isFull ? t("full") : t("spotsLeft", { count: spotsLeft })}
               </span>
             </div>
           </div>

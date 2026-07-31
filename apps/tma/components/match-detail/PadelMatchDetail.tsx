@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
 import { MapPin, Clock } from "lucide-react";
 import {
@@ -37,21 +38,15 @@ interface PadelPlayer {
   padelLevel?: number;
 }
 
-const AMENITY_LABELS: Record<string, string> = {
-  PARKING: "Parking",
-  CHANGING_ROOM: "Changing room",
-  WATER_FOUNTAIN: "Water",
-  CAFE: "Café",
-  SECURITY: "Security",
-  LIGHTS: "Lights",
-  BATHROOM: "Bathroom",
-};
-
 export function PadelMatchDetail({ match }: { match: any }) {
   const router = useRouter();
   const id = String(match.id);
   const qc = useQueryClient();
   const { user } = useAuth();
+  const t = useTranslations("matches");
+  const tAmenities = useTranslations("amenities");
+  const tHome = useTranslations("home");
+  const tBands = useTranslations("levels.bands");
 
   // Render the in-page reserve button only outside Telegram (inside Telegram the
   // native Main Button is used). Resolved after mount to avoid SSR mismatch.
@@ -133,11 +128,11 @@ export function PadelMatchDetail({ match }: { match: any }) {
         return;
       }
       if (isInsufficientBalanceError(e)) {
-        showAlert("Not enough wallet balance — top up to reserve your place.");
+        showAlert(t("insufficientPlace"));
         router.push("/wallet");
         return;
       }
-      showAlert(e?.response?.data?.message ?? "Could not join this match.");
+      showAlert(e?.response?.data?.message ?? t("couldNotJoin"));
     },
     onSettled: () => setMainButtonLoading(false),
   });
@@ -151,7 +146,7 @@ export function PadelMatchDetail({ match }: { match: any }) {
     },
     onError: (e: any) => {
       hapticError();
-      showAlert(e?.response?.data?.message ?? "Could not leave this match.");
+      showAlert(e?.response?.data?.message ?? t("couldNotLeave"));
     },
     onSettled: () => setMainButtonLoading(false),
   });
@@ -190,11 +185,11 @@ export function PadelMatchDetail({ match }: { match: any }) {
     if (isCancelled) {
       hideMainButton();
     } else if (joined) {
-      cleanup = showMainButton(`✓ You're in — Team ${mySide}`, () => leave.mutate(), "#FF5252");
+      cleanup = showMainButton(`${t("youreInTeam", { team: mySide ?? "" })} · ${t("tapToLeave")}`, () => leave.mutate(), "#FF5252");
     } else if (isFull) {
       hideMainButton();
     } else {
-      cleanup = showMainButton(`Reserve place — ${formatUZS(match.pricePerPlayer)}`, reserve);
+      cleanup = showMainButton(t("reserve", { price: formatUZS(match.pricePerPlayer) }), reserve);
     }
     return () => {
       cleanup();
@@ -203,13 +198,13 @@ export function PadelMatchDetail({ match }: { match: any }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joined, isFull, isCancelled, mySide]);
 
-  const genderLabel = match.isCoEd ? "Mixed" : "Single gender";
+  const genderLabel = match.isCoEd ? t("mixed") : t("singleGender");
   const levelLabel =
     match.minLevel != null || match.maxLevel != null
       ? `${formatLevel(match.minLevel ?? 0)} – ${formatLevel(match.maxLevel ?? 7)}`
-      : "All levels";
+      : t("allLevels");
   const amenities: string[] = (match.pitch?.amenities ?? [])
-    .map((a: any) => AMENITY_LABELS[a.type])
+    .map((a: any) => (a?.type ? tAmenities(a.type) : null))
     .filter(Boolean);
 
   return (
@@ -220,7 +215,7 @@ export function PadelMatchDetail({ match }: { match: any }) {
       <div className="px-4 -mt-10 space-y-4">
         {isCancelled && (
           <div className="rounded-2xl p-3 text-sm font-semibold text-white" style={{ background: "#FF5252" }}>
-            This match was cancelled
+            {t("matchCancelled")}
           </div>
         )}
 
@@ -229,7 +224,7 @@ export function PadelMatchDetail({ match }: { match: any }) {
             className="rounded-xl px-3 py-2 text-[13px] font-medium"
             style={{ background: "rgba(245,158,11,0.15)", color: "#B45309" }}
           >
-            ⚠️ Registration for this match ends soon
+            {t("registrationEndsSoon")}
           </div>
         )}
 
@@ -253,25 +248,25 @@ export function PadelMatchDetail({ match }: { match: any }) {
                 color: isFull ? "#EF4444" : "#00C853",
               }}
             >
-              {isFull ? "Match full" : `${available} ${available === 1 ? "spot" : "spots"} available`}
+              {isFull ? t("matchFull") : t("spotAvailable", { count: available })}
             </span>
           </div>
           <div className="h-px my-3" style={{ background: "rgba(0,0,0,0.08)" }} />
           <div className="grid grid-cols-3 gap-2 text-center">
-            <InfoCol label="Gender" value={genderLabel} />
-            <InfoCol label="Level" value={levelLabel} />
-            <InfoCol label="Price" value={formatUZS(match.pricePerPlayer)} />
+            <InfoCol label={t("gender")} value={genderLabel} />
+            <InfoCol label={t("level")} value={levelLabel} />
+            <InfoCol label={t("price")} value={formatUZS(match.pricePerPlayer)} />
           </div>
         </div>
 
         {/* Status row */}
         <div className="flex gap-2">
           <StatusPill
-            text={match.isPrivate ? "Private" : "Open Match"}
+            text={match.isPrivate ? t("private") : t("openMatch")}
             icon={match.isPrivate ? "🔒" : "🔓"}
           />
           <StatusPill
-            text={match.courtReserved ? "Court reserved" : "Court pending"}
+            text={match.courtReserved ? t("courtReserved") : t("courtPending")}
             icon={match.courtReserved ? "✅" : "⏳"}
             good={!!match.courtReserved}
           />
@@ -285,12 +280,10 @@ export function PadelMatchDetail({ match }: { match: any }) {
           }}
         >
           <div className="font-bold text-sm" style={{ color: isCompetitive ? "#EF4444" : "#00B0FF" }}>
-            {isCompetitive ? "⚔️ Competitive" : "😎 Casual"}
+            {isCompetitive ? tHome("competitive") : tHome("casual")}
           </div>
           <div className="text-xs mt-1" style={{ color: "var(--tg-hint)" }}>
-            {isCompetitive
-              ? "Challenge yourself and level up. Results impact your level."
-              : "Just for fun. Results won't affect your level."}
+            {isCompetitive ? t("competitiveDesc") : t("casualDesc")}
           </div>
         </div>
 
@@ -300,9 +293,9 @@ export function PadelMatchDetail({ match }: { match: any }) {
         {/* Players — Team A / Team B */}
         <div>
           <div className="flex items-baseline justify-between mb-2 px-1">
-            <div className="text-sm font-semibold">Players</div>
+            <div className="text-sm font-semibold">{t("players")}</div>
             <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-              {filled}/{match.maxPlayers} joined · {available} open
+              {t("joinedOpen", { joined: filled, max: match.maxPlayers, open: available })}
             </div>
           </div>
           <div className="rounded-2xl p-4 flex items-stretch" style={{ background: "var(--tg-card)" }}>
@@ -314,19 +307,19 @@ export function PadelMatchDetail({ match }: { match: any }) {
 
         {/* Where You'll Play */}
         <div>
-          <div className="text-sm font-semibold mb-2 px-1">Where You&apos;ll Play</div>
+          <div className="text-sm font-semibold mb-2 px-1">{t("whereYoullPlay")}</div>
           <div className="rounded-2xl p-4 space-y-2" style={{ background: "var(--tg-card)" }}>
             <div className="flex items-center gap-2 font-semibold text-sm">
               <MapPin size={15} className="text-[#00B0FF]" />
-              {match.pitch?.name ?? "Padel court"}
+              {match.pitch?.name ?? t("padelCourt")}
             </div>
             <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
               {match.pitch?.addressLine}
               {match.pitch?.district ? `, ${match.pitch.district}` : ""}
             </div>
             <div className="flex items-center gap-2 text-xs" style={{ color: "var(--tg-hint)" }}>
-              <Clock size={13} /> {match.durationMinutes ?? 60} min ·{" "}
-              {match.pitch?.isCovered ? "Covered court" : "Outdoor court"}
+              <Clock size={13} /> {t("duration", { minutes: match.durationMinutes ?? 60 })} ·{" "}
+              {match.pitch?.isCovered ? t("coveredCourt") : t("outdoorCourt")}
             </div>
             {amenities.length > 0 && (
               <div className="flex flex-wrap gap-1.5 pt-1">
@@ -364,10 +357,10 @@ export function PadelMatchDetail({ match }: { match: any }) {
             style={{ background: joined ? "#FF5252" : isFull ? "#9CA3AF" : "#00C853" }}
           >
             {joined
-              ? `✓ You're in — Team ${mySide} · Tap to leave`
+              ? `${t("youreInTeam", { team: mySide ?? "" })} · ${t("tapToLeave")}`
               : isFull
-                ? "Match full"
-                : `Reserve place — ${formatUZS(match.pricePerPlayer)}`}
+                ? t("matchFull")
+                : t("reserve", { price: formatUZS(match.pricePerPlayer) })}
           </button>
         )}
       </div>
@@ -376,13 +369,13 @@ export function PadelMatchDetail({ match }: { match: any }) {
       {gate === "confirm" && (
         <GateSheet onClose={() => setGate(null)}>
           <div className="text-center">
-            <div className="text-xs" style={{ color: "var(--tg-hint)" }}>Your padel level</div>
+            <div className="text-xs" style={{ color: "var(--tg-hint)" }}>{t("yourPadelLevel")}</div>
             <div className="text-4xl font-black my-1" style={{ color: myBand.color }}>
               {formatLevel(myPadelLevel)}
             </div>
-            <div className="text-sm font-bold" style={{ color: myBand.color }}>{myBand.label}</div>
+            <div className="text-sm font-bold" style={{ color: myBand.color }}>{tBands(myBand.key)}</div>
             <p className="text-xs mt-3" style={{ color: "var(--tg-hint)" }}>
-              You&apos;ll join <b>Team {pendingSide}</b>. Your level adjusts automatically as you play.
+              {t("youllJoinTeam", { team: pendingSide ?? "" })}
             </p>
           </div>
           <button
@@ -394,14 +387,14 @@ export function PadelMatchDetail({ match }: { match: any }) {
             className="mt-4 w-full rounded-2xl py-3.5 font-bold text-white"
             style={{ background: "#00C853" }}
           >
-            That&apos;s right — continue
+            {t("confirmContinue")}
           </button>
           <button
             onClick={() => router.push(`/onboarding?next=/match/${id}`)}
             className="mt-2 w-full text-sm font-semibold"
             style={{ color: "var(--tg-hint)" }}
           >
-            Update my level
+            {t("updateMyLevel")}
           </button>
         </GateSheet>
       )}
@@ -411,10 +404,10 @@ export function PadelMatchDetail({ match }: { match: any }) {
           <div className="text-center">
             <div className="text-4xl mb-2">🎾</div>
             <h2 className="text-lg font-bold">
-              This match is for level {formatLevel(match.minLevel ?? 0)}–{formatLevel(match.maxLevel ?? 7)}
+              {t("forLevel", { min: formatLevel(match.minLevel ?? 0), max: formatLevel(match.maxLevel ?? 7) })}
             </h2>
             <p className="text-sm mt-1" style={{ color: "var(--tg-hint)" }}>
-              Your level is {formatLevel(myPadelLevel)}.
+              {t("yourLevelIs", { level: formatLevel(myPadelLevel) })}
             </p>
           </div>
           <button
@@ -425,14 +418,14 @@ export function PadelMatchDetail({ match }: { match: any }) {
             className="mt-4 w-full rounded-2xl py-3.5 font-bold text-white"
             style={{ background: "#00B0FF" }}
           >
-            Find matches for my level
+            {t("findForMyLevel")}
           </button>
           <button
             onClick={() => setGate(null)}
             className="mt-2 w-full text-sm font-semibold"
             style={{ color: "var(--tg-hint)" }}
           >
-            Go back
+            {t("goBack")}
           </button>
         </GateSheet>
       )}

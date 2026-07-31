@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SmsService } from './sms.service';
+import { I18nService } from '../i18n/i18n.service';
 
 type NotificationType =
   | 'BOOKING_CONFIRMED'
@@ -14,69 +15,12 @@ type NotificationType =
   | 'REFERRAL_BONUS'
   | 'ADMIN_ANNOUNCEMENT';
 
-// Keyed by NotificationType value; typed by string so newly-added enum members
-// (which are valid at runtime/schema) don't require a client regen to compile.
-const NOTIFICATION_TEMPLATES: Record<
-  string,
-  (vars: any) => { title: string; body: string }
-> = {
-  BOOKING_CONFIRMED: (v) => ({
-    title: 'Booking Confirmed!',
-    body: `Your spot in ${v.matchTitle} is confirmed.`,
-  }),
-  MATCH_FULL: (v) => ({
-    title: 'Match Full',
-    body: `${v.matchTitle} is now full!`,
-  }),
-  MATCH_CONFIRMED: (v) => ({
-    title: 'Match Confirmed',
-    body: `${v.matchTitle} is happening! See you there.`,
-  }),
-  MATCH_CANCELLED: (v) => ({
-    title: 'Match Cancelled',
-    body: `${v.matchTitle} has been cancelled. Refund processed.`,
-  }),
-  SPOT_FREED: (v) => ({
-    title: 'Spot Available!',
-    body: `A spot opened up in ${v.matchTitle}. Book now!`,
-  }),
-  GAME_STARTING_SOON: (v) => ({
-    title: 'Game Starting Soon',
-    body: `${v.matchTitle} starts in ${v.minutes} minutes!`,
-  }),
-  RATING_RECEIVED: (v) => ({
-    title: 'New Rating',
-    body: `${v.raterName} ${v.thumbsUp ? '👍' : '👎'} rated you.`,
-  }),
-  PAYMENT_RELEASED: (v) => ({
-    title: 'Payment Released',
-    body: `Payment for ${v.matchTitle} processed.`,
-  }),
-  REFERRAL_BONUS: (v) => ({
-    title: 'Referral Bonus!',
-    body: `You earned 50,000 UZS for referring ${v.friendName}!`,
-  }),
-  ADMIN_ANNOUNCEMENT: (v) => ({
-    title: v.title,
-    body: v.body,
-  }),
-  CANCELLATION_WINDOW_CLOSING: (v) => ({
-    title: '⚠️ Free cancellation closing soon',
-    body: `Free cancellation for ${v.matchTitle} closes in ~30 min. Cancel now for a full refund.`,
-  }),
-  INVITE_JOINED: (v) => ({
-    title: '🎉 Someone joined your game!',
-    body: `${v.joinerName ?? 'A player'} joined ${v.matchTitle}.${
-      v.spotsLeft != null ? ` ${v.spotsLeft} spots left.` : ''
-    }`,
-  }),
-};
-
 @Injectable()
 export class NotificationsService {
   constructor(
     private prisma: PrismaService,
     private smsService: SmsService,
+    private i18n: I18nService,
   ) {}
 
   async send(
@@ -85,15 +29,14 @@ export class NotificationsService {
     matchId?: string,
     variables?: any,
   ): Promise<void> {
-    const template = NOTIFICATION_TEMPLATES[type];
-    const { title, body } = template(variables || {});
-
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { notifSms: true, notifPush: true, notifTelegram: true, phone: true },
+      select: { notifSms: true, notifPush: true, notifTelegram: true, phone: true, language: true },
     });
 
     if (!user) return;
+
+    const { title, body } = this.render(type, user.language, variables || {});
 
     const sentVia: string[] = [];
 
@@ -119,6 +62,26 @@ export class NotificationsService {
         data: { sentVia },
       });
     }
+  }
+
+  /**
+   * Resolve a notification's title/body in the recipient's language.
+   * ADMIN_ANNOUNCEMENT carries its own text (already authored by an admin), so
+   * it passes through untranslated. RATING_RECEIVED maps thumbsUp→emoji.
+   */
+  private render(
+    type: string,
+    locale: string,
+    v: any,
+  ): { title: string; body: string } {
+    if (type === 'ADMIN_ANNOUNCEMENT') {
+      return { title: v.title ?? '', body: v.body ?? '' };
+    }
+    const params = { ...v, thumb: v.thumbsUp ? '👍' : '👎', joinerName: v.joinerName ?? '' };
+    return {
+      title: this.i18n.t(`notifications.${type}.title`, locale, params),
+      body: this.i18n.t(`notifications.${type}.body`, locale, params),
+    };
   }
 
   async markRead(userId: string, notificationId: string) {

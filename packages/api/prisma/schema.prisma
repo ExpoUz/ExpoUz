@@ -51,6 +51,7 @@ model User {
   preferredMatchType MatchType?     @default(COMPETITIVE)
 
   role             UserRole  @default(PLAYER)
+  language         String    @default("uz") // BCP-47 locale: "uz" | "ru" | "en" (extensible)
   city             String    @default("Tashkent")
   district         String?
   isVerified       Boolean   @default(false)

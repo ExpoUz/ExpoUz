@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { submitOnboarding, formatLevel } from "@/lib/api";
+import { useTranslations } from "next-intl";
+import { submitOnboarding, formatLevel, getSkillBand } from "@/lib/api";
 import {
   showMainButton,
   hideMainButton,
@@ -16,18 +17,14 @@ import {
 
 type Experience = "never" | "few_times" | "months" | "years";
 
-const EXPERIENCE: { key: Experience; label: string; sub: string }[] = [
-  { key: "never", label: "Never played", sub: "This is my first time" },
-  { key: "few_times", label: "A few times", sub: "I've tried it casually" },
-  { key: "months", label: "A few months", sub: "I play semi-regularly" },
-  { key: "years", label: "Years", sub: "I'm an experienced player" },
-];
-
-const SELF_LABELS = ["Just starting", "Still learning", "Solid rallies", "Strong player", "Very competitive"];
+const EXPERIENCE_KEYS: Experience[] = ["never", "few_times", "months", "years"];
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const t = useTranslations("onboarding");
+  const tBands = useTranslations("levels.bands");
   const searchParams = useSearchParams();
+  const SELF_LABELS = [t("self_1"), t("self_2"), t("self_3"), t("self_4"), t("self_5")];
   // Where to go after onboarding — e.g. back to a match the user tried to join.
   const next = searchParams.get("next") || "/";
   const [step, setStep] = useState(0);
@@ -61,7 +58,7 @@ export default function OnboardingPage() {
       setResult({ level: res.level, band: res.band });
     } catch (e: any) {
       hapticError();
-      showAlert(e?.response?.data?.message ?? "Could not save your level. Try again.");
+      showAlert(e?.response?.data?.message ?? t("saveError"));
     } finally {
       setMainButtonLoading(false);
     }
@@ -81,7 +78,7 @@ export default function OnboardingPage() {
       hideMainButton();
       return;
     }
-    const label = step < totalSteps - 1 ? "Continue" : "See my level";
+    const label = step < totalSteps - 1 ? t("continue") : t("seeLevel");
     const cleanup = showMainButton(label, () => actionRef.current());
     return () => {
       cleanup();
@@ -103,17 +100,16 @@ export default function OnboardingPage() {
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
         <div className="text-5xl mb-4">🎾</div>
         <p className="text-sm" style={{ color: "var(--tg-hint)" }}>
-          Your starting level is
+          {t("startingLevel")}
         </p>
         <div className="text-6xl font-black my-2" style={{ color: result.band.color }}>
           {formatLevel(result.level)}
         </div>
         <div className="text-lg font-bold" style={{ color: result.band.color }}>
-          {result.band.label}
+          {tBands(getSkillBand(result.level).key)}
         </div>
         <p className="text-sm mt-5 max-w-xs" style={{ color: "var(--tg-hint)" }}>
-          This is just your starting point. Your level adjusts automatically as you play
-          competitive matches — win against stronger players and it climbs faster.
+          {t("resultExplain")}
         </p>
         <button
           onClick={() => {
@@ -123,7 +119,7 @@ export default function OnboardingPage() {
           className="mt-8 w-full max-w-xs rounded-2xl py-3.5 font-bold text-white"
           style={{ background: "#00C853" }}
         >
-          {next === "/" ? "Start playing" : "Continue to match"}
+          {next === "/" ? t("startPlaying") : t("continueToMatch")}
         </button>
       </div>
     );
@@ -142,16 +138,16 @@ export default function OnboardingPage() {
       </div>
 
       {step === 0 && (
-        <Question title="How long have you played padel?">
-          {EXPERIENCE.map((e) => (
+        <Question title={t("q_experience")}>
+          {EXPERIENCE_KEYS.map((key) => (
             <OptionCard
-              key={e.key}
-              active={experience === e.key}
-              title={e.label}
-              sub={e.sub}
+              key={key}
+              active={experience === key}
+              title={t(`exp_${key}_label`)}
+              sub={t(`exp_${key}_sub`)}
               onClick={() => {
                 hapticImpact("light");
-                setExperience(e.key);
+                setExperience(key);
               }}
             />
           ))}
@@ -159,14 +155,14 @@ export default function OnboardingPage() {
       )}
 
       {step === 1 && (
-        <Question title="Do you play other racket sports?" sub="Tennis, squash, badminton, table tennis…">
-          <OptionCard active={otherRacketSports === true} title="Yes" onClick={() => { hapticImpact("light"); setOtherRacketSports(true); }} />
-          <OptionCard active={otherRacketSports === false} title="No" onClick={() => { hapticImpact("light"); setOtherRacketSports(false); }} />
+        <Question title={t("q_otherRacket")} sub={t("q_otherRacket_sub")}>
+          <OptionCard active={otherRacketSports === true} title={t("yes")} onClick={() => { hapticImpact("light"); setOtherRacketSports(true); }} />
+          <OptionCard active={otherRacketSports === false} title={t("no")} onClick={() => { hapticImpact("light"); setOtherRacketSports(false); }} />
         </Question>
       )}
 
       {step === 2 && (
-        <Question title="How would you rate your own level?">
+        <Question title={t("q_selfAssessment")}>
           <div className="rounded-2xl p-5" style={{ background: "var(--tg-card)" }}>
             <div className="text-center mb-4">
               <div className="text-4xl font-black text-[#00C853]">{selfAssessment}</div>
@@ -191,9 +187,9 @@ export default function OnboardingPage() {
       )}
 
       {step === 3 && (
-        <Question title="Do you play competitively?" sub="Leagues, tournaments, or ranked matches">
-          <OptionCard active={competitivePlay === true} title="Yes" onClick={() => { hapticImpact("light"); setCompetitivePlay(true); }} />
-          <OptionCard active={competitivePlay === false} title="No, just for fun" onClick={() => { hapticImpact("light"); setCompetitivePlay(false); }} />
+        <Question title={t("q_competitive")} sub={t("q_competitive_sub")}>
+          <OptionCard active={competitivePlay === true} title={t("yes")} onClick={() => { hapticImpact("light"); setCompetitivePlay(true); }} />
+          <OptionCard active={competitivePlay === false} title={t("noJustFun")} onClick={() => { hapticImpact("light"); setCompetitivePlay(false); }} />
         </Question>
       )}
     </div>

@@ -58,6 +58,12 @@ export class UpdateUserDto {
   @IsEnum(Gender)
   gender?: Gender;
 
+  @ApiPropertyOptional({ description: 'UI/notification locale, e.g. "uz" | "ru" | "en"' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  language?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()

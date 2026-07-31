@@ -12,16 +12,16 @@ import {
   formatLevel,
   LEVEL_META,
 } from "@/lib/api";
+import { useTranslations } from "next-intl";
 import { BottomNav } from "@/components/BottomNav";
 import { LevelChart } from "@/components/LevelChart";
 import { SkillBadge } from "@/components/SkillBadge";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useAuth } from "@/lib/auth";
 import { useSportStore, type Sport } from "@/lib/sport-store";
 import { hideMainButton, hapticImpact } from "@/lib/telegram";
 import { useEffect } from "react";
 
-const HAND_LABEL: Record<string, string> = { LEFT: "Left ✋", RIGHT: "Right ✋" };
-const POS_LABEL: Record<string, string> = { FOREHAND: "Forehand", BACKHAND: "Backhand", BOTH: "Both sides" };
 const FOOTBALL_SKILL: Record<string, { label: string; color: string }> = {
   BEGINNER: { label: "Beginner", color: "#34D399" },
   AMATEUR: { label: "Amateur", color: "#00B0FF" },
@@ -32,6 +32,9 @@ export default function ProfilePage() {
   const { user: cached } = useAuth();
   const { sport: storeSport } = useSportStore();
   const [tab, setTab] = useState<Sport>(storeSport);
+  const t = useTranslations("profile");
+  const tw = useTranslations("wallet");
+  const tSports = useTranslations("sports");
 
   useEffect(() => {
     hideMainButton();
@@ -83,9 +86,9 @@ export default function ProfilePage() {
         >
           <div className="text-xl">👛</div>
           <div className="flex-1">
-            <div className="text-sm font-semibold">Wallet</div>
+            <div className="text-sm font-semibold">{tw("title")}</div>
             <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-              Balance &amp; transaction history
+              {tw("balance")} &amp; {tw("history")}
             </div>
           </div>
           <span style={{ color: "var(--tg-hint)" }}>›</span>
@@ -95,8 +98,8 @@ export default function ProfilePage() {
       {/* Sport tabs */}
       <div className="px-4 mt-4">
         <div className="flex gap-2 rounded-2xl p-1" style={{ background: "var(--tg-card)" }}>
-          <SportTab active={tab === "FOOTBALL"} icon="⚽" label="Football" onClick={() => { hapticImpact("light"); setTab("FOOTBALL"); }} />
-          <SportTab active={tab === "PADEL"} icon="🎾" label="Padel" onClick={() => { hapticImpact("light"); setTab("PADEL"); }} />
+          <SportTab active={tab === "FOOTBALL"} icon="⚽" label={tSports("football")} onClick={() => { hapticImpact("light"); setTab("FOOTBALL"); }} />
+          <SportTab active={tab === "PADEL"} icon="🎾" label={tSports("padel")} onClick={() => { hapticImpact("light"); setTab("PADEL"); }} />
         </div>
       </div>
 
@@ -105,6 +108,14 @@ export default function ProfilePage() {
       {/* My games (filtered to the active sport) */}
       <MyGames bookings={bookings} sport={tab} />
 
+      {/* Language */}
+      <div className="px-4 mt-6">
+        <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--tg-hint)" }}>
+          {t("language")}
+        </div>
+        <LanguageSwitcher />
+      </div>
+
       <BottomNav />
     </div>
   );
@@ -112,6 +123,7 @@ export default function ProfilePage() {
 
 // ─── PADEL TAB ────────────────────────────────────────────────────────────────
 function PadelProfile({ me, stats }: { me: any; stats: any }) {
+  const t = useTranslations("profile");
   const level = stats?.level ?? me?.padelLevel ?? 0;
   const band = getSkillBand(Number(level));
   const reliability = stats?.reliability ?? me?.padelReliability ?? 0;
@@ -137,16 +149,16 @@ function PadelProfile({ me, stats }: { me: any; stats: any }) {
 
       {/* Level chart */}
       <div className="px-4 mt-5">
-        <SectionTitle>Level Progression</SectionTitle>
+        <SectionTitle>{t("levelProgression")}</SectionTitle>
         <LevelChart history={stats?.levelHistory ?? []} />
       </div>
 
       {/* Stats cards row */}
       <div className="px-4 mt-5 grid grid-cols-4 gap-2">
-        <StatCard value={stats?.matchesPlayed ?? 0} label="Played" />
-        <StatCard value={stats?.matchesWon ?? 0} label="Won" />
-        <StatCard value={stats?.matchesLost ?? 0} label="Lost" />
-        <StatCard value={`${effectiveness}%`} label="Win %" />
+        <StatCard value={stats?.matchesPlayed ?? 0} label={t("played")} />
+        <StatCard value={stats?.matchesWon ?? 0} label={t("won")} />
+        <StatCard value={stats?.matchesLost ?? 0} label={t("lost")} />
+        <StatCard value={`${effectiveness}%`} label={t("winPct")} />
       </div>
 
       {/* Effectiveness donut + streak */}
@@ -173,12 +185,12 @@ function PadelProfile({ me, stats }: { me: any; stats: any }) {
       {/* Preferences */}
       {stats?.preferences && (
         <div className="px-4 mt-5">
-          <SectionTitle>Preferences</SectionTitle>
+          <SectionTitle>{t("preferences")}</SectionTitle>
           <div className="rounded-2xl divide-y" style={{ background: "var(--tg-card)" }}>
-            <PrefRow label="Best hand" value={HAND_LABEL[stats.preferences.bestHand] ?? "—"} />
-            <PrefRow label="Court position" value={POS_LABEL[stats.preferences.courtPosition] ?? "—"} />
+            <PrefRow label={t("bestHand")} value={stats.preferences.bestHand ? t(`hand_${stats.preferences.bestHand}`) : "—"} />
+            <PrefRow label={t("courtPosition")} value={stats.preferences.courtPosition ? t(`pos_${stats.preferences.courtPosition}`) : "—"} />
             <PrefRow
-              label="Preferred"
+              label={t("preferred")}
               value={stats.preferences.preferredMatchType === "CASUAL" ? "😎 Casual" : "⚔️ Competitive"}
             />
           </div>
@@ -192,7 +204,7 @@ function PadelProfile({ me, stats }: { me: any; stats: any }) {
       {/* Clubs played */}
       {(stats?.recentClubs ?? []).length > 0 && (
         <div className="px-4 mt-5">
-          <SectionTitle>Clubs Played</SectionTitle>
+          <SectionTitle>{t("clubsPlayed")}</SectionTitle>
           <div className="rounded-2xl divide-y" style={{ background: "var(--tg-card)" }}>
             {stats!.recentClubs.map((c: any) => (
               <div key={c.id} className="flex items-center justify-between px-4 py-3">
@@ -211,6 +223,7 @@ function PadelProfile({ me, stats }: { me: any; stats: any }) {
 
 // ─── FOOTBALL TAB ─────────────────────────────────────────────────────────────
 function FootballProfile({ me }: { me: any }) {
+  const t = useTranslations("profile");
   const skill = FOOTBALL_SKILL[me?.skillLevel] ?? { label: me?.skillLevel ?? "—", color: "#9CA3AF" };
   const playerMeta = LEVEL_META[me?.playerLevel] ?? LEVEL_META.NEW;
   const reliability = Math.round(Number(me?.reliabilityScore ?? 0));
@@ -250,9 +263,9 @@ function FootballProfile({ me }: { me: any }) {
 
       {/* Football stats */}
       <div className="px-4 mt-5 grid grid-cols-3 gap-2">
-        <StatCard value={me?.gamesAttended ?? 0} label="Games played" />
-        <StatCard value={me?.gamesThisMonth ?? 0} label="This month" />
-        <StatCard value={me?.winCount ?? 0} label="Wins" />
+        <StatCard value={me?.gamesAttended ?? 0} label={t("gamesPlayed")} />
+        <StatCard value={me?.gamesThisMonth ?? 0} label={t("thisMonth")} />
+        <StatCard value={me?.winCount ?? 0} label={t("wins")} />
       </div>
 
       <div className="px-4 mt-5">
@@ -267,6 +280,7 @@ function FootballProfile({ me }: { me: any }) {
 
 // ─── My games (sport-filtered) ───────────────────────────────────────────────
 function MyGames({ bookings, sport }: { bookings: any[] | undefined; sport: Sport }) {
+  const t = useTranslations("profile");
   const filtered = (bookings ?? []).filter((b: any) => {
     const s = (b.match ?? b)?.sport;
     // Older bookings may not carry sport — show them under padel (the default).
@@ -275,11 +289,11 @@ function MyGames({ bookings, sport }: { bookings: any[] | undefined; sport: Spor
 
   return (
     <div className="px-4 mt-6">
-      <SectionTitle>My {sport === "FOOTBALL" ? "Football" : "Padel"} Games</SectionTitle>
+      <SectionTitle>{sport === "FOOTBALL" ? t("myFootballGames") : t("myPadelGames")}</SectionTitle>
       <div className="space-y-2">
         {filtered.length === 0 ? (
           <div className="rounded-2xl py-10 text-center text-sm" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
-            No {sport === "FOOTBALL" ? "football" : "padel"} games yet.
+            {t("noGames")}
           </div>
         ) : (
           filtered.map((b: any) => {
