@@ -40,6 +40,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const t = useTranslations("matches");
+  const tBooking = useTranslations("bookingType");
   const searchParams = useSearchParams();
   const justCreated = searchParams.get("created") === "1";
   const [showCancel, setShowCancel] = useState(false);
@@ -139,7 +140,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
                 className="px-2 py-0.5 rounded-full text-[11px] font-bold text-white"
                 style={{ background: BOOKING_TYPE_LABELS[match.bookingType].color }}
               >
-                {BOOKING_TYPE_LABELS[match.bookingType].icon} {BOOKING_TYPE_LABELS[match.bookingType].label}
+                {BOOKING_TYPE_LABELS[match.bookingType].icon} {tBooking(match.bookingType)}
               </span>
             )}
             <span
@@ -196,7 +197,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
         )}
         {match.bookingType === "FULL_BOOKING" && (
           <div className="rounded-2xl p-4 text-sm" style={{ background: "var(--tg-card)" }}>
-            🏟️ Full pitch booking — {match.isPrivate ? "Private" : "Open to others"}
+            {t("fullPitchBooking")} — {match.isPrivate ? t("private") : t("openToOthers")}
           </div>
         )}
 
@@ -204,10 +205,10 @@ export function FootballMatchDetail({ match }: { match: any }) {
         {share?.telegramShareLink && (justCreated || isHost) && (
           <div className="rounded-2xl p-4 space-y-3" style={{ background: "var(--tg-card)" }}>
             <div className="font-semibold text-sm">
-              {justCreated ? "⚽ You created a game!" : "Invite players"}
+              {justCreated ? t("youCreatedGame") : t("invitePlayers")}
             </div>
             <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-              Share this link to invite friends. Code: <span className="font-mono font-semibold">{share.shareCode}</span>
+              {t("shareInvite", { code: "" })} <span className="font-mono font-semibold">{share.shareCode}</span>
             </div>
             <div className="flex gap-2">
               <button
@@ -321,10 +322,10 @@ export function FootballMatchDetail({ match }: { match: any }) {
             <div className="text-2xl">🏆</div>
             <div className="flex-1">
               <div className="font-semibold text-sm">
-                {match.resultSubmitted ? "View match result" : "Submit match result"}
+                {match.resultSubmitted ? t("viewResult") : t("submitResult")}
               </div>
               <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-                Record the final score
+                {t("recordScore")}
               </div>
             </div>
             <ChevronRight size={18} style={{ color: "var(--tg-hint)" }} />

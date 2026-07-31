@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import {
   getMatch,
   getMatchResult,
@@ -28,6 +29,7 @@ export default function MatchResultPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const qc = useQueryClient();
+  const t = useTranslations("result");
 
   const { data: me } = useQuery({ queryKey: ["tma-me"], queryFn: getMe });
   const { data: match } = useQuery({ queryKey: ["match", id], queryFn: () => getMatch(id) });
@@ -68,7 +70,7 @@ export default function MatchResultPage() {
       await qc.invalidateQueries({ queryKey: ["match-result", id] });
     } catch (e: any) {
       hapticError();
-      showAlert(e?.response?.data?.message ?? "Could not submit the result.");
+      showAlert(e?.response?.data?.message ?? t("errSubmit"));
     } finally {
       setMainButtonLoading(false);
     }
@@ -83,7 +85,7 @@ export default function MatchResultPage() {
       await qc.invalidateQueries({ queryKey: ["tma-statistics"] });
     } catch (e: any) {
       hapticError();
-      showAlert(e?.response?.data?.message ?? "Could not confirm.");
+      showAlert(e?.response?.data?.message ?? t("errConfirm"));
     } finally {
       setMainButtonLoading(false);
     }
@@ -95,7 +97,7 @@ export default function MatchResultPage() {
       hapticImpact("medium");
       await qc.invalidateQueries({ queryKey: ["match-result", id] });
     } catch (e: any) {
-      showAlert(e?.response?.data?.message ?? "Could not dispute.");
+      showAlert(e?.response?.data?.message ?? t("errDispute"));
     }
   }
 
@@ -108,10 +110,10 @@ export default function MatchResultPage() {
   };
 
   useEffect(() => {
-    let label = "Submit Result";
-    if (result?.isConfirmed) label = "Done";
-    else if (result && !alreadyConfirmed) label = "Confirm Score";
-    else if (result && alreadyConfirmed) label = "Waiting for opponents…";
+    let label = t("btnSubmit");
+    if (result?.isConfirmed) label = t("btnDone");
+    else if (result && !alreadyConfirmed) label = t("btnConfirm");
+    else if (result && alreadyConfirmed) label = t("btnWaiting");
     const cleanup = showMainButton(label, () => actionRef.current());
     return () => {
       cleanup();
@@ -136,30 +138,30 @@ export default function MatchResultPage() {
 
   return (
     <div className="min-h-screen pb-28 px-4 pt-5">
-      <h1 className="text-xl font-bold">Match Result</h1>
+      <h1 className="text-xl font-bold">{t("title")}</h1>
       <p className="text-sm mt-0.5" style={{ color: "var(--tg-hint)" }}>
-        {match?.pitch?.name ?? "Padel match"} · best of 3 sets
+        {match?.pitch?.name ?? t("padelMatch")} · {t("bestOf3")}
       </p>
 
       {result?.isConfirmed && (
         <div className="mt-4 rounded-2xl p-3 text-sm font-semibold text-center text-white" style={{ background: "#00C853" }}>
-          ✓ Result confirmed — levels updated
+          {t("confirmed")}
         </div>
       )}
       {result && !result.isConfirmed && result.isDisputed && (
         <div className="mt-4 rounded-2xl p-3 text-sm font-semibold text-center" style={{ background: "rgba(239,68,68,0.12)", color: "#EF4444" }}>
-          ⚠ This result is disputed
+          {t("disputed")}
         </div>
       )}
       {result && !result.isConfirmed && !result.isDisputed && (
         <div className="mt-4 rounded-2xl p-3 text-sm text-center" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
-          {alreadyConfirmed ? "Waiting for opponents to confirm…" : "Review the score and confirm or dispute it."}
+          {alreadyConfirmed ? t("waitingConfirm") : t("reviewScore")}
         </div>
       )}
 
       {/* Teams + scores */}
       <div className="mt-5 rounded-2xl p-4" style={{ background: "var(--tg-card)" }}>
-        <TeamRow team={team1} label="Team 1" highlight={winningTeam === 1} />
+        <TeamRow team={team1} label={t("team1")} highlight={winningTeam === 1} />
 
         <div className="my-3 grid grid-cols-3 gap-2">
           {[0, 1, 2].map((i) => (
@@ -183,7 +185,7 @@ export default function MatchResultPage() {
           ))}
         </div>
 
-        <TeamRow team={team2} label="Team 2" highlight={winningTeam === 2} />
+        <TeamRow team={team2} label={t("team2")} highlight={winningTeam === 2} />
       </div>
 
       {/* Dispute action (only while pending and not the submitter) */}
@@ -193,7 +195,7 @@ export default function MatchResultPage() {
           className="mt-4 w-full rounded-2xl py-3 font-semibold border-2"
           style={{ borderColor: "#EF4444", color: "#EF4444", background: "transparent" }}
         >
-          Dispute this score
+          {t("disputeScore")}
         </button>
       )}
     </div>
@@ -250,6 +252,7 @@ function SetColumn({
   displayValue?: [number | null, number | null];
   onChange: (v: [number, number]) => void;
 }) {
+  const t = useTranslations("result");
   const top = displayValue ? displayValue[0] : value[0];
   const bottom = displayValue ? displayValue[1] : value[1];
   if (displayValue && top == null && bottom == null) {
@@ -262,8 +265,8 @@ function SetColumn({
   return (
     <div className="text-center">
       <div className="text-[10px] mb-1" style={{ color: "var(--tg-hint)" }}>
-        Set {index + 1}
-        {optional ? " (if needed)" : ""}
+        {t("set", { n: index + 1 })}
+        {optional ? ` ${t("ifNeeded")}` : ""}
       </div>
       <ScoreStepper value={Number(top ?? 0)} editable={editable} onChange={(n) => onChange([n, value[1]])} />
       <div className="h-1" />

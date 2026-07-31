@@ -141,7 +141,7 @@ function PadelProfile({ me, stats }: { me: any; stats: any }) {
               <div className="h-full rounded-full" style={{ width: `${reliability}%`, background: band.color }} />
             </div>
             <span className="text-[11px] font-semibold" style={{ color: "var(--tg-hint)" }}>
-              {reliability}% reliable
+              {t("reliable", { percent: reliability })}
             </span>
           </div>
         </div>
@@ -174,10 +174,10 @@ function PadelProfile({ me, stats }: { me: any; stats: any }) {
             {streak > 0 ? `🔥 ${streak}` : streak < 0 ? `❄️ ${Math.abs(streak)}` : "—"}
           </div>
           <div className="text-xs mt-1" style={{ color: "var(--tg-hint)" }}>
-            {streak > 0 ? "match win streak" : streak < 0 ? "match losing streak" : "no active streak"}
+            {streak > 0 ? t("winStreak") : streak < 0 ? t("losingStreak") : t("noStreak")}
           </div>
           <div className="text-[11px] mt-2" style={{ color: "var(--tg-hint)" }}>
-            Longest: {stats?.longestWinStreak ?? 0} wins
+            {t("longestWins", { count: stats?.longestWinStreak ?? 0 })}
           </div>
         </div>
       </div>
@@ -198,8 +198,8 @@ function PadelProfile({ me, stats }: { me: any; stats: any }) {
       )}
 
       {/* Recent partners / opponents */}
-      <PlayerStrip title="Recent Partners" players={stats?.recentPartners} />
-      <PlayerStrip title="Recent Opponents" players={stats?.recentOpponents} />
+      <PlayerStrip title={t("recentPartners")} players={stats?.recentPartners} />
+      <PlayerStrip title={t("recentOpponents")} players={stats?.recentOpponents} />
 
       {/* Clubs played */}
       {(stats?.recentClubs ?? []).length > 0 && (
@@ -210,7 +210,7 @@ function PadelProfile({ me, stats }: { me: any; stats: any }) {
               <div key={c.id} className="flex items-center justify-between px-4 py-3">
                 <div className="text-sm font-medium">{c.name}</div>
                 <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-                  {c.visits} {c.visits === 1 ? "visit" : "visits"}
+                  {t("visits", { count: c.visits })}
                 </div>
               </div>
             ))}
@@ -224,7 +224,12 @@ function PadelProfile({ me, stats }: { me: any; stats: any }) {
 // ─── FOOTBALL TAB ─────────────────────────────────────────────────────────────
 function FootballProfile({ me }: { me: any }) {
   const t = useTranslations("profile");
+  const tRanks = useTranslations("levels.ranks");
+  const tFootball = useTranslations("levels.football");
   const skill = FOOTBALL_SKILL[me?.skillLevel] ?? { label: me?.skillLevel ?? "—", color: "#9CA3AF" };
+  const skillLabel = me?.skillLevel && ["BEGINNER", "AMATEUR", "PRO"].includes(me.skillLevel)
+    ? tFootball(me.skillLevel)
+    : skill.label;
   const playerMeta = LEVEL_META[me?.playerLevel] ?? LEVEL_META.NEW;
   const reliability = Math.round(Number(me?.reliabilityScore ?? 0));
 
@@ -239,10 +244,10 @@ function FootballProfile({ me }: { me: any }) {
                 className="inline-block px-2.5 py-1 rounded-full text-xs font-bold text-white"
                 style={{ background: skill.color }}
               >
-                {skill.label}
+                {skillLabel}
               </span>
               <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold" style={{ color: "var(--tg-hint)" }}>
-                {playerMeta.icon} {playerMeta.label}
+                {playerMeta.icon} {tRanks(me?.playerLevel ?? "NEW")}
               </span>
             </div>
             <div className="text-right">
@@ -255,7 +260,7 @@ function FootballProfile({ me }: { me: any }) {
               <div className="h-full rounded-full" style={{ width: `${reliability}%`, background: skill.color }} />
             </div>
             <span className="text-[11px] font-semibold" style={{ color: "var(--tg-hint)" }}>
-              {reliability}% reliable
+              {t("reliable", { percent: reliability })}
             </span>
           </div>
         </div>
@@ -270,8 +275,7 @@ function FootballProfile({ me }: { me: any }) {
 
       <div className="px-4 mt-5">
         <div className="rounded-2xl p-4 text-xs" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
-          Football tracks your skill level (Beginner → Pro), ELO from thumbs-up ratings, and games
-          attended. Your padel level is tracked separately on the Padel tab.
+          {t("footballExplain")}
         </div>
       </div>
     </>

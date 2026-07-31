@@ -88,7 +88,7 @@ export function PadelMatchCard({ match }: { match: any }) {
               <span className="truncate">{match.pitch?.name ?? t("host")}</span>
             </div>
             <div className="text-[11px] mt-0.5" style={{ color: "var(--tg-hint)" }}>
-              {match.pitch?.district ?? match.pitch?.city ?? "Tashkent"} · {match.durationMinutes ?? 60} min
+              {match.pitch?.district ?? match.pitch?.city ?? "Tashkent"} · {t("minSuffix", { n: match.durationMinutes ?? 60 })}
             </div>
           </div>
           <span className="text-sm font-bold text-[#00C853] shrink-0">{formatUZS(match.pricePerPlayer)}</span>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
 import { getPitches, createMatch, getPricingPreview, formatUZS } from "@/lib/api";
 import { useSportStore, setSport, sportMeta, SPORTS } from "@/lib/sport-store";
@@ -25,34 +26,11 @@ const capForFormat = (f: string) => {
 
 type BookingType = "OPEN_EVENT" | "GROUP_BOOKING" | "FULL_BOOKING";
 
-const BOOKING_TYPES: {
-  type: BookingType;
-  icon: string;
-  title: string;
-  description: string;
-  color: string;
-}[] = [
-  {
-    type: "OPEN_EVENT",
-    icon: "📢",
-    title: "Open Event",
-    description: "Create a public game. Anyone can join up to your limit.",
-    color: "#00C853",
-  },
-  {
-    type: "GROUP_BOOKING",
-    icon: "👥",
-    title: "Group Booking",
-    description: "Pay for your group upfront, invite others to fill remaining spots.",
-    color: "#00B0FF",
-  },
-  {
-    type: "FULL_BOOKING",
-    icon: "🏟️",
-    title: "Full Pitch",
-    description: "Book the entire pitch for your team. Private or open to others.",
-    color: "#FF5252",
-  },
+// Titles/descriptions are translated at render via the `bookingType` namespace.
+const BOOKING_TYPES: { type: BookingType; icon: string; color: string }[] = [
+  { type: "OPEN_EVENT", icon: "📢", color: "#00C853" },
+  { type: "GROUP_BOOKING", icon: "👥", color: "#00B0FF" },
+  { type: "FULL_BOOKING", icon: "🏟️", color: "#FF5252" },
 ];
 
 type MatchType = "COMPETITIVE" | "CASUAL";
@@ -76,12 +54,16 @@ interface Form {
   isPrivate: boolean;
 }
 
-const STEP_TITLES = ["Booking type", "Choose a pitch", "Match details", "Review & pricing"];
+const STEP_KEYS = ["step_bookingType", "step_choosePitch", "step_matchDetails", "step_review"] as const;
 
 export default function CreateMatchPage() {
   const router = useRouter();
+  const t = useTranslations("create");
+  const tBooking = useTranslations("bookingType");
+  const tSports = useTranslations("sports");
   const { sport } = useSportStore();
   const meta = sportMeta(sport);
+  const sportLabel = tSports(sport === "PADEL" ? "padel" : "football");
   const isPadel = sport === "PADEL";
   const [step, setStep] = useState(0); // 0..3
   const [submitting, setSubmitting] = useState(false);
@@ -196,7 +178,7 @@ export default function CreateMatchPage() {
       router.replace(`/match/${match.id}?created=1`);
     } catch (e: any) {
       hapticError();
-      showAlert(e?.response?.data?.message ?? "Could not create the match.");
+      showAlert(e?.response?.data?.message ?? t("errCreate"));
       setSubmitting(false);
       setMainButtonLoading(false);
     }
@@ -214,7 +196,7 @@ export default function CreateMatchPage() {
   };
 
   useEffect(() => {
-    const label = step < 3 ? "Continue" : "Create Match";
+    const label = step < 3 ? t("continue") : t("createMatch");
     const cleanup = showMainButton(label, () => actionRef.current());
     return () => {
       cleanup();
@@ -242,9 +224,9 @@ export default function CreateMatchPage() {
         ))}
       </div>
 
-      <h1 className="text-xl font-bold mb-1">{STEP_TITLES[step]}</h1>
+      <h1 className="text-xl font-bold mb-1">{t(STEP_KEYS[step])}</h1>
       <p className="text-sm mb-5" style={{ color: "var(--tg-hint)" }}>
-        Step {step + 1} of 4
+        {t("stepOf", { n: step + 1 })}
       </p>
 
       {/* STEP 0 — Booking type */}
@@ -252,7 +234,7 @@ export default function CreateMatchPage() {
         <div className="space-y-3">
           {/* Sport (inherited from the home filter; changeable here) */}
           <div>
-            <label className="block text-sm font-medium mb-2">Sport</label>
+            <label className="block text-sm font-medium mb-2">{t("sport")}</label>
             <div className="grid grid-cols-2 gap-2">
               {SPORTS.map((s) => {
                 const active = s.id === sport;
@@ -268,7 +250,7 @@ export default function CreateMatchPage() {
                   >
                     <span className="text-xl">{s.icon}</span>
                     <span className="font-semibold text-sm" style={{ color: active ? "#00C853" : "var(--tg-text)" }}>
-                      {s.label}
+                      {tSports(s.id === "PADEL" ? "padel" : "football")}
                     </span>
                   </button>
                 );
@@ -290,11 +272,11 @@ export default function CreateMatchPage() {
                 <div className="text-3xl shrink-0">{bt.icon}</div>
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold flex items-center gap-2">
-                    {bt.title}
+                    {tBooking(bt.type)}
                     {active && <span style={{ color: bt.color }}>✓</span>}
                   </div>
                   <div className="text-xs mt-0.5" style={{ color: "var(--tg-hint)" }}>
-                    {bt.description}
+                    {tBooking(`${bt.type}_desc`)}
                   </div>
                 </div>
               </button>
@@ -308,7 +290,7 @@ export default function CreateMatchPage() {
         <div className="space-y-2">
           {(pitches ?? []).length === 0 && (
             <p className="text-sm" style={{ color: "var(--tg-hint)" }}>
-              No pitches available yet.
+              {t("noPitches")}
             </p>
           )}
           {(pitches ?? []).map((p: any) => (
@@ -332,7 +314,7 @@ export default function CreateMatchPage() {
               <div className="min-w-0">
                 <div className="font-semibold text-sm truncate">{p.name}</div>
                 <div className="text-xs truncate" style={{ color: "var(--tg-hint)" }}>
-                  {p.district ?? p.city ?? "Tashkent"} · {formatUZS(p.hourlyRate)}/hr
+                  {p.district ?? p.city ?? "Tashkent"} · {formatUZS(p.hourlyRate)}{t("perHr")}
                 </div>
               </div>
             </button>
@@ -343,7 +325,7 @@ export default function CreateMatchPage() {
       {/* STEP 2 — Details (per booking type) */}
       {step === 2 && (
         <div className="space-y-5">
-          <Field label="Date">
+          <Field label={t("date")}>
             <input
               type="date"
               value={form.date}
@@ -352,12 +334,12 @@ export default function CreateMatchPage() {
               className="input"
             />
           </Field>
-          <Field label="Kick-off time">
+          <Field label={t("kickoff")}>
             <input type="time" value={form.time} onChange={(e) => set("time", e.target.value)} className="input" />
           </Field>
 
           {form.bookingType !== "FULL_BOOKING" && (
-            <Field label="Format">
+            <Field label={t("format")}>
               <div className="flex flex-wrap gap-2">
                 {meta.formats.map((f) => (
                   <Chip key={f.id} active={form.format === f.id} onClick={() => pickFormat(f.id)}>
@@ -366,56 +348,58 @@ export default function CreateMatchPage() {
                 ))}
               </div>
               <p className="text-xs mt-2" style={{ color: "var(--tg-hint)" }}>
-                A {form.format} {meta.label.toLowerCase()} match is capped at{" "}
-                {meta.formats.find((f) => f.id === form.format)?.maxPlayers ?? capForFormat(form.format)} players.
+                {t("capNote", {
+                  format: form.format,
+                  sport: sportLabel,
+                  count: meta.formats.find((f) => f.id === form.format)?.maxPlayers ?? capForFormat(form.format),
+                })}
               </p>
             </Field>
           )}
 
           {/* Match type (Casual / Competitive) is padel-only */}
           {form.bookingType !== "FULL_BOOKING" && isPadel && (
-            <Field label="Match type">
+            <Field label={t("matchType")}>
               <div className="grid grid-cols-2 gap-2">
                 <MatchTypeButton
                   active={form.matchType === "COMPETITIVE"}
                   icon="⚔️"
-                  title="Competitive"
+                  title={t("competitive")}
                   color="#EF4444"
                   onClick={() => { hapticImpact("light"); set("matchType", "COMPETITIVE"); }}
                 />
                 <MatchTypeButton
                   active={form.matchType === "CASUAL"}
                   icon="😎"
-                  title="Casual"
+                  title={t("casual")}
                   color="#00B0FF"
                   onClick={() => { hapticImpact("light"); set("matchType", "CASUAL"); }}
                 />
               </div>
               <p className="text-xs mt-2" style={{ color: "var(--tg-hint)" }}>
-                {form.matchType === "COMPETITIVE"
-                  ? "Results count toward everyone's level."
-                  : "Just for fun — no level changes."}
+                {form.matchType === "COMPETITIVE" ? t("competitiveNote") : t("casualNote")}
               </p>
             </Field>
           )}
 
           {form.bookingType === "OPEN_EVENT" && (
             <>
-              <Field label="Duration">
+              <Field label={t("duration")}>
                 <div className="flex gap-2">
                   {DURATIONS.map((d) => (
                     <Chip key={d} active={form.durationMinutes === d} onClick={() => set("durationMinutes", d)}>
-                      {d} min
+                      {t("minSuffix", { n: d })}
                     </Chip>
                   ))}
                 </div>
               </Field>
-              <Field label="Players">
+              <Field label={t("players")}>
                 <div className="rounded-2xl p-3 text-sm" style={{ background: "var(--tg-card)" }}>
-                  Fixed by format: <span className="font-bold text-[#00C853]">{form.maxPlayers} players</span>
+                  {t("fixedByFormat")}{" "}
+                  <span className="font-bold text-[#00C853]">{t("playersCount", { count: form.maxPlayers })}</span>
                 </div>
               </Field>
-              <Field label="Price per player (UZS)">
+              <Field label={t("pricePerPlayer")}>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -431,24 +415,24 @@ export default function CreateMatchPage() {
 
           {form.bookingType === "GROUP_BOOKING" && (
             <>
-              <Field label="How many people are you bringing? (incl. you)">
+              <Field label={t("groupBringing")}>
                 <Stepper value={form.organizerPlayerCount} min={1} max={10} onChange={(v) => set("organizerPlayerCount", v)} />
               </Field>
-              <Field label="How many more can join?">
+              <Field label={t("groupMore")}>
                 <Stepper value={form.extraSpotsAvailable} min={0} max={10} onChange={(v) => set("extraSpotsAvailable", v)} />
               </Field>
               <div className="rounded-2xl p-3 text-sm" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
-                Total spots: <span className="font-semibold">{form.organizerPlayerCount + form.extraSpotsAvailable}</span>
+                {t("totalSpots")} <span className="font-semibold">{form.organizerPlayerCount + form.extraSpotsAvailable}</span>
               </div>
             </>
           )}
 
           {form.bookingType === "FULL_BOOKING" && (
             <>
-              <Field label="How many hours?">
+              <Field label={t("hours")}>
                 <Stepper value={form.fullBookingHours} min={1} max={8} onChange={(v) => set("fullBookingHours", v)} />
               </Field>
-              <Field label="Private booking">
+              <Field label={t("privateBooking")}>
                 <button
                   onClick={() => {
                     hapticImpact("light");
@@ -457,13 +441,13 @@ export default function CreateMatchPage() {
                   className="w-full flex items-center justify-between rounded-2xl p-3 border-2"
                   style={{ background: "var(--tg-card)", borderColor: form.isPrivate ? "#FF5252" : "transparent" }}
                 >
-                  <span className="text-sm">{form.isPrivate ? "Private — hidden from listings" : "Open — visible on platform"}</span>
+                  <span className="text-sm">{form.isPrivate ? t("privateHidden") : t("openVisible")}</span>
                   <span>{form.isPrivate ? "🔒" : "🌍"}</span>
                 </button>
               </Field>
               {selectedPitch && (
                 <div className="rounded-2xl p-3 text-sm" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
-                  Total pitch cost:{" "}
+                  {t("totalPitchCost")}{" "}
                   <span className="font-semibold text-[#00C853]">
                     {formatUZS(Number(selectedPitch.hourlyRate) * form.fullBookingHours)}
                   </span>
@@ -478,52 +462,52 @@ export default function CreateMatchPage() {
       {step === 3 && (
         <div className="space-y-4">
           <div className="rounded-2xl p-4 space-y-3" style={{ background: "var(--tg-card)" }}>
-            <ReviewRow label="Type" value={BOOKING_TYPES.find((b) => b.type === form.bookingType)!.title} />
-            <ReviewRow label="Pitch" value={selectedPitch?.name ?? "—"} />
-            <ReviewRow label="When" value={dayjs(`${form.date}T${form.time}`).format("ddd, MMM D · HH:mm")} />
-            <ReviewRow label="Sport" value={`${meta.icon} ${meta.label}`} />
-            {form.bookingType !== "FULL_BOOKING" && <ReviewRow label="Format" value={form.format} />}
+            <ReviewRow label={t("r_type")} value={tBooking(form.bookingType)} />
+            <ReviewRow label={t("r_pitch")} value={selectedPitch?.name ?? "—"} />
+            <ReviewRow label={t("r_when")} value={dayjs(`${form.date}T${form.time}`).format("ddd, MMM D · HH:mm")} />
+            <ReviewRow label={t("r_sport")} value={`${meta.icon} ${sportLabel}`} />
+            {form.bookingType !== "FULL_BOOKING" && <ReviewRow label={t("r_format")} value={form.format} />}
             {form.bookingType !== "FULL_BOOKING" && isPadel && (
-              <ReviewRow label="Match type" value={form.matchType === "CASUAL" ? "😎 Casual" : "⚔️ Competitive"} />
+              <ReviewRow label={t("r_matchType")} value={form.matchType === "CASUAL" ? `😎 ${t("casual")}` : `⚔️ ${t("competitive")}`} />
             )}
-            {form.bookingType === "OPEN_EVENT" && <ReviewRow label="Max players" value={String(form.maxPlayers)} />}
+            {form.bookingType === "OPEN_EVENT" && <ReviewRow label={t("r_maxPlayers")} value={String(form.maxPlayers)} />}
             {form.bookingType === "GROUP_BOOKING" && (
               <>
-                <ReviewRow label="Your group" value={String(form.organizerPlayerCount)} />
-                <ReviewRow label="Extra spots" value={String(form.extraSpotsAvailable)} />
+                <ReviewRow label={t("r_yourGroup")} value={String(form.organizerPlayerCount)} />
+                <ReviewRow label={t("r_extraSpots")} value={String(form.extraSpotsAvailable)} />
               </>
             )}
             {form.bookingType === "FULL_BOOKING" && (
               <>
-                <ReviewRow label="Hours" value={String(form.fullBookingHours)} />
-                <ReviewRow label="Visibility" value={form.isPrivate ? "Private" : "Open"} />
+                <ReviewRow label={t("r_hours")} value={String(form.fullBookingHours)} />
+                <ReviewRow label={t("r_visibility")} value={form.isPrivate ? t("v_private") : t("v_open")} />
               </>
             )}
           </div>
 
           {/* Pricing breakdown */}
           <div className="rounded-2xl p-4 space-y-2" style={{ background: "var(--tg-card)" }}>
-            <div className="text-sm font-semibold mb-1">Pricing</div>
-            {!pricing && <div className="text-sm" style={{ color: "var(--tg-hint)" }}>Calculating…</div>}
+            <div className="text-sm font-semibold mb-1">{t("pricing")}</div>
+            {!pricing && <div className="text-sm" style={{ color: "var(--tg-hint)" }}>{t("calculating")}</div>}
             {pricing && form.bookingType === "OPEN_EVENT" && (
               <>
-                <PriceRow label="Base per player" value={formatUZS(pricing.basePrice)} />
-                <PriceRow label="Platform fee (5%)" value={`+ ${formatUZS(pricing.platformFee)}`} />
-                <PriceRow label="Players pay" value={formatUZS(pricing.youPay)} strong />
+                <PriceRow label={t("basePerPlayer")} value={formatUZS(pricing.basePrice)} />
+                <PriceRow label={t("platformFee5")} value={`+ ${formatUZS(pricing.platformFee)}`} />
+                <PriceRow label={t("playersPay")} value={formatUZS(pricing.youPay)} strong />
               </>
             )}
             {pricing && form.bookingType === "GROUP_BOOKING" && (
               <>
-                <PriceRow label="Cost per player" value={formatUZS(pricing.costPerPlayer)} />
-                <PriceRow label="You pay now" value={formatUZS(pricing.organizerPayNow)} strong />
-                <PriceRow label="Others joining pay" value={`${formatUZS(pricing.perJoiningPlayer)} each`} />
+                <PriceRow label={t("costPerPlayer")} value={formatUZS(pricing.costPerPlayer)} />
+                <PriceRow label={t("youPayNow")} value={formatUZS(pricing.organizerPayNow)} strong />
+                <PriceRow label={t("othersJoiningPay")} value={t("each", { price: formatUZS(pricing.perJoiningPlayer) })} />
               </>
             )}
             {pricing && form.bookingType === "FULL_BOOKING" && (
               <>
-                <PriceRow label={`Pitch rate × ${pricing.hours}h`} value={formatUZS(pricing.totalCost)} />
-                <PriceRow label="Platform commission (10%)" value={formatUZS(pricing.platformCommission)} />
-                <PriceRow label="You pay" value={formatUZS(pricing.youPay)} strong />
+                <PriceRow label={t("pitchRateHours", { hours: pricing.hours })} value={formatUZS(pricing.totalCost)} />
+                <PriceRow label={t("platformCommission10")} value={formatUZS(pricing.platformCommission)} />
+                <PriceRow label={t("youPay")} value={formatUZS(pricing.youPay)} strong />
               </>
             )}
           </div>

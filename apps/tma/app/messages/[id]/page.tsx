@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
 import { Send } from "lucide-react";
 import {
@@ -20,6 +21,7 @@ export default function ConversationPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const qc = useQueryClient();
+  const t = useTranslations("chat");
   const id = params.id;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -40,7 +42,7 @@ export default function ConversationPage() {
   const otherFromMsg = messages.find((m) => m.senderId !== me?.id)?.sender;
   const title =
     cachedConvo?.type === "MATCH_GROUP"
-      ? "Match group"
+      ? t("matchGroup")
       : chatUserName(cachedConvo?.otherMember ?? otherFromMsg);
 
   useEffect(() => {
@@ -98,9 +100,9 @@ export default function ConversationPage() {
         ) : messages.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-3xl mb-2">👋</div>
-            <p className="font-medium">No messages yet</p>
+            <p className="font-medium">{t("noConversations")}</p>
             <p className="text-sm mt-1" style={{ color: "var(--tg-hint)" }}>
-              Say hello to start the conversation.
+              {t("noMessages")}
             </p>
           </div>
         ) : (
@@ -150,7 +152,7 @@ export default function ConversationPage() {
             }
           }}
           rows={1}
-          placeholder="Message…"
+          placeholder={t("typeMessage")}
           className="flex-1 resize-none rounded-2xl px-3 py-2 text-[15px] max-h-28 outline-none"
           style={{ background: "var(--tg-card)", color: "var(--tg-text)" }}
         />

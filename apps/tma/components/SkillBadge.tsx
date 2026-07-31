@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { getSkillBand, formatLevel } from "@/lib/api";
 
 // The small colored skill-rating badge (e.g. "2.62") used on avatars and cards.
@@ -12,6 +13,7 @@ export function SkillBadge({
   size?: "xs" | "sm" | "md";
   showLabel?: boolean;
 }) {
+  const tBands = useTranslations("levels.bands");
   const value = Number(level ?? 0);
   const band = getSkillBand(value);
   const dims =
@@ -31,7 +33,7 @@ export function SkillBadge({
       </span>
       {showLabel && (
         <span className="text-xs font-medium" style={{ color: band.color }}>
-          {band.label}
+          {tBands(band.key)}
         </span>
       )}
     </span>

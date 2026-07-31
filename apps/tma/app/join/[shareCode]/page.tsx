@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
 import {
   getMatchByShareCode,
@@ -24,6 +25,8 @@ import {
 
 export default function JoinViaInvitePage() {
   const router = useRouter();
+  const t = useTranslations("join");
+  const tm = useTranslations("matches");
   const params = useParams<{ shareCode: string }>();
   const shareCode = params.shareCode;
   const [joining, setJoining] = useState(false);
@@ -56,10 +59,10 @@ export default function JoinViaInvitePage() {
     } catch (e: any) {
       hapticError();
       if (isInsufficientBalanceError(e)) {
-        showAlert("Not enough wallet balance — top up to join this game.");
+        showAlert(t("insufficient"));
         router.push("/wallet");
       } else {
-        showAlert(e?.response?.data?.message ?? "Could not join this game.");
+        showAlert(e?.response?.data?.message ?? tm("couldNotJoinGame"));
       }
       setJoining(false);
       setMainButtonLoading(false);
@@ -78,7 +81,7 @@ export default function JoinViaInvitePage() {
       hideMainButton();
       return;
     }
-    const cleanup = showMainButton("⚽ Join This Game", () => actionRef.current());
+    const cleanup = showMainButton(t("joinThisGame"), () => actionRef.current());
     return () => {
       cleanup();
       hideMainButton();
@@ -86,16 +89,16 @@ export default function JoinViaInvitePage() {
   }, [match]);
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: "var(--tg-hint)" }}>Loading invite…</div>;
+    return <div className="min-h-screen flex items-center justify-center text-sm" style={{ color: "var(--tg-hint)" }}>{t("loading")}</div>;
   }
 
   if (error || !match) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center gap-2">
         <div className="text-4xl">🔗</div>
-        <div className="font-semibold">Invalid or expired invite</div>
+        <div className="font-semibold">{t("invalidInvite")}</div>
         <button onClick={() => router.replace("/")} className="mt-3 text-sm font-medium text-[#00C853]">
-          Browse games instead
+          {t("browseInstead")}
         </button>
       </div>
     );
@@ -108,7 +111,7 @@ export default function JoinViaInvitePage() {
     <div className="min-h-screen pb-28">
       {/* Invite banner */}
       <div className="px-4 py-3 text-center text-sm font-semibold text-white" style={{ background: "#00B0FF" }}>
-        🎉 You were invited to join this game!
+        {t("invitedBanner")}
       </div>
 
       {/* Pitch image */}
@@ -130,19 +133,19 @@ export default function JoinViaInvitePage() {
         </div>
 
         <div className="rounded-2xl p-4 space-y-3" style={{ background: "var(--tg-card)" }}>
-          <Row label="When" value={dayjs(match.startTime).format("ddd, MMM D · HH:mm")} />
-          {match.format && <Row label="Format" value={match.format} />}
-          <Row label="Players" value={`${match.currentPlayers} / ${match.maxPlayers}`} />
-          <Row label="Price" value={formatUZS(match.pricePerPlayer)} />
+          <Row label={tm("when")} value={dayjs(match.startTime).format("ddd, MMM D · HH:mm")} />
+          {match.format && <Row label={tm("format")} value={match.format} />}
+          <Row label={tm("players")} value={`${match.currentPlayers} / ${match.maxPlayers}`} />
+          <Row label={tm("price")} value={formatUZS(match.pricePerPlayer)} />
         </div>
 
         {full ? (
           <div className="rounded-2xl p-3 text-sm text-center" style={{ background: "rgba(255,82,82,0.12)", color: "#FF5252" }}>
-            This game is full.
+            {t("gameFull")}
           </div>
         ) : (
           <div className="rounded-2xl p-3 text-sm text-center" style={{ background: "rgba(0,200,83,0.1)", color: "#00C853" }}>
-            {spotsLeft} {spotsLeft === 1 ? "spot" : "spots"} left
+            {tm("spotsLeft", { count: spotsLeft })}
           </div>
         )}
       </div>
