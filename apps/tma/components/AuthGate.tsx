@@ -1,9 +1,10 @@
 "use client";
 
 import { useAuth } from "@/lib/auth";
+import { BrowserLogin } from "./BrowserLogin";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
-  const { status, error, retry } = useAuth();
+  const { status, error, retry, browserLogin } = useAuth();
 
   if (status === "loading") {
     return (
@@ -19,6 +20,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (status === "unauthenticated") {
+    // Browser context with the fallback enabled — show the phone+OTP form
+    // instead of the "open from Telegram" message. The Telegram path is
+    // untouched: if initData exists it always wins in AuthProvider.
+    if (browserLogin) {
+      return <BrowserLogin />;
+    }
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-8 text-center">
         <div className="text-3xl">⚽</div>
