@@ -1,0 +1,36 @@
+{
+  "login": {
+    "title": "Kirish",
+    "subtitle": "Administrator email va parolini kiriting",
+    "email": "Email",
+    "password": "Parol",
+    "submit": "Kirish",
+    "submitting": "Kirilmoqda…",
+    "invalid": "Email yoki parol noto'g'ri",
+    "denied": "Ruxsat yo'q. Faqat administratorlar uchun.",
+    "restricted": "Faqat ADMIN va SUPER_ADMIN hisoblari uchun"
+  },
+  "common": {
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "delete": "O'chirish",
+    "confirm": "Tasdiqlash",
+    "search": "Qidirish",
+    "loading": "Yuklanmoqda…",
+    "empty": "Hozircha bo'sh",
+    "error": "Xatolik yuz berdi",
+    "logout": "Chiqish"
+  },
+  "nav": {
+    "dashboard": "Boshqaruv",
+    "users": "Foydalanuvchilar",
+    "matches": "O'yinlar",
+    "pitches": "Maydonlar",
+    "transactions": "Tranzaksiyalar",
+    "analytics": "Tahlil",
+    "activity": "Faoliyat",
+    "settings": "Sozlamalar",
+    "admins": "Administratorlar",
+    "help": "Yordam"
+  }
+}

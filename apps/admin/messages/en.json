@@ -1,0 +1,36 @@
+{
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Enter your admin email and password",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "invalid": "Invalid email or password",
+    "denied": "Access denied. Admin accounts only.",
+    "restricted": "Restricted to ADMIN and SUPER_ADMIN accounts only"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "search": "Search",
+    "loading": "Loading…",
+    "empty": "Nothing here yet",
+    "error": "Something went wrong",
+    "logout": "Log out"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "matches": "Matches",
+    "pitches": "Pitches",
+    "transactions": "Transactions",
+    "analytics": "Analytics",
+    "activity": "Activity",
+    "settings": "Settings",
+    "admins": "Admins",
+    "help": "Help"
+  }
+}

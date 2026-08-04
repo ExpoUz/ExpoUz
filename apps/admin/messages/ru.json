@@ -1,0 +1,36 @@
+{
+  "login": {
+    "title": "Вход",
+    "subtitle": "Введите email и пароль администратора",
+    "email": "Email",
+    "password": "Пароль",
+    "submit": "Войти",
+    "submitting": "Вход…",
+    "invalid": "Неверный email или пароль",
+    "denied": "Доступ запрещён. Только для администраторов.",
+    "restricted": "Только для учётных записей ADMIN и SUPER_ADMIN"
+  },
+  "common": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "confirm": "Подтвердить",
+    "search": "Поиск",
+    "loading": "Загрузка…",
+    "empty": "Пока ничего нет",
+    "error": "Что-то пошло не так",
+    "logout": "Выйти"
+  },
+  "nav": {
+    "dashboard": "Панель",
+    "users": "Пользователи",
+    "matches": "Матчи",
+    "pitches": "Площадки",
+    "transactions": "Транзакции",
+    "analytics": "Аналитика",
+    "activity": "Активность",
+    "settings": "Настройки",
+    "admins": "Администраторы",
+    "help": "Помощь"
+  }
+}
