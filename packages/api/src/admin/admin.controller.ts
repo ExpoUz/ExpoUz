@@ -8,10 +8,12 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
   Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
+import { AdminAuditInterceptor } from './admin-audit.interceptor';
 import { GeminiService } from '../gemini/gemini.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -20,6 +22,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 @ApiTags('admin')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
+@UseInterceptors(AdminAuditInterceptor)
 @Roles('ADMIN', 'SUPER_ADMIN')
 @Controller('admin')
 export class AdminController {

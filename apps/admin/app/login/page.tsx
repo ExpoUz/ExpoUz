@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
 
-type Step = "phone" | "otp";
-
 // Persist tokens to localStorage AND the cookie the middleware checks.
 function setSession(accessToken: string, refreshToken: string, user: any) {
   localStorage.setItem("admin_access_token", accessToken);
@@ -16,9 +14,8 @@ function setSession(accessToken: string, refreshToken: string, user: any) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("phone");
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [tgChecking, setTgChecking] = useState(true);
@@ -58,32 +55,15 @@ export default function LoginPage() {
     );
   }
 
-  async function handleSendOtp(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    if (phone.replace(/\D/g, "").length < 9) {
-      setError("Enter a valid phone number");
-      return;
-    }
-    setLoading(true);
-    try {
-      const fullPhone = phone.startsWith("+") ? phone : `+998${phone}`;
-      await authApi.post("/auth/send-otp", { phone: fullPhone });
-      setStep("otp");
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? "Failed to send OTP");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleVerifyOtp(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const fullPhone = phone.startsWith("+") ? phone : `+998${phone}`;
-      const { data } = await authApi.post("/auth/verify-otp", { phone: fullPhone, otp });
+      const { data } = await authApi.post("/auth/admin/login", {
+        email: email.trim(),
+        password,
+      });
       const { accessToken, refreshToken, user } = data;
 
       if (!["ADMIN", "SUPER_ADMIN"].includes(user?.role)) {
@@ -95,7 +75,7 @@ export default function LoginPage() {
       setSession(accessToken, refreshToken, user);
       router.replace("/");
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? "Invalid OTP");
+      setError(err?.response?.data?.message ?? "Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -107,77 +87,45 @@ export default function LoginPage() {
         {/* Brand */}
         <div className="text-center mb-8">
           <div className="text-3xl font-extrabold tracking-tight mb-1">
-            <span className="text-[#00C853]">SCORE</span>
-            <span className="text-white"> WITH US</span>
+            <span className="text-[#00C853]">EXPO</span>
+            <span className="text-white">UZ</span>
           </div>
           <p className="text-gray-500 text-sm">Admin Panel</p>
         </div>
 
         <div className="bg-[#161B22] rounded-2xl border border-white/10 p-8">
-          <h1 className="text-white font-semibold text-lg mb-1">
-            {step === "phone" ? "Sign in" : "Enter code"}
-          </h1>
+          <h1 className="text-white font-semibold text-lg mb-1">Sign in</h1>
           <p className="text-gray-500 text-sm mb-6">
-            {step === "phone"
-              ? "Enter your admin phone number"
-              : `Code sent to +998${phone}`}
+            Enter your admin email and password
           </p>
 
-          {step === "phone" ? (
-            <form onSubmit={handleSendOtp} className="space-y-4">
-              <div className="flex rounded-xl border border-white/10 bg-[#0D1117] overflow-hidden focus-within:ring-2 focus-within:ring-[#00C853]/40">
-                <span className="text-gray-400 text-sm px-4 py-3 border-r border-white/10 flex-shrink-0">
-                  +998
-                </span>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={9}
-                  placeholder="90 000 00 00"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                  className="flex-1 bg-transparent text-white text-sm px-4 py-3 outline-none placeholder:text-gray-600"
-                  autoFocus
-                />
-              </div>
-              {error && <p className="text-red-400 text-xs">{error}</p>}
-              <button
-                type="submit"
-                disabled={loading || phone.length < 9}
-                className="w-full py-3 rounded-xl bg-[#00C853] text-black font-semibold text-sm disabled:opacity-50 transition-opacity"
-              >
-                {loading ? "Sending…" : "Send OTP"}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-4">
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="000000"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                className="w-full bg-[#0D1117] border border-white/10 rounded-xl text-white text-center text-2xl tracking-[0.5em] py-4 outline-none focus:ring-2 focus:ring-[#00C853]/40"
-                autoFocus
-              />
-              {error && <p className="text-red-400 text-xs text-center">{error}</p>}
-              <button
-                type="submit"
-                disabled={loading || otp.length < 6}
-                className="w-full py-3 rounded-xl bg-[#00C853] text-black font-semibold text-sm disabled:opacity-50 transition-opacity"
-              >
-                {loading ? "Verifying…" : "Verify"}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setStep("phone"); setOtp(""); setError(""); }}
-                className="w-full py-2 text-gray-500 text-sm hover:text-gray-300 transition-colors"
-              >
-                ← Change number
-              </button>
-            </form>
-          )}
+          <form onSubmit={handleLogin} className="space-y-4">
+            <input
+              type="email"
+              autoComplete="username"
+              placeholder="admin@expouz.uz"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-[#0D1117] border border-white/10 rounded-xl text-white text-sm px-4 py-3 outline-none focus:ring-2 focus:ring-[#00C853]/40 placeholder:text-gray-600"
+              autoFocus
+            />
+            <input
+              type="password"
+              autoComplete="current-password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-[#0D1117] border border-white/10 rounded-xl text-white text-sm px-4 py-3 outline-none focus:ring-2 focus:ring-[#00C853]/40 placeholder:text-gray-600"
+            />
+            {error && <p className="text-red-400 text-xs">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading || !email || password.length < 1}
+              className="w-full py-3 rounded-xl bg-[#00C853] text-black font-semibold text-sm disabled:opacity-50 transition-opacity"
+            >
+              {loading ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
         </div>
 
         <p className="text-center text-gray-700 text-xs mt-6">

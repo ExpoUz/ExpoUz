@@ -17,6 +17,8 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { AdminLoginDto } from './dto/admin-login.dto';
+import { AdminSetupDto } from './dto/admin-setup.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 
@@ -83,6 +85,26 @@ export class AuthController {
   @ApiResponse({ status: 403, description: 'Not an authorized admin' })
   telegramAdminAuth(@Body('initData') initData: string) {
     return this.authService.telegramAdminAuth(initData);
+  }
+
+  @Post('admin/login')
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @ApiOperation({ summary: 'Admin email + password login (Super Admin panel)' })
+  @ApiResponse({ status: 200, description: 'Tokens returned' })
+  @ApiResponse({ status: 401, description: 'Invalid email or password' })
+  adminLogin(@Body() dto: AdminLoginDto) {
+    return this.authService.adminLogin(dto);
+  }
+
+  @Post('admin/setup')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  @ApiOperation({
+    summary: 'Create/reset a SUPER_ADMIN (gated by ADMIN_SETUP_KEY env var)',
+  })
+  @ApiResponse({ status: 201, description: 'Super admin created or reset' })
+  @ApiResponse({ status: 403, description: 'Setup disabled or invalid setup key' })
+  adminSetup(@Body() dto: AdminSetupDto) {
+    return this.authService.adminSetup(dto);
   }
 
   @Post('google')

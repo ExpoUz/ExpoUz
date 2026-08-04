@@ -14,8 +14,11 @@ import { RegisterDto } from './dto/register.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { WalletService } from '../payments/wallet/wallet.service';
 import { normalizeLocale } from '../i18n/locales';
+import { AdminLoginDto } from './dto/admin-login.dto';
+import { AdminSetupDto } from './dto/admin-setup.dto';
 import axios from 'axios';
 import * as crypto from 'crypto';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AuthService {
@@ -375,6 +378,87 @@ export class AuthService {
       data: { userId: user.id, token: tokens.refreshToken, expiresAt: refreshExpiry },
     });
     return { ...tokens, user };
+  }
+
+  /**
+   * Email + password login for web admins (Super Admin panel).
+   * Only ADMIN / SUPER_ADMIN accounts that have a password set can log in here.
+   */
+  async adminLogin(dto: AdminLoginDto): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: any;
+  }> {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    // Uniform error to avoid leaking which emails exist / are admins.
+    const invalid = new UnauthorizedException('Invalid email or password');
+    if (!user || !user.passwordHash) throw invalid;
+    if (!['SUPER_ADMIN', 'ADMIN'].includes(user.role)) throw invalid;
+
+    const ok = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!ok) throw invalid;
+
+    if (user.isBanned) throw new UnauthorizedException('Your account has been banned');
+
+    const tokens = await this.generateTokens(user.id, user.role);
+    const refreshExpiry = new Date();
+    refreshExpiry.setDate(refreshExpiry.getDate() + 30);
+    await this.prisma.refreshToken.create({
+      data: { userId: user.id, token: tokens.refreshToken, expiresAt: refreshExpiry },
+    });
+    return { ...tokens, user };
+  }
+
+  /**
+   * First-run / recovery provisioning of a SUPER_ADMIN with email+password.
+   * Inert unless the ADMIN_SETUP_KEY env var is set AND the supplied key matches
+   * it. Upserts by email, so it doubles as the documented lockout-recovery
+   * procedure (re-set the env var, re-run to reset the password). Operators
+   * unset ADMIN_SETUP_KEY again afterwards to disable the endpoint.
+   */
+  async adminSetup(dto: AdminSetupDto): Promise<{ id: string; email: string; role: string }> {
+    const configuredKey = process.env.ADMIN_SETUP_KEY;
+    if (!configuredKey) {
+      throw new ForbiddenException(
+        'Admin setup is disabled. Set the ADMIN_SETUP_KEY env var to enable it.',
+      );
+    }
+    // Constant-time comparison so the key can't be guessed by timing.
+    const a = Buffer.from(dto.setupKey);
+    const b = Buffer.from(configuredKey);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+      throw new ForbiddenException('Invalid setup key');
+    }
+
+    const email = dto.email.trim().toLowerCase();
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    const user = existing
+      ? await this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            passwordHash,
+            role: 'SUPER_ADMIN',
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+            isBanned: false,
+          },
+        })
+      : await this.prisma.user.create({
+          data: {
+            email,
+            passwordHash,
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+            role: 'SUPER_ADMIN',
+            isVerified: true,
+          },
+        });
+
+    return { id: user.id, email: user.email, role: user.role };
   }
 
   async googleAuth(credential: string): Promise<{

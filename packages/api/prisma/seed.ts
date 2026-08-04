@@ -1,4 +1,5 @@
 import { PrismaClient, PlayerLevel } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -33,12 +34,16 @@ async function main() {
     create: { id: 'singleton', commissionRate: 0.1, platformFeeRate: 0.05, cancellationFeeRate: 0.5, cancellationWindowHours: 5 },
   });
 
-  // ── Super admin (phone login: +998901111111) ──
+  // ── Super admin ──
+  // Phone login: +998901111111  ·  Email login: admin@expouz.uz / ChangeMe123!
+  // Change this password immediately in production (or use POST /auth/admin/setup).
+  const superAdminPasswordHash = await bcrypt.hash('ChangeMe123!', 12);
   const superAdmin = await prisma.user.upsert({
     where: { phone: '+998901111111' },
-    update: { role: 'SUPER_ADMIN' },
+    update: { role: 'SUPER_ADMIN', email: 'admin@expouz.uz', passwordHash: superAdminPasswordHash },
     create: {
-      phone: '+998901111111', firstName: 'Admin', lastName: 'Superuser', role: 'SUPER_ADMIN',
+      phone: '+998901111111', email: 'admin@expouz.uz', passwordHash: superAdminPasswordHash,
+      firstName: 'Admin', lastName: 'Superuser', role: 'SUPER_ADMIN',
       skillLevel: 'PRO', eloRating: 1500, padelLevel: 5.0, padelReliability: 80, padelInitialSet: true,
       city: 'Tashkent', isVerified: true,
     },
