@@ -56,7 +56,7 @@ export function BottomNav() {
                 </span>
               )}
             </span>
-            <span className="text-[11px] font-medium">{t(key)}</span>
+            <span className="text-[10px] font-medium">{t(key)}</span>
           </Link>
         );
       })}

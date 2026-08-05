@@ -59,3 +59,63 @@ body {
   width: 0;
   height: 0;
 }
+
+/* ─── Home discovery layout ─────────────────────────────────────── */
+
+/* Horizontal carousels: momentum + gentle snap, no scrollbar */
+.snap-x {
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.snap-x::-webkit-scrollbar {
+  display: none;
+}
+.snap-start {
+  scroll-snap-align: start;
+}
+
+/* Shimmer skeleton for loading photos / placeholder cards */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.05) 25%,
+    rgba(0, 0, 0, 0.09) 37%,
+    rgba(0, 0, 0, 0.05) 63%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Sections fade + slide up 8px on first load (staggered via inline delay) */
+@keyframes section-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.section-in {
+  animation: section-in 0.34s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-in,
+  .skeleton {
+    animation: none;
+  }
+  .skeleton {
+    background: rgba(0, 0, 0, 0.06);
+  }
+}

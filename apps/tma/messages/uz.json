@@ -47,7 +47,12 @@
     "noLocations": "Hozircha joylashuvlar yo'q.",
     "noGames": "Filtrlaringizga mos {sport} o'yinlari topilmadi",
     "tryClearing": "Filtrlarni tozalang — yoki o'zingiz tashkil qiling!",
-    "hostGame": "O'yin tashkil qilish"
+    "hostGame": "O'yin tashkil qilish",
+    "seeAll": "Barchasi",
+    "featured": "Tavsiya",
+    "happeningToday": "Bugun",
+    "openMatches": "Ochiq o'yinlar",
+    "playersNearYou": "Yaqin o'yinchilar"
   },
   "matches": {
     "full": "To'la",

@@ -47,7 +47,12 @@
     "noLocations": "No locations yet.",
     "noGames": "No {sport} games match your filters",
     "tryClearing": "Try clearing filters — or host one!",
-    "hostGame": "Host a Game"
+    "hostGame": "Host a Game",
+    "seeAll": "See all",
+    "featured": "Featured",
+    "happeningToday": "Happening today",
+    "openMatches": "Open matches",
+    "playersNearYou": "Players near you"
   },
   "matches": {
     "full": "Full",

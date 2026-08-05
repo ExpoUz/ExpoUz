@@ -47,7 +47,12 @@
     "noLocations": "Пока нет районов.",
     "noGames": "Нет игр «{sport}» по вашим фильтрам",
     "tryClearing": "Сбросьте фильтры — или создайте игру!",
-    "hostGame": "Создать игру"
+    "hostGame": "Создать игру",
+    "seeAll": "Все",
+    "featured": "Рекомендуем",
+    "happeningToday": "Сегодня",
+    "openMatches": "Открытые игры",
+    "playersNearYou": "Игроки рядом"
   },
   "matches": {
     "full": "Заполнен",
