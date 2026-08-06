@@ -85,6 +85,7 @@
     "joinedToast": "Siz o'yindasiz!",
     "insufficientJoin": "Mablag' yetarli emas — joy band qilish uchun hamyonni to'ldiring.",
     "insufficientPlace": "Mablag' yetarli emas — joy band qilish uchun hamyonni to'ldiring.",
+    "yourWallet": "Hamyoningiz: {balance}",
     "couldNotJoin": "O'yinga qo'shilib bo'lmadi.",
     "couldNotLeave": "O'yindan chiqib bo'lmadi.",
     "couldNotJoinGame": "O'yinga qo'shilib bo'lmadi.",

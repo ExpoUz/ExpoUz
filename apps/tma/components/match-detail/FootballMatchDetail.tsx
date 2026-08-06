@@ -12,6 +12,7 @@ import {
   leaveMatch,
   getShareLink,
   isInsufficientBalanceError,
+  insufficientBalanceInfo,
   isPhoneRequiredError,
   formatUZS,
 } from "@/lib/api";
@@ -57,10 +58,14 @@ export function FootballMatchDetail({ match }: { match: any }) {
 
   const hoursUntilMatch = (new Date(match.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
 
-  const players: any[] =
-    match?.positions?.filter((p: any) => p.booking?.user).map((p: any) => p.booking.user) ?? [];
-  const joined = !!user && players.some((p) => p.id === user.id);
-  const spotsLeft = Math.max(0, (match?.maxPlayers ?? 0) - (match?.currentPlayers ?? players.length));
+  // Every occupied slot is a booking (host, organizer-paid guest, or joined
+  // player). Reading match.bookings — the same array the count is derived from —
+  // makes the header and grid structurally unable to disagree, and it refetches
+  // live via the match query the socket invalidates.
+  const slots: any[] = match?.bookings ?? [];
+  const filled = slots.length;
+  const joined = !!user && slots.some((b) => !b.isGuestSlot && b.user?.id === user.id);
+  const spotsLeft = Math.max(0, (match?.maxPlayers ?? 0) - filled);
   const isFull = spotsLeft === 0 && !joined;
 
   const join = useMutation({
@@ -78,7 +83,12 @@ export function FootballMatchDetail({ match }: { match: any }) {
         return;
       }
       if (isInsufficientBalanceError(e)) {
-        showAlert(t("insufficientJoin"));
+        const info = insufficientBalanceInfo(e);
+        showAlert(
+          info
+            ? `${t("insufficientJoin")}\n${formatUZS(info.needed)} · ${t("yourWallet", { balance: formatUZS(info.balance) })}`
+            : t("insufficientJoin"),
+        );
         router.push("/wallet");
         return;
       }
@@ -186,7 +196,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
           />
           <Row
             icon={<Users size={16} />}
-            label={`${match.currentPlayers ?? players.length}/${match.maxPlayers} players · min ${
+            label={`${filled}/${match.maxPlayers} players · min ${
               match.minPlayers ?? "—"
             }`}
           />
@@ -292,19 +302,24 @@ export function FootballMatchDetail({ match }: { match: any }) {
         {/* Players */}
         <div>
           <div className="text-sm font-semibold mb-2 px-1">
-            Players ({players.length}/{match.maxPlayers})
+            Players ({filled}/{match.maxPlayers})
           </div>
           <div className="grid grid-cols-4 gap-3">
-            {players.map((p) => (
+            {slots.map((b) => (
               <button
-                key={p.id}
+                key={b.id}
                 type="button"
-                onClick={() => router.push(`/players/${p.id}`)}
+                onClick={() => !b.isGuestSlot && b.user?.id && router.push(`/players/${b.user.id}`)}
                 className="flex flex-col items-center gap-1 pressable"
               >
-                <Avatar user={p} />
+                <div className="relative">
+                  <Avatar user={b.isGuestSlot ? { firstName: "?" } : b.user} />
+                  {b.isHostBooking && (
+                    <span className="absolute -top-1 -right-1 text-[11px]" title="Host">👑</span>
+                  )}
+                </div>
                 <span className="text-[11px] text-center truncate w-full" style={{ color: "var(--tg-hint)" }}>
-                  {p.firstName}
+                  {b.isGuestSlot ? b.guestLabel ?? "Guest" : b.user?.firstName}
                 </span>
               </button>
             ))}

@@ -10,6 +10,7 @@ import {
   joinMatchAndPay,
   leaveMatch,
   isInsufficientBalanceError,
+  insufficientBalanceInfo,
   isPhoneRequiredError,
   formatUZS,
   formatLevel,
@@ -135,7 +136,12 @@ export function PadelMatchDetail({ match }: { match: any }) {
         return;
       }
       if (isInsufficientBalanceError(e)) {
-        showAlert(t("insufficientPlace"));
+        const info = insufficientBalanceInfo(e);
+        showAlert(
+          info
+            ? `${t("insufficientPlace")}\n${formatUZS(info.needed)} · ${t("yourWallet", { balance: formatUZS(info.balance) })}`
+            : t("insufficientPlace"),
+        );
         router.push("/wallet");
         return;
       }

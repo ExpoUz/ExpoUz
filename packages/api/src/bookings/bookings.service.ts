@@ -9,6 +9,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { ActivityService } from '../activity/activity.service';
+import { WalletService } from '../payments/wallet/wallet.service';
+import { syncPlayerCount } from '../matches/player-count';
 
 @Injectable()
 export class BookingsService {
@@ -16,6 +18,7 @@ export class BookingsService {
     private prisma: PrismaService,
     private redis: RedisService,
     private activity: ActivityService,
+    private wallet: WalletService,
   ) {}
 
   async create(userId: string, dto: CreateBookingDto) {
@@ -81,10 +84,8 @@ export class BookingsService {
         });
       }
 
-      await tx.match.update({
-        where: { id: matchId },
-        data: { currentPlayers: { increment: 1 } },
-      });
+      // currentPlayers is derived from the real bookings — never incremented by hand.
+      await syncPlayerCount(tx, matchId);
 
       return { booking, transaction };
     });
@@ -192,21 +193,29 @@ export class BookingsService {
       }
 
       if (refundAmount) {
-        await tx.user.update({
-          where: { id: userId },
-          data: { credit: { increment: refundAmount } },
-        });
+        // Refund through the ledger (single source of truth) — never write credit directly.
+        await this.wallet.adjust(
+          userId,
+          refundAmount,
+          'REFUND',
+          {
+            reference: booking.matchId,
+            description:
+              newStatus === 'CANCELLED_PENALTY'
+                ? 'Cancelled booking (late) — partial refund'
+                : 'Cancelled booking — full refund',
+          },
+          tx,
+        );
       }
-
-      await tx.match.update({
-        where: { id: booking.matchId },
-        data: { currentPlayers: { decrement: 1 }, status: 'OPEN' },
-      });
 
       await tx.matchPosition.updateMany({
         where: { bookingId: id },
         data: { bookingId: null, isLocked: false },
       });
+
+      // currentPlayers is recomputed from the surviving bookings.
+      await syncPlayerCount(tx, booking.matchId);
     });
 
     await this.activity.log(

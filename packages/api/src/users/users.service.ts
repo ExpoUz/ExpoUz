@@ -272,8 +272,10 @@ export class UsersService {
   }
 
   async getMatchPlayers(matchId: string) {
+    // Every occupied slot is a booking: host, organizer-paid guest, or a joined
+    // player. PENDING_PAYMENT is included so a slot shows the instant it's taken.
     const bookings = await this.prisma.booking.findMany({
-      where: { matchId, status: { in: ['CONFIRMED', 'COMPLETED'] } },
+      where: { matchId, status: { in: ['CONFIRMED', 'PENDING_PAYMENT', 'COMPLETED'] } },
       include: {
         user: {
           select: {
@@ -289,9 +291,15 @@ export class UsersService {
         },
         positionTaken: { select: { position: true } },
       },
+      orderBy: { createdAt: 'asc' },
     });
     return bookings.map((b) => ({
+      bookingId: b.id,
+      // A guest slot has no distinct occupant yet — surface the organizer as owner.
       ...b.user,
+      isHost: b.isHostBooking,
+      isGuest: b.isGuestSlot,
+      guestLabel: b.guestLabel,
       position: b.positionTaken?.position ?? null,
       teamSide: b.teamSide,
       checkedIn: b.checkedIn,

@@ -90,7 +90,19 @@ export async function payWithWallet(transactionId: string) {
 }
 
 export function isInsufficientBalanceError(e: any): boolean {
-  return /insufficient wallet balance/i.test(e?.response?.data?.message ?? "");
+  return (
+    e?.response?.data?.code === "INSUFFICIENT_BALANCE" ||
+    /insufficient wallet balance/i.test(e?.response?.data?.message ?? "")
+  );
+}
+
+/** Amounts (needed / current balance) attached to an INSUFFICIENT_BALANCE error. */
+export function insufficientBalanceInfo(
+  e: any,
+): { needed: number; balance: number } | null {
+  const d = e?.response?.data;
+  if (d?.code !== "INSUFFICIENT_BALANCE") return null;
+  return { needed: Number(d.needed ?? 0), balance: Number(d.balance ?? 0) };
 }
 
 /**
@@ -103,26 +115,17 @@ export async function payForBookingWithWallet(bookingId: string) {
 }
 
 /**
- * Join a match and immediately settle it from the wallet. If the wallet can't
- * cover it, the booking is released again (so an unpaid booking never holds a
- * slot) and the payment error is rethrown for the UI to handle.
+ * Join a match. Joining is now atomic on the server — the wallet is debited and
+ * the slot is taken in one transaction, or neither happens (e.g. on
+ * INSUFFICIENT_BALANCE the error is thrown and no slot is held). The
+ * `pricePerPlayer` arg is retained for call-site compatibility but unused.
  */
 export async function joinMatchAndPay(
   id: string,
   body: { positionId?: string; teamSide?: string },
-  pricePerPlayer?: number | string,
+  _pricePerPlayer?: number | string,
 ) {
-  const res = await joinMatch(id, body);
-  const bookingId = res?.booking?.id;
-  if (bookingId && Number(pricePerPlayer ?? 0) > 0) {
-    try {
-      await payForBookingWithWallet(bookingId);
-    } catch (e) {
-      await leaveMatch(id).catch(() => {});
-      throw e;
-    }
-  }
-  return res;
+  return joinMatch(id, body);
 }
 
 export async function leaveMatch(id: string) {

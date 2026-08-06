@@ -100,6 +100,16 @@ export class CreateMatchDto {
   @IsBoolean()
   isPrivate?: boolean;
 
+  @ApiPropertyOptional({ description: 'FULL_BOOKING: whether the host also plays (occupies a slot)' })
+  @IsOptional()
+  @IsBoolean()
+  hostIsPlaying?: boolean;
+
+  @ApiPropertyOptional({ description: "Host's team side for their own slot (HOME/AWAY)" })
+  @IsOptional()
+  @IsString()
+  teamSide?: string;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()

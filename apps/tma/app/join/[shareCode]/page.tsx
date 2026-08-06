@@ -8,8 +8,6 @@ import dayjs from "dayjs";
 import {
   getMatchByShareCode,
   joinByShareCode,
-  payForBookingWithWallet,
-  leaveMatch,
   isInsufficientBalanceError,
   isPhoneRequiredError,
   formatUZS,
@@ -49,16 +47,8 @@ export default function JoinViaInvitePage() {
     setJoining(true);
     setMainButtonLoading(true);
     try {
-      const res = await joinByShareCode(shareCode, {});
-      const bookingId = res?.booking?.id;
-      if (bookingId && Number(match.pricePerPlayer ?? 0) > 0) {
-        try {
-          await payForBookingWithWallet(bookingId);
-        } catch (payErr) {
-          await leaveMatch(match.id).catch(() => {});
-          throw payErr;
-        }
-      }
+      // Joining is atomic on the server (slot + wallet debit in one tx).
+      await joinByShareCode(shareCode, {});
       hapticSuccess();
       router.replace(`/match/${match.id}`);
     } catch (e: any) {

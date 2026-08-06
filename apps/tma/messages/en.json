@@ -85,6 +85,7 @@
     "joinedToast": "You're in!",
     "insufficientJoin": "Not enough wallet balance — top up to reserve your spot.",
     "insufficientPlace": "Not enough wallet balance — top up to reserve your place.",
+    "yourWallet": "Your wallet: {balance}",
     "couldNotJoin": "Could not join this match.",
     "couldNotLeave": "Could not leave this match.",
     "couldNotJoinGame": "Could not join this game.",

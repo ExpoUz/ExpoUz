@@ -470,8 +470,16 @@ model Booking {
   qrCode        String         @unique @default(cuid())
   checkedIn     Boolean        @default(false)
   isNoShow      Boolean        @default(false)
+  // The host's own slot on a match they created (except pure FULL_BOOKING).
+  isHostBooking Boolean        @default(false)
+  // A seat the organizer paid for on a GROUP_BOOKING; occupant is TBD. Owned by
+  // the organizer (userId = organizerId) and does not count as their membership.
+  isGuestSlot   Boolean        @default(false)
+  guestLabel    String? // "Guest 1", or a name the organizer enters
   transaction   Transaction?
   createdAt     DateTime       @default(now())
+
+  @@index([matchId, status])
 }
 
 enum BookingStatus {
