@@ -10,10 +10,12 @@ import {
   joinMatchAndPay,
   leaveMatch,
   isInsufficientBalanceError,
+  isPhoneRequiredError,
   formatUZS,
   formatLevel,
   getSkillBand,
 } from "@/lib/api";
+import { usePhoneGate } from "@/lib/phone-gate";
 import {
   showMainButton,
   hideMainButton,
@@ -43,6 +45,7 @@ export function PadelMatchDetail({ match }: { match: any }) {
   const id = String(match.id);
   const qc = useQueryClient();
   const { user } = useAuth();
+  const { requirePhone } = usePhoneGate();
   const t = useTranslations("matches");
   const tAmenities = useTranslations("amenities");
   const tHome = useTranslations("home");
@@ -120,9 +123,13 @@ export function PadelMatchDetail({ match }: { match: any }) {
       qc.invalidateQueries({ queryKey: ["tma-match", id] });
       qc.invalidateQueries({ queryKey: ["wallet"] });
     },
-    onError: (e: any) => {
+    onError: async (e: any) => {
       hapticError();
       const code = e?.response?.data?.code;
+      if (isPhoneRequiredError(e)) {
+        if (await requirePhone()) join.mutate(pendingSide ?? "A");
+        return;
+      }
       if (code === "PADEL_LEVEL_REQUIRED") {
         router.push(`/onboarding?next=/match/${id}`);
         return;
@@ -153,8 +160,11 @@ export function PadelMatchDetail({ match }: { match: any }) {
 
   // Level gate runs before any join. Routes to onboarding if unassessed, blocks
   // if out of range, otherwise asks for a one-tap level confirmation.
-  function handleJoin(side: Side) {
+  async function handleJoin(side: Side) {
     if (joined || isFull || isCancelled) return;
+    // A verified phone is required before booking — venues must be able to
+    // reach players if a game changes. Prompt now; abort if dismissed.
+    if (!(await requirePhone())) return;
     if (!user?.padelInitialSet) {
       hapticImpact("light");
       router.push(`/onboarding?next=/match/${id}`);

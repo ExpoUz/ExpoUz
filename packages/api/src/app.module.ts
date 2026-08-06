@@ -8,6 +8,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { PhoneModule } from './phone/phone.module';
 import { PitchesModule } from './pitches/pitches.module';
 import { MatchesModule } from './matches/matches.module';
 import { BookingsModule } from './bookings/bookings.module';
@@ -69,6 +70,7 @@ import { HealthController } from './health.controller';
     TelegramModule,
     AuthModule,
     UsersModule,
+    PhoneModule,
     PitchesModule,
     MatchesModule,
     BookingsModule,

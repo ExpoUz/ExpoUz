@@ -428,6 +428,37 @@
     "refundFull": "Full refund",
     "refundHalf": "50% refund"
   },
+  "phone": {
+    "title": "Add your phone number",
+    "why": "Venues need a way to reach you if a game changes. Your number is never shown to other players.",
+    "shareViaTelegram": "Share via Telegram",
+    "sharing": "Sharing…",
+    "useDifferentNumber": "Use a different number",
+    "enterNumber": "Enter your phone",
+    "enterNumberSub": "We'll send a verification code to your Telegram.",
+    "sendCode": "Send code",
+    "sending": "Sending…",
+    "back": "Back",
+    "enterCode": "Enter code",
+    "codeSentTo": "Code sent to {phone}",
+    "resend": "Resend code",
+    "resendIn": "Resend in {seconds}s",
+    "changeNumber": "Change number",
+    "nudgeTitle": "Add your phone number",
+    "nudgeSub": "Verify once to book games and host matches.",
+    "add": "Add",
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "PHONE_REQUIRED": "Add your phone number to continue.",
+      "PHONE_INVALID": "Enter a valid phone number.",
+      "PHONE_ALREADY_USED": "This number is already linked to another account.",
+      "PHONE_NOT_REACHABLE": "We couldn't reach that number. Try a different one.",
+      "CONTACT_MISMATCH": "That contact doesn't match your Telegram account.",
+      "CODE_INVALID": "That code isn't right. Try again.",
+      "CODE_EXPIRED": "The code expired. Request a new one.",
+      "TOO_MANY_ATTEMPTS": "Too many attempts. Please wait and try again."
+    }
+  },
   "errors": {
     "MATCH_FULL": "This match is already full.",
     "MATCH_NOT_ACCEPTING": "This match is not accepting players.",

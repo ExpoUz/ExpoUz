@@ -15,6 +15,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { AdminService } from './admin.service';
 import { AdminAuditInterceptor } from './admin-audit.interceptor';
 import { GeminiService } from '../gemini/gemini.service';
+import { PhoneVerificationService } from '../phone/phone-verification.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -29,6 +30,7 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly geminiService: GeminiService,
+    private readonly phoneVerification: PhoneVerificationService,
   ) {}
 
   @Get('dashboard')
@@ -314,6 +316,12 @@ export class AdminController {
   @ApiOperation({ summary: 'Soft-delete user account' })
   deleteUser(@Param('id') id: string) {
     return this.adminService.deleteUser(id);
+  }
+
+  @Post('users/:id/verify-phone')
+  @ApiOperation({ summary: "Manually mark a user's phone as verified (method = ADMIN, audited)" })
+  markPhoneVerified(@Param('id') id: string, @Body('phone') phone: string) {
+    return this.phoneVerification.adminMarkVerified(id, phone);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

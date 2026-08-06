@@ -18,6 +18,7 @@ import { LevelChart } from "@/components/LevelChart";
 import { SkillBadge } from "@/components/SkillBadge";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useAuth } from "@/lib/auth";
+import { usePhoneGate } from "@/lib/phone-gate";
 import { useSportStore, type Sport } from "@/lib/sport-store";
 import { hideMainButton, hapticImpact } from "@/lib/telegram";
 import { useEffect } from "react";
@@ -30,10 +31,12 @@ const FOOTBALL_SKILL: Record<string, { label: string; color: string }> = {
 
 export default function ProfilePage() {
   const { user: cached } = useAuth();
+  const { phoneVerified, openPhonePrompt } = usePhoneGate();
   const { sport: storeSport } = useSportStore();
   const [tab, setTab] = useState<Sport>(storeSport);
   const t = useTranslations("profile");
   const tw = useTranslations("wallet");
+  const tPhone = useTranslations("phone");
   const tSports = useTranslations("sports");
 
   useEffect(() => {
@@ -75,6 +78,29 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Phone verification nudge (only while unverified) */}
+      {!phoneVerified && (
+        <div className="px-4 mt-3">
+          <button
+            onClick={() => {
+              hapticImpact("light");
+              openPhonePrompt();
+            }}
+            className="w-full flex items-center gap-3 rounded-2xl p-4 text-left active:opacity-80"
+            style={{ background: "rgba(0,176,255,0.1)", border: "1px solid rgba(0,176,255,0.25)" }}
+          >
+            <div className="text-xl">📱</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold">{tPhone("nudgeTitle")}</div>
+              <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
+                {tPhone("nudgeSub")}
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-[#00875A] shrink-0">{tPhone("add")}</span>
+          </button>
+        </div>
+      )}
 
       {/* Wallet quick-link */}
       <div className="px-4 mt-3">

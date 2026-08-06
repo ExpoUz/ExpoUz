@@ -1,7 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getUserById } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getUserById, verifyUserPhone } from "@/lib/api";
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dayjs from "dayjs";
@@ -73,6 +73,7 @@ export default function UserDetailPage() {
             Joined {dayjs(u.createdAt).format("MMM YYYY")} · {u.city ?? "Tashkent"}
             {u.district ? ` · ${u.district}` : ""}
           </div>
+          <PhoneVerification user={u} />
         </div>
       </div>
 
@@ -152,6 +153,71 @@ export default function UserDetailPage() {
               <span className="text-xs font-medium text-gray-600">{t.status}</span>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PhoneVerification({ user }: { user: any }) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [phone, setPhone] = useState(user.phone ?? "");
+  const [error, setError] = useState<string | null>(null);
+
+  const verify = useMutation({
+    mutationFn: (p: string) => verifyUserPhone(user.id, p),
+    onSuccess: () => {
+      setEditing(false);
+      setError(null);
+      qc.invalidateQueries({ queryKey: ["admin-user", user.id] });
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+    },
+    onError: (e: any) => {
+      setError(e?.response?.data?.code ?? "Could not verify phone");
+    },
+  });
+
+  if (user.phoneVerified && !editing) {
+    return (
+      <div className="mt-1.5 flex items-center gap-2 text-xs">
+        <span className="inline-flex items-center gap-1 font-semibold text-green-700">✓ Phone verified</span>
+        <span className="text-gray-400">
+          {(user.phoneVerifyMethod ?? "").replace("_", " ")}
+          {user.phoneVerifiedAt ? ` · ${dayjs(user.phoneVerifiedAt).format("MMM D, YYYY")}` : ""}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-1.5 text-xs">
+      {!editing ? (
+        <button
+          onClick={() => setEditing(true)}
+          className="inline-flex items-center gap-1 font-semibold text-amber-600 hover:text-amber-700"
+        >
+          ⚠ Phone unverified — mark verified
+        </button>
+      ) : (
+        <div className="flex items-center gap-2">
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+998901234567"
+            className="rounded-lg border border-gray-200 px-2 py-1 text-xs font-mono outline-none focus:ring-2 focus:ring-green-500/30"
+          />
+          <button
+            onClick={() => verify.mutate(phone)}
+            disabled={verify.isPending}
+            className="rounded-lg bg-green-600 text-white px-3 py-1 text-xs font-semibold disabled:opacity-50"
+          >
+            {verify.isPending ? "Saving…" : "Confirm"}
+          </button>
+          <button onClick={() => setEditing(false)} className="text-gray-400 hover:text-gray-600">
+            Cancel
+          </button>
+          {error && <span className="text-red-500">{error}</span>}
         </div>
       )}
     </div>

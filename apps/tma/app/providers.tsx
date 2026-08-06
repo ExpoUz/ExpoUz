@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { AuthProvider } from "@/lib/auth";
+import { PhoneGateProvider } from "@/lib/phone-gate";
 import { I18nProvider } from "@/lib/i18n";
 import { FirstRunLanguageGate } from "@/components/FirstRunLanguageGate";
 
@@ -17,7 +18,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <FirstRunLanguageGate />
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <PhoneGateProvider>{children}</PhoneGateProvider>
+        </AuthProvider>
       </I18nProvider>
     </QueryClientProvider>
   );

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
-import { getPitches, createMatch, getPricingPreview, formatUZS } from "@/lib/api";
+import { getPitches, createMatch, getPricingPreview, formatUZS, isPhoneRequiredError } from "@/lib/api";
+import { usePhoneGate } from "@/lib/phone-gate";
 import { useSportStore, setSport, sportMeta, SPORTS } from "@/lib/sport-store";
 import {
   showMainButton,
@@ -59,6 +60,7 @@ const STEP_KEYS = ["step_bookingType", "step_choosePitch", "step_matchDetails", 
 export default function CreateMatchPage() {
   const router = useRouter();
   const t = useTranslations("create");
+  const { requirePhone } = usePhoneGate();
   const tBooking = useTranslations("bookingType");
   const tSports = useTranslations("sports");
   const { sport } = useSportStore();
@@ -146,6 +148,9 @@ export default function CreateMatchPage() {
   }, [step, form]);
 
   async function submit() {
+    // Hosting requires a verified phone so the venue can reach the organizer.
+    // Prompt at this moment; bail out quietly if the user dismisses it.
+    if (!(await requirePhone())) return;
     setSubmitting(true);
     setMainButtonLoading(true);
     try {
@@ -177,6 +182,14 @@ export default function CreateMatchPage() {
       hapticSuccess();
       router.replace(`/match/${match.id}?created=1`);
     } catch (e: any) {
+      // Server-side safety net: if the phone became unverified between the
+      // prompt and submit, re-open the prompt instead of showing an error.
+      if (isPhoneRequiredError(e)) {
+        setSubmitting(false);
+        setMainButtonLoading(false);
+        if (await requirePhone()) submit();
+        return;
+      }
       hapticError();
       showAlert(e?.response?.data?.message ?? t("errCreate"));
       setSubmitting(false);

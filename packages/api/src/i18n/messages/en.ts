@@ -50,6 +50,15 @@ const en = {
     LEVEL_TOO_LOW: 'Your level is below this match’s minimum.',
     LEVEL_TOO_HIGH: 'Your level is above this match’s maximum.',
     INSUFFICIENT_BALANCE: 'Not enough wallet balance. Please top up.',
+    // Phone verification (returned as codes; each app translates in messages/phone.errors).
+    PHONE_REQUIRED: 'Add your phone number to continue.',
+    PHONE_INVALID: 'Enter a valid phone number.',
+    PHONE_ALREADY_USED: 'This number is already linked to another account.',
+    PHONE_NOT_REACHABLE: 'We couldn’t reach that number. Try a different one.',
+    CONTACT_MISMATCH: 'That contact doesn’t match your Telegram account.',
+    CODE_INVALID: 'That code isn’t right. Try again.',
+    CODE_EXPIRED: 'The code expired. Request a new one.',
+    TOO_MANY_ATTEMPTS: 'Too many attempts. Please wait and try again.',
   },
 };
 

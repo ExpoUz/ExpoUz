@@ -11,8 +11,10 @@ import {
   payForBookingWithWallet,
   leaveMatch,
   isInsufficientBalanceError,
+  isPhoneRequiredError,
   formatUZS,
 } from "@/lib/api";
+import { usePhoneGate } from "@/lib/phone-gate";
 import {
   showMainButton,
   hideMainButton,
@@ -27,6 +29,7 @@ export default function JoinViaInvitePage() {
   const router = useRouter();
   const t = useTranslations("join");
   const tm = useTranslations("matches");
+  const { requirePhone } = usePhoneGate();
   const params = useParams<{ shareCode: string }>();
   const shareCode = params.shareCode;
   const [joining, setJoining] = useState(false);
@@ -41,6 +44,8 @@ export default function JoinViaInvitePage() {
   const actionRef = useRef<() => void>(() => {});
   actionRef.current = async () => {
     if (joining || !match) return;
+    // Booking via an invite is still a booking — require a verified phone first.
+    if (!(await requirePhone())) return;
     setJoining(true);
     setMainButtonLoading(true);
     try {
@@ -58,6 +63,12 @@ export default function JoinViaInvitePage() {
       router.replace(`/match/${match.id}`);
     } catch (e: any) {
       hapticError();
+      if (isPhoneRequiredError(e)) {
+        setJoining(false);
+        setMainButtonLoading(false);
+        if (await requirePhone()) actionRef.current();
+        return;
+      }
       if (isInsufficientBalanceError(e)) {
         showAlert(t("insufficient"));
         router.push("/wallet");

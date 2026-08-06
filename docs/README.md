@@ -10,6 +10,7 @@ known gaps are listed explicitly (see the runbook).
 | [PITCH_OWNER_GUIDE.ru.md](./PITCH_OWNER_GUIDE.ru.md) | Venue owners | Русский |
 | [PITCH_OWNER_GUIDE.uz.md](./PITCH_OWNER_GUIDE.uz.md) | Venue owners | O'zbekcha |
 | [ADMIN_OPERATIONS_RUNBOOK.md](./ADMIN_OPERATIONS_RUNBOOK.md) | Operator (on-call) | English |
+| [PHONE_VERIFICATION_SETUP.md](./PHONE_VERIFICATION_SETUP.md) | Operator | English |
 
 Related: `../PAYMENTS_GO_LIVE.md` (enabling real payment gateways).
 

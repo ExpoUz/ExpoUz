@@ -93,6 +93,12 @@ export async function deleteUser(id: string) {
   return data;
 }
 
+/** Manually mark a user's phone as verified (method = ADMIN, written to audit log). */
+export async function verifyUserPhone(id: string, phone: string) {
+  const { data } = await adminApi.post(`/admin/users/${id}/verify-phone`, { phone });
+  return data;
+}
+
 // ─── Pitches ─────────────────────────────────────────────────
 export async function getPendingPitches(): Promise<any[]> {
   const { data } = await adminApi.get("/admin/pitches/pending");

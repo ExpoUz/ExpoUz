@@ -321,6 +321,58 @@ export async function getMyBookings(): Promise<any[]> {
   return Array.isArray(data) ? data : data?.data ?? [];
 }
 
+// ─── Phone verification ───────────────────────────────────────
+export interface PhoneStatus {
+  phoneVerified: boolean;
+  method: "TELEGRAM_CONTACT" | "TELEGRAM_GATEWAY" | "SMS" | "ADMIN" | null;
+  verifiedAt: string | null;
+  maskedPhone: string | null;
+}
+
+export async function getPhoneStatus(): Promise<PhoneStatus> {
+  const { data } = await api.get("/users/me/phone/status");
+  return data;
+}
+
+/** Tier 1: save a one-tap Telegram contact share (raw signed payload). */
+export async function savePhoneContact(raw: string): Promise<{
+  verified: boolean;
+  method: string;
+  maskedPhone: string;
+}> {
+  const { data } = await api.post("/users/me/phone/telegram-contact", { raw });
+  return data;
+}
+
+/** Tier 2: request an OTP for a typed number. */
+export async function requestPhoneCode(phone: string): Promise<{
+  method: string;
+  expiresIn: number;
+}> {
+  const { data } = await api.post("/users/me/phone/request-code", { phone });
+  return data;
+}
+
+/** Tier 2: verify the OTP the user received. */
+export async function verifyPhoneCode(code: string): Promise<{
+  verified: boolean;
+  method: string;
+  maskedPhone: string;
+}> {
+  const { data } = await api.post("/users/me/phone/verify-code", { code });
+  return data;
+}
+
+/** Extract the API error CODE (client translates it) from an axios error. */
+export function apiErrorCode(e: any): string | null {
+  return e?.response?.data?.code ?? null;
+}
+
+/** True when a gated action was blocked because the phone isn't verified. */
+export function isPhoneRequiredError(e: any): boolean {
+  return apiErrorCode(e) === "PHONE_REQUIRED";
+}
+
 // ─── Wallet ───────────────────────────────────────────────────
 export interface WalletTransaction {
   id: string;

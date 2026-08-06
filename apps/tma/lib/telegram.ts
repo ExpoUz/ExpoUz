@@ -53,6 +53,38 @@ export function getColorScheme(): "light" | "dark" {
   return getWebApp()?.colorScheme ?? "light";
 }
 
+// ─── Phone / Contact ──────────────────────────────────────────
+/**
+ * Ask Telegram to share the user's verified phone number (one tap, no code).
+ *
+ * On success the callback receives a signed `responseUnsafe` containing the raw
+ * query-string payload. We forward that RAW payload to the backend, which
+ * verifies the HMAC signature — the client is never trusted with the number.
+ * Resolves `{ ok: false }` outside Telegram or when the user declines.
+ */
+export function requestPhoneNumber(): Promise<{ ok: boolean; raw?: string }> {
+  return new Promise((resolve) => {
+    const tg = getWebApp();
+    if (!tg?.requestContact) {
+      resolve({ ok: false });
+      return;
+    }
+    try {
+      tg.requestContact((granted: boolean, result?: any) => {
+        // Newer clients pass { status, responseUnsafe, response }. The `response`
+        // field is the raw signed query string we need for server validation.
+        const raw =
+          result?.response ??
+          (typeof result === "string" ? result : undefined) ??
+          result?.responseUnsafe?.raw;
+        resolve({ ok: !!granted, raw });
+      });
+    } catch {
+      resolve({ ok: false });
+    }
+  });
+}
+
 // ─── Main Button ──────────────────────────────────────────────
 export function showMainButton(text: string, onClick: () => void, color = "#00C853") {
   const wa = getWebApp();

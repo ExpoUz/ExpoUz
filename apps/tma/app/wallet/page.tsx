@@ -13,11 +13,13 @@ import {
   type WalletTransaction,
 } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
+import { usePhoneGate } from "@/lib/phone-gate";
 import { hideMainButton, showBackButton, hapticImpact, showAlert } from "@/lib/telegram";
 
 export default function WalletPage() {
   const router = useRouter();
   const t = useTranslations("wallet");
+  const { requirePhone } = usePhoneGate();
 
   useEffect(() => {
     hideMainButton();
@@ -55,8 +57,10 @@ export default function WalletPage() {
             </div>
           )}
           <button
-            onClick={() => {
+            onClick={async () => {
               hapticImpact("light");
+              // Wallet movements require a verified, reachable phone.
+              if (!(await requirePhone())) return;
               showAlert(t("topUpSoon"));
             }}
             className="mt-4 w-full rounded-xl bg-white/15 py-2.5 text-sm font-semibold active:bg-white/25"

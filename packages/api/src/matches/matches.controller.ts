@@ -18,6 +18,7 @@ import { RatePlayerDto } from './dto/rate-player.dto';
 import { SubmitResultDto } from './dto/submit-result.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { PhoneVerifiedGuard } from '../phone/phone-verified.guard';
 
 @ApiTags('matches')
 @Controller('matches')
@@ -58,7 +59,7 @@ export class MatchesController {
 
   @Post('join/code/:shareCode')
   @Throttle({ default: { ttl: 60000, limit: 20 } })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PhoneVerifiedGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Join a match via invite/share code' })
   joinByShareCode(
@@ -82,7 +83,7 @@ export class MatchesController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PhoneVerifiedGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new match' })
   create(@CurrentUser() user: any, @Body() dto: CreateMatchDto) {
@@ -123,7 +124,7 @@ export class MatchesController {
 
   @Post(':id/join')
   @Throttle({ default: { ttl: 60000, limit: 20 } })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PhoneVerifiedGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Join a match' })
   join(

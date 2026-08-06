@@ -111,6 +111,12 @@ export default function DashboardPage() {
                 : undefined
             }
           />
+          <StatCard
+            icon="📱"
+            title="Unverified Phones"
+            value={(dashboard?.unverifiedPhoneUsers ?? 0).toLocaleString()}
+            color="#00B0FF"
+          />
         </div>
       )}
 

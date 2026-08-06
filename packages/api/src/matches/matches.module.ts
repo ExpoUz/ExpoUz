@@ -7,9 +7,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { EscrowModule } from '../escrow/escrow.module';
 import { GatewayModule } from '../gateway/gateway.module';
 import { WalletModule } from '../payments/wallet/wallet.module';
+import { PhoneModule } from '../phone/phone.module';
 
 @Module({
-  imports: [FormationModule, RemindersModule, NotificationsModule, EscrowModule, GatewayModule, WalletModule],
+  imports: [FormationModule, RemindersModule, NotificationsModule, EscrowModule, GatewayModule, WalletModule, PhoneModule],
   controllers: [MatchesController],
   providers: [MatchesService],
   exports: [MatchesService],

@@ -12,8 +12,10 @@ import {
   leaveMatch,
   getShareLink,
   isInsufficientBalanceError,
+  isPhoneRequiredError,
   formatUZS,
 } from "@/lib/api";
+import { usePhoneGate } from "@/lib/phone-gate";
 import {
   showMainButton,
   hideMainButton,
@@ -39,6 +41,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
   const id = String(match.id);
   const qc = useQueryClient();
   const { user } = useAuth();
+  const { requirePhone } = usePhoneGate();
   const t = useTranslations("matches");
   const tBooking = useTranslations("bookingType");
   const searchParams = useSearchParams();
@@ -68,8 +71,12 @@ export function FootballMatchDetail({ match }: { match: any }) {
       qc.invalidateQueries({ queryKey: ["tma-match", id] });
       qc.invalidateQueries({ queryKey: ["wallet"] });
     },
-    onError: (e: any) => {
+    onError: async (e: any) => {
       hapticError();
+      if (isPhoneRequiredError(e)) {
+        if (await requirePhone()) join.mutate();
+        return;
+      }
       if (isInsufficientBalanceError(e)) {
         showAlert(t("insufficientJoin"));
         router.push("/wallet");
@@ -79,6 +86,12 @@ export function FootballMatchDetail({ match }: { match: any }) {
     },
     onSettled: () => setMainButtonLoading(false),
   });
+
+  // Gate booking on a verified phone, then join. Used by the Main Button.
+  async function reserve() {
+    if (!(await requirePhone())) return;
+    join.mutate();
+  }
 
   const leave = useMutation({
     mutationFn: () => leaveMatch(id),
@@ -106,7 +119,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
     } else if (isFull) {
       hideMainButton();
     } else {
-      cleanup = showMainButton(`⚽ ${t("reserve", { price: formatUZS(match.pricePerPlayer) })}`, () => join.mutate(), "#FF5252");
+      cleanup = showMainButton(`⚽ ${t("reserve", { price: formatUZS(match.pricePerPlayer) })}`, () => reserve(), "#FF5252");
     }
     return () => {
       cleanup();

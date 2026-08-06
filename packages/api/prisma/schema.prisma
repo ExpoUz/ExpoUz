@@ -11,6 +11,12 @@ datasource db {
 model User {
   id               String      @id @default(cuid())
   phone            String?     @unique
+  // Verified phone-number capture (see PhoneVerification). A `phone` value may
+  // exist as a non-E.164 placeholder (e.g. "+998000…" derived from telegramId)
+  // without being verified — always gate on phoneVerified, never on phone.
+  phoneVerified     Boolean            @default(false)
+  phoneVerifiedAt   DateTime?
+  phoneVerifyMethod PhoneVerifyMethod?
   email            String?     @unique
   passwordHash     String?     // bcrypt hash — set only for email+password admin accounts
   googleId         String?     @unique
@@ -90,6 +96,35 @@ model User {
   levelHistory               LevelHistory[]
   matchResults               MatchResult[]             @relation("PlayerResults")
   walletTransactions         WalletTransaction[]
+  phoneVerifications         PhoneVerification[]
+}
+
+// ============ PHONE VERIFICATION ============
+enum PhoneVerifyMethod {
+  TELEGRAM_CONTACT // one-tap share via requestContact (free, no code)
+  TELEGRAM_GATEWAY // Telegram Gateway OTP
+  SMS              // Eskiz SMS fallback (feature-flagged)
+  ADMIN            // manually set by an admin
+}
+
+// Short-lived verification attempt. Codes are verified Telegram-side
+// (checkVerificationStatus) so codeHash is normally null; it exists only for a
+// future self-generated-code path. Rows expire and are single-use.
+model PhoneVerification {
+  id        String            @id @default(cuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone     String
+  requestId String? // Telegram Gateway request_id
+  codeHash  String? // bcrypt hash of the code — NEVER store plaintext
+  method    PhoneVerifyMethod
+  attempts  Int               @default(0)
+  verified  Boolean           @default(false)
+  expiresAt DateTime
+  createdAt DateTime          @default(now())
+
+  @@index([userId])
+  @@index([phone])
 }
 
 // ============ WALLET LEDGER ============

@@ -6,9 +6,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { GeminiModule } from '../gemini/gemini.module';
 import { WalletModule } from '../payments/wallet/wallet.module';
+import { PhoneModule } from '../phone/phone.module';
 
 @Module({
-  imports: [NotificationsModule, PrismaModule, GeminiModule, WalletModule],
+  imports: [NotificationsModule, PrismaModule, GeminiModule, WalletModule, PhoneModule],
   controllers: [AdminController],
   providers: [AdminService, AdminAuditInterceptor],
   exports: [AdminService],

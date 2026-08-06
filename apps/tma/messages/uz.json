@@ -428,6 +428,37 @@
     "refundFull": "To'liq qaytarish",
     "refundHalf": "50% qaytarish"
   },
+  "phone": {
+    "title": "Telefon raqamingizni qo'shing",
+    "why": "O'yin o'zgarsa, maydonlar siz bilan bog'lanishi kerak. Raqamingiz boshqa o'yinchilarga hech qachon ko'rsatilmaydi.",
+    "shareViaTelegram": "Telegram orqali ulashish",
+    "sharing": "Yuborilmoqda…",
+    "useDifferentNumber": "Boshqa raqamdan foydalanish",
+    "enterNumber": "Telefon raqamingizni kiriting",
+    "enterNumberSub": "Telegramingizga tasdiqlash kodini yuboramiz.",
+    "sendCode": "Kod yuborish",
+    "sending": "Yuborilmoqda…",
+    "back": "Orqaga",
+    "enterCode": "Kodni kiriting",
+    "codeSentTo": "Kod {phone} raqamiga yuborildi",
+    "resend": "Qayta yuborish",
+    "resendIn": "{seconds} soniyadan keyin qayta",
+    "changeNumber": "Raqamni o'zgartirish",
+    "nudgeTitle": "Telefon raqamingizni qo'shing",
+    "nudgeSub": "O'yinlarni bron qilish va matchlar yaratish uchun bir marta tasdiqlang.",
+    "add": "Qo'shish",
+    "errors": {
+      "generic": "Nimadir xato ketdi. Qayta urinib ko'ring.",
+      "PHONE_REQUIRED": "Davom etish uchun telefon raqamingizni qo'shing.",
+      "PHONE_INVALID": "To'g'ri telefon raqamini kiriting.",
+      "PHONE_ALREADY_USED": "Bu raqam allaqachon boshqa hisobga bog'langan.",
+      "PHONE_NOT_REACHABLE": "Bu raqamga yetib bo'lmadi. Boshqasini urinib ko'ring.",
+      "CONTACT_MISMATCH": "Bu kontakt Telegram hisobingizga mos kelmaydi.",
+      "CODE_INVALID": "Kod noto'g'ri. Qayta urinib ko'ring.",
+      "CODE_EXPIRED": "Kod muddati tugadi. Yangisini so'rang.",
+      "TOO_MANY_ATTEMPTS": "Urinishlar juda ko'p. Kuting va qayta urinib ko'ring."
+    }
+  },
   "errors": {
     "MATCH_FULL": "Bu o'yin allaqachon to'lgan.",
     "MATCH_NOT_ACCEPTING": "Bu o'yin o'yinchilarni qabul qilmayapti.",

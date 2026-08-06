@@ -84,6 +84,7 @@ export default function UsersPage() {
             <tr className="bg-gray-50 border-b border-gray-100">
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">User</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Verified</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">⚽ Football</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">🎾 Padel</th>
@@ -97,7 +98,7 @@ export default function UsersPage() {
             {isLoading &&
               [...Array(8)].map((_, i) => (
                 <tr key={i}>
-                  {[...Array(9)].map((_, j) => (
+                  {[...Array(10)].map((_, j) => (
                     <td key={j} className="px-5 py-3">
                       <div className="h-4 bg-gray-100 rounded animate-pulse" />
                     </td>
@@ -106,7 +107,7 @@ export default function UsersPage() {
               ))}
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-5 py-12 text-center text-gray-400">
+                <td colSpan={10} className="px-5 py-12 text-center text-gray-400">
                   No users found
                 </td>
               </tr>
@@ -133,6 +134,9 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td className="px-5 py-3 text-gray-700 font-mono text-xs">{u.phone}</td>
+                  <td className="px-5 py-3">
+                    <PhoneVerifiedCell user={u} />
+                  </td>
                   <td className="px-5 py-3">
                     <RoleBadge role={u.role} />
                   </td>
@@ -184,6 +188,24 @@ export default function UsersPage() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function PhoneVerifiedCell({ user }: { user: any }) {
+  if (!user.phoneVerified) {
+    return <span className="text-xs text-gray-400">Unverified</span>;
+  }
+  const method = (user.phoneVerifyMethod ?? "").replace("TELEGRAM_", "TG ").replace("_", " ");
+  return (
+    <div className="flex flex-col">
+      <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
+        ✓ Verified
+      </span>
+      <span className="text-[10px] text-gray-400">
+        {method || "—"}
+        {user.phoneVerifiedAt ? ` · ${dayjs(user.phoneVerifiedAt).format("MMM D")}` : ""}
+      </span>
     </div>
   );
 }

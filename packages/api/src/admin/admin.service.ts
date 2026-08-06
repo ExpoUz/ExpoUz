@@ -65,6 +65,7 @@ export class AdminService {
       footballPitches,
       padelPitches,
       assessedPadelPlayers,
+      unverifiedPhoneUsers,
     ] = await Promise.all([
       this.prisma.user.count({ where: { deletedAt: null, isBanned: false } }),
       this.prisma.match.count({ where: { status: { in: ['OPEN', 'FULL', 'CONFIRMED', 'IN_PROGRESS'] } } }),
@@ -95,6 +96,9 @@ export class AdminService {
       this.prisma.pitch.count({ where: { sport: 'FOOTBALL' } }),
       this.prisma.pitch.count({ where: { sport: 'PADEL' } }),
       this.prisma.user.count({ where: { padelInitialSet: true } }),
+      this.prisma.user.count({
+        where: { deletedAt: null, isBanned: false, phoneVerified: false },
+      }),
     ]);
 
     return {
@@ -104,6 +108,7 @@ export class AdminService {
       revenueMonth: revenueMonth._sum.amount || 0,
       pendingPitches,
       failedTransactions,
+      unverifiedPhoneUsers,
       dailyActiveUsers: activeBookingsToday,
       sportBreakdown: {
         football: { matches: footballMatches, pitches: footballPitches },
@@ -150,6 +155,9 @@ export class AdminService {
           gamesAttended: true,
           padelLevel: true,
           padelInitialSet: true,
+          phoneVerified: true,
+          phoneVerifyMethod: true,
+          phoneVerifiedAt: true,
           city: true,
           createdAt: true,
           _count: { select: { bookings: true } },

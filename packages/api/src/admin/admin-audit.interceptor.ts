@@ -80,6 +80,7 @@ function buildDescription(
   if (path.includes('/ban')) return `Toggled ban on user ${id}`;
   if (path.includes('/wallet')) return `Adjusted wallet for user ${id}`;
   if (path.includes('/role')) return `Changed role for user ${id}`;
+  if (path.includes('/verify-phone')) return `Manually verified phone for user ${id}`;
   if (path.includes('/verify')) return `Reviewed pitch ${id}`;
   if (path.includes('/release')) return `Released transaction ${id}`;
   if (path.includes('/disputes')) return `Resolved dispute for match ${id}`;
