@@ -134,6 +134,16 @@ export default function ProfilePage() {
       {/* My games (filtered to the active sport) */}
       <MyGames bookings={bookings} sport={tab} />
 
+      {/* Venue privacy transparency */}
+      <div className="px-4 mt-6">
+        <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--tg-hint)" }}>
+          {t("venuePrivacyTitle")}
+        </div>
+        <div className="rounded-2xl p-4 text-xs leading-relaxed" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
+          🔒 {t("venuePrivacyBody")}
+        </div>
+      </div>
+
       {/* Language */}
       <div className="px-4 mt-6">
         <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--tg-hint)" }}>

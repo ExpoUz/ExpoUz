@@ -110,6 +110,90 @@ export async function getPlayers(params?: { search?: string; pitchId?: string; p
   return data;
 }
 
+// ─── CRM: Players ────────────────────────────────────────────
+export type Segment = "ALL" | "NEW" | "REGULAR" | "LOYAL" | "AT_RISK" | "LAPSED" | "RISKY";
+
+export interface CrmPlayer {
+  id: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
+  padelLevel: number | null;
+  eloRating: number;
+  skillLevel: string;
+  gamesHere: number;
+  firstVisit: string | null;
+  lastVisit: string | null;
+  noShowsHere: number;
+  spentHere: number;
+  favouriteSlot: string | null;
+  segment: Segment;
+}
+
+export async function getCrmPlayers(params?: {
+  search?: string;
+  segment?: string;
+  sort?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ data: CrmPlayer[]; total: number; page: number; limit: number }> {
+  const { data } = await portalApi.get("/pitch-admin/players", { params: { limit: 50, ...params } });
+  return data;
+}
+
+export async function getCrmSegments(): Promise<Record<string, number>> {
+  const { data } = await portalApi.get("/pitch-admin/players/segments");
+  return data;
+}
+
+export async function getCrmPlayer(id: string): Promise<
+  CrmPlayer & { contactAvailable: boolean; notes: any[] }
+> {
+  const { data } = await portalApi.get(`/pitch-admin/players/${id}`);
+  return data;
+}
+
+export async function getCrmPlayerHistory(id: string): Promise<any[]> {
+  const { data } = await portalApi.get(`/pitch-admin/players/${id}/history`);
+  return data;
+}
+
+export async function addCrmNote(id: string, note: string) {
+  const { data } = await portalApi.post(`/pitch-admin/players/${id}/notes`, { note });
+  return data;
+}
+
+export async function revealCrmContact(id: string, reason: string): Promise<{ phone: string | null; firstName?: string }> {
+  const { data } = await portalApi.post(`/pitch-admin/players/${id}/reveal`, { reason });
+  return data;
+}
+
+export async function messageCrmPlayer(id: string, content: string) {
+  const { data } = await portalApi.post(`/pitch-admin/players/${id}/message`, { content });
+  return data;
+}
+
+// ─── CRM: Insights ───────────────────────────────────────────
+export async function getCrmInsights(): Promise<any> {
+  const { data } = await portalApi.get("/pitch-admin/insights");
+  return data;
+}
+
+// ─── CRM: Broadcast ──────────────────────────────────────────
+export async function getBroadcastAudience(): Promise<{
+  counts: Record<string, number>;
+  sentThisWeek: number;
+  weeklyLimit: number;
+}> {
+  const { data } = await portalApi.get("/pitch-admin/broadcast/audience");
+  return data;
+}
+
+export async function sendBroadcast(segment: string, message: string): Promise<{ sent: number; segment: string }> {
+  const { data } = await portalApi.post("/pitch-admin/broadcast", { segment, message });
+  return data;
+}
+
 // ─── Revenue ─────────────────────────────────────────────────
 export interface RevenueBreakdown {
   grossRevenue: number;

@@ -17,6 +17,7 @@ const NAV_ITEMS = [
 const SUPER_ITEMS = [
   { href: "/super/admins", label: "Admins", icon: "🛡" },
   { href: "/super/pitch-admins", label: "Pitch Owners", icon: "🏗" },
+  { href: "/super/crm-oversight", label: "CRM Oversight", icon: "🔍" },
   { href: "/super/locations", label: "Locations", icon: "📍" },
   { href: "/super/settings", label: "Settings", icon: "⚙️" },
 ];

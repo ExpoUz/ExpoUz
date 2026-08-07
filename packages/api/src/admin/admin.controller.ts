@@ -518,4 +518,51 @@ export class AdminController {
     this.geminiService.clearSession(`admin:${req.user.id}`);
     return { message: 'Chat session reset' };
   }
+
+  // ─── Venue Owner CRM Oversight ────────────────────────────────────────────
+
+  @Get('crm/usage')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Which owners use CRM, with reveal/broadcast/report tallies' })
+  crmUsage() {
+    return this.adminService.getCrmUsage();
+  }
+
+  @Get('crm/reveals')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Contact-reveal audit log across all venues' })
+  crmReveals(@Query('limit') limit?: string) {
+    return this.adminService.getContactRevealLog(limit ? +limit : 100);
+  }
+
+  @Get('crm/broadcasts')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Broadcast log across all venues' })
+  crmBroadcasts(@Query('limit') limit?: string) {
+    return this.adminService.getBroadcastLog(limit ? +limit : 100);
+  }
+
+  @Get('crm/reports')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Player reports of venue misuse' })
+  crmReports(@Query('includeResolved') includeResolved?: string) {
+    return this.adminService.getVenueReports(includeResolved === 'true');
+  }
+
+  @Post('crm/reports/:id/resolve')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Mark a venue misuse report resolved' })
+  resolveReport(@Param('id') id: string) {
+    return this.adminService.resolveVenueReport(id);
+  }
+
+  @Patch('crm/owners/:ownerId/flags')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @ApiOperation({ summary: 'Disable/enable an owner’s CRM view or broadcast ability' })
+  setOwnerFlags(
+    @Param('ownerId') ownerId: string,
+    @Body() body: { crmDisabled?: boolean; broadcastDisabled?: boolean },
+  ) {
+    return this.adminService.setOwnerCrmFlags(ownerId, body);
+  }
 }
