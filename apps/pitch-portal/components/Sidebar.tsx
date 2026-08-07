@@ -3,18 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { useI18n, LANGS } from "@/lib/i18n";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: "📊" },
-  { href: "/pitches", label: "My Pitches", icon: "🏟" },
-  { href: "/schedule", label: "Schedule", icon: "🗓" },
-  { href: "/players", label: "Players", icon: "👥" },
-  { href: "/revenue", label: "Revenue", icon: "💰" },
+  { href: "/", key: "nav.dashboard", icon: "📊" },
+  { href: "/pitches", key: "nav.pitches", icon: "🏟" },
+  { href: "/schedule", key: "nav.schedule", icon: "🗓" },
+  { href: "/players", key: "nav.players", icon: "👥" },
+  { href: "/insights", key: "nav.insights", icon: "📈" },
+  { href: "/broadcast", key: "nav.broadcast", icon: "📣" },
+  { href: "/revenue", key: "nav.revenue", icon: "💰" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { t, lang, setLang } = useI18n();
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -32,7 +36,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map(({ href, label, icon }) => (
+        {NAV_ITEMS.map(({ href, key, icon }) => (
           <Link
             key={href}
             href={href}
@@ -43,10 +47,25 @@ export function Sidebar() {
             }`}
           >
             <span className="text-base">{icon}</span>
-            {label}
+            {t(key)}
           </Link>
         ))}
       </nav>
+
+      {/* Language switcher */}
+      <div className="px-4 pb-2 flex gap-1">
+        {LANGS.map((l) => (
+          <button
+            key={l.code}
+            onClick={() => setLang(l.code)}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              lang === l.code ? "bg-[#00C853]/20 text-[#00C853]" : "text-gray-500 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            {l.label}
+          </button>
+        ))}
+      </div>
 
       {/* User + Logout */}
       <div className="px-4 py-4 border-t border-white/10">
@@ -69,7 +88,7 @@ export function Sidebar() {
           onClick={logout}
           className="w-full text-left text-xs text-gray-600 hover:text-red-400 transition-colors py-1"
         >
-          Sign out →
+          {t("nav.signout")} →
         </button>
       </div>
     </aside>

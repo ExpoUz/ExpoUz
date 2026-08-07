@@ -70,6 +70,10 @@ model User {
   notifPush        Boolean   @default(true)
   notifSms         Boolean   @default(true)
   notifTelegram    Boolean   @default(true)
+  // Venue-owner CRM guards (set by platform admin on abuse). When a user is a
+  // PITCH_OWNER these disable their CRM view / broadcast ability respectively.
+  crmDisabled       Boolean   @default(false)
+  broadcastDisabled Boolean   @default(false)
   isBanned         Boolean   @default(false)
   bannedAt         DateTime?
   bannedReason     String?
@@ -761,4 +765,73 @@ model UserSession {
   deviceInfo String?
   ipAddress  String?
   updatedAt  DateTime @updatedAt
+}
+
+// ============ VENUE OWNER CRM ============
+// A venue owner's private view of the players who book at THEIR venues. All of
+// this is scoped server-side to venues the owner owns; owner ≠ admin. ownerId /
+// playerId are plain user ids (no relation fields — these are aux/log tables
+// queried only by those scalars).
+
+// A private note an owner writes about a player. Visible only to that owner.
+model VenuePlayerNote {
+  id        String   @id @default(cuid())
+  ownerId   String
+  playerId  String
+  pitchId   String?
+  note      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, playerId])
+}
+
+// Audit trail: every time an owner reveals a player's phone number.
+model ContactReveal {
+  id        String   @id @default(cuid())
+  ownerId   String
+  playerId  String
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+  @@index([playerId])
+}
+
+// Log of every segment broadcast an owner sends (for rate-limiting + admin oversight).
+model VenueBroadcast {
+  id             String   @id @default(cuid())
+  ownerId        String
+  segment        String
+  message        String
+  recipientCount Int
+  createdAt      DateTime @default(now())
+
+  @@index([ownerId])
+  @@index([createdAt])
+}
+
+// A player muting broadcasts from a specific venue owner. Muted players are
+// excluded from broadcast recipients and from the count shown to the owner.
+model VenueBroadcastMute {
+  id        String   @id @default(cuid())
+  ownerId   String
+  playerId  String
+  createdAt DateTime @default(now())
+
+  @@unique([ownerId, playerId])
+  @@index([playerId])
+}
+
+// A player's report of venue misuse — surfaced to platform admin.
+model VenueReport {
+  id        String   @id @default(cuid())
+  ownerId   String
+  playerId  String
+  reason    String
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+  @@index([resolved])
 }

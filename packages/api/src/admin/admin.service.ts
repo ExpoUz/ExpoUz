@@ -1053,4 +1053,143 @@ export class AdminService {
       create: { userId, deviceInfo, ipAddress },
     });
   }
+
+  // ═══════════ VENUE OWNER CRM OVERSIGHT ═══════════
+  // Platform-admin visibility into how venue owners use the CRM: who reveals
+  // whose phone, who broadcasts, and who players report — plus the kill switches.
+
+  private async namesFor(ids: string[]) {
+    const uniq = [...new Set(ids)].filter(Boolean);
+    if (uniq.length === 0) return new Map<string, string>();
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: uniq } },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    return new Map(users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()]));
+  }
+
+  /** Owners actively using CRM features, with reveal/broadcast/report tallies. */
+  async getCrmUsage() {
+    const owners = await this.prisma.user.findMany({
+      where: { role: 'PITCH_OWNER' },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        crmDisabled: true,
+        broadcastDisabled: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const [reveals, broadcasts, reports] = await Promise.all([
+      this.prisma.contactReveal.groupBy({ by: ['ownerId'], _count: { _all: true } }),
+      this.prisma.venueBroadcast.groupBy({
+        by: ['ownerId'],
+        _count: { _all: true },
+        _sum: { recipientCount: true },
+      }),
+      this.prisma.venueReport.groupBy({
+        by: ['ownerId'],
+        where: { resolved: false },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const revealBy = new Map(reveals.map((r) => [r.ownerId, r._count._all]));
+    const bcastBy = new Map(broadcasts.map((b) => [b.ownerId, b]));
+    const reportBy = new Map(reports.map((r) => [r.ownerId, r._count._all]));
+
+    return owners.map((o) => ({
+      ownerId: o.id,
+      name: `${o.firstName} ${o.lastName}`.trim(),
+      crmDisabled: o.crmDisabled,
+      broadcastDisabled: o.broadcastDisabled,
+      reveals: revealBy.get(o.id) ?? 0,
+      broadcasts: bcastBy.get(o.id)?._count._all ?? 0,
+      broadcastRecipients: bcastBy.get(o.id)?._sum.recipientCount ?? 0,
+      openReports: reportBy.get(o.id) ?? 0,
+    }));
+  }
+
+  /** Contact-reveal audit log across all venues (who revealed whose number, when). */
+  async getContactRevealLog(limit = 100) {
+    const rows = await this.prisma.contactReveal.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(limit, 500),
+    });
+    const names = await this.namesFor(rows.flatMap((r) => [r.ownerId, r.playerId]));
+    return rows.map((r) => ({
+      id: r.id,
+      ownerId: r.ownerId,
+      ownerName: names.get(r.ownerId) ?? '—',
+      playerId: r.playerId,
+      playerName: names.get(r.playerId) ?? '—',
+      reason: r.reason,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  /** Broadcast log across all venues. */
+  async getBroadcastLog(limit = 100) {
+    const rows = await this.prisma.venueBroadcast.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(limit, 500),
+    });
+    const names = await this.namesFor(rows.map((r) => r.ownerId));
+    return rows.map((r) => ({
+      id: r.id,
+      ownerId: r.ownerId,
+      ownerName: names.get(r.ownerId) ?? '—',
+      segment: r.segment,
+      message: r.message,
+      recipientCount: r.recipientCount,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  /** Player reports of venue misuse. */
+  async getVenueReports(includeResolved = false) {
+    const rows = await this.prisma.venueReport.findMany({
+      where: includeResolved ? {} : { resolved: false },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    const names = await this.namesFor(rows.flatMap((r) => [r.ownerId, r.playerId]));
+    return rows.map((r) => ({
+      id: r.id,
+      ownerId: r.ownerId,
+      ownerName: names.get(r.ownerId) ?? '—',
+      playerId: r.playerId,
+      playerName: names.get(r.playerId) ?? '—',
+      reason: r.reason,
+      resolved: r.resolved,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  async resolveVenueReport(reportId: string) {
+    await this.prisma.venueReport.update({
+      where: { id: reportId },
+      data: { resolved: true },
+    });
+    return { resolved: true };
+  }
+
+  /** Kill switches: disable an owner's CRM view or broadcast ability. */
+  async setOwnerCrmFlags(
+    ownerId: string,
+    flags: { crmDisabled?: boolean; broadcastDisabled?: boolean },
+  ) {
+    const data: { crmDisabled?: boolean; broadcastDisabled?: boolean } = {};
+    if (typeof flags.crmDisabled === 'boolean') data.crmDisabled = flags.crmDisabled;
+    if (typeof flags.broadcastDisabled === 'boolean') data.broadcastDisabled = flags.broadcastDisabled;
+    if (Object.keys(data).length === 0) throw new BadRequestException('No flags provided');
+    const owner = await this.prisma.user.update({
+      where: { id: ownerId },
+      data,
+      select: { id: true, crmDisabled: true, broadcastDisabled: true },
+    });
+    return owner;
+  }
 }

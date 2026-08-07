@@ -234,3 +234,37 @@ export async function updateCommission(rate: number) {
   const { data } = await adminApi.patch("/admin/settings/commission", { rate });
   return data;
 }
+
+// ─── Venue Owner CRM Oversight ───────────────────────────────
+export async function getCrmUsage(): Promise<any[]> {
+  const { data } = await adminApi.get("/admin/crm/usage");
+  return data;
+}
+
+export async function getContactRevealLog(): Promise<any[]> {
+  const { data } = await adminApi.get("/admin/crm/reveals");
+  return data;
+}
+
+export async function getBroadcastLog(): Promise<any[]> {
+  const { data } = await adminApi.get("/admin/crm/broadcasts");
+  return data;
+}
+
+export async function getVenueReports(includeResolved = false): Promise<any[]> {
+  const { data } = await adminApi.get("/admin/crm/reports", { params: { includeResolved } });
+  return data;
+}
+
+export async function resolveVenueReport(id: string) {
+  const { data } = await adminApi.post(`/admin/crm/reports/${id}/resolve`);
+  return data;
+}
+
+export async function setOwnerCrmFlags(
+  ownerId: string,
+  flags: { crmDisabled?: boolean; broadcastDisabled?: boolean },
+) {
+  const { data } = await adminApi.patch(`/admin/crm/owners/${ownerId}/flags`, flags);
+  return data;
+}
