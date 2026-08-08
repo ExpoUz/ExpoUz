@@ -30,6 +30,9 @@ import {
   copyToClipboard,
 } from "@/lib/telegram";
 import { useAuth } from "@/lib/auth";
+import { HostCard } from "./HostCard";
+import { MatchChatRow } from "./MatchChatRow";
+import { VenueMap } from "./VenueMap";
 
 const BOOKING_TYPE_LABELS: Record<string, { label: string; icon: string; color: string }> = {
   OPEN_EVENT: { label: "Open Event", icon: "📢", color: "#00C853" },
@@ -259,23 +262,8 @@ export function FootballMatchDetail({ match }: { match: any }) {
           </div>
         )}
 
-        {/* Host */}
-        {match.host && (
-          <div className="rounded-2xl p-4 flex items-center gap-3" style={{ background: "var(--tg-card)" }}>
-            <Avatar user={match.host} />
-            <div>
-              <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-                Hosted by
-              </div>
-              <div className="font-semibold text-sm">
-                {match.host.firstName} {match.host.lastName}
-              </div>
-            </div>
-            {match.host.eloRating != null && (
-              <span className="ml-auto text-sm font-bold text-[#00C853]">{match.host.eloRating} ELO</span>
-            )}
-          </div>
-        )}
+        {/* Host card */}
+        <HostCard host={match.host} matchId={id} sport="FOOTBALL" isViewerHost={isHost} />
 
         {match.description && (
           <div className="rounded-2xl p-4 text-sm" style={{ background: "var(--tg-card)" }}>
@@ -338,6 +326,12 @@ export function FootballMatchDetail({ match }: { match: any }) {
             ))}
           </div>
         </div>
+
+        {/* Match chat */}
+        <MatchChatRow matchId={id} />
+
+        {/* Where you'll play — static map + amenities */}
+        <VenueMap pitch={match.pitch} />
 
         {/* Result entry — available once the match has started */}
         {hoursUntilMatch <= 0 && (joined || isHost) && (

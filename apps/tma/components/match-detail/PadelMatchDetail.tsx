@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
-import { MapPin, Clock } from "lucide-react";
 import {
   joinMatchAndPay,
   leaveMatch,
@@ -30,6 +29,9 @@ import {
 } from "@/lib/telegram";
 import { useAuth } from "@/lib/auth";
 import { VersusPreview } from "./VersusPreview";
+import { HostCard } from "./HostCard";
+import { MatchChatRow } from "./MatchChatRow";
+import { VenueMap } from "./VenueMap";
 
 type Side = "A" | "B";
 
@@ -48,7 +50,6 @@ export function PadelMatchDetail({ match }: { match: any }) {
   const { user } = useAuth();
   const { requirePhone } = usePhoneGate();
   const t = useTranslations("matches");
-  const tAmenities = useTranslations("amenities");
   const tHome = useTranslations("home");
   const tBands = useTranslations("levels.bands");
 
@@ -219,10 +220,6 @@ export function PadelMatchDetail({ match }: { match: any }) {
     match.minLevel != null || match.maxLevel != null
       ? `${formatLevel(match.minLevel ?? 0)} – ${formatLevel(match.maxLevel ?? 7)}`
       : t("allLevels");
-  const amenities: string[] = (match.pitch?.amenities ?? [])
-    .map((a: any) => (a?.type ? tAmenities(a.type) : null))
-    .filter(Boolean);
-
   return (
     <div className="min-h-screen pb-28">
       {/* Court-tinted banner */}
@@ -306,6 +303,9 @@ export function PadelMatchDetail({ match }: { match: any }) {
         {/* Versus preview */}
         <VersusPreview teamA={padA} teamB={padB} />
 
+        {/* Host card */}
+        <HostCard host={match.host} matchId={id} sport="PADEL" isViewerHost={user?.id === match.hostId} />
+
         {/* Players — Team A / Team B */}
         <div>
           <div className="flex items-baseline justify-between mb-2 px-1">
@@ -321,43 +321,11 @@ export function PadelMatchDetail({ match }: { match: any }) {
           </div>
         </div>
 
-        {/* Where You'll Play */}
-        <div>
-          <div className="text-sm font-semibold mb-2 px-1">{t("whereYoullPlay")}</div>
-          <div className="rounded-2xl p-4 space-y-2" style={{ background: "var(--tg-card)" }}>
-            <div className="flex items-center gap-2 font-semibold text-sm">
-              <MapPin size={15} className="text-[#00B0FF]" />
-              {match.pitch?.name ?? t("padelCourt")}
-            </div>
-            <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-              {match.pitch?.addressLine}
-              {match.pitch?.district ? `, ${match.pitch.district}` : ""}
-            </div>
-            <div className="flex items-center gap-2 text-xs" style={{ color: "var(--tg-hint)" }}>
-              <Clock size={13} /> {t("duration", { minutes: match.durationMinutes ?? 60 })} ·{" "}
-              {match.pitch?.isCovered ? t("coveredCourt") : t("outdoorCourt")}
-            </div>
-            {amenities.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {amenities.map((a) => (
-                  <span key={a} className="text-[11px] px-2 py-0.5 rounded-full bg-black/5">
-                    {a}
-                  </span>
-                ))}
-              </div>
-            )}
-            {match.pitch?.lat != null && match.pitch?.lng != null && (
-              <a
-                href={`https://maps.google.com/?q=${match.pitch.lat},${match.pitch.lng}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block text-xs font-semibold text-[#00B0FF] pt-1"
-              >
-                Open in maps →
-              </a>
-            )}
-          </div>
-        </div>
+        {/* Match chat */}
+        <MatchChatRow matchId={id} />
+
+        {/* Where you'll play — static map + amenities */}
+        <VenueMap pitch={match.pitch} />
 
         {/* Fallback sticky reserve bar (when not inside Telegram) */}
         {!isCancelled && showFallbackBar && (

@@ -6,16 +6,17 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Calendar, Clock, Check, Menu } from "lucide-react";
 import dayjs from "dayjs";
-import { getMatches, getCities, getLeaderboard } from "@/lib/api";
+import { getMatches, getCities, getNearbyPitches } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/lib/auth";
 import { useSportStore, setSport, setCity as setStoreCity, sportMeta, type Sport } from "@/lib/sport-store";
 import { showMainButton, hideMainButton, hapticImpact } from "@/lib/telegram";
+import { useGeolocation } from "@/lib/use-geolocation";
 import { HeroBanner } from "@/components/home/HeroBanner";
 import { SectionHeader } from "@/components/home/SectionHeader";
-import { TodayCarousel } from "@/components/home/TodayCarousel";
+import { GamesTodayCarousel } from "@/components/home/GamesTodayCarousel";
 import { OpenMatchesCarousel } from "@/components/home/OpenMatchesCarousel";
-import { PlayersCarousel } from "@/components/home/PlayersCarousel";
+import { PitchesCarousel } from "@/components/home/PitchesCarousel";
 import { deriveSections } from "@/components/home/matchHelpers";
 import { initialsOf } from "@/components/home/PhotoOrInitials";
 
@@ -65,10 +66,18 @@ export default function HomePage() {
       }),
   });
 
-  // Players near you — reuses the leaderboard endpoint, scoped to the city.
-  const { data: nearbyPlayers } = useQuery({
-    queryKey: ["home-players", city],
-    queryFn: () => getLeaderboard(city || undefined),
+  // Pitches near you — live location when granted (distance-sorted), else
+  // city/district. Never blocks on the permission prompt.
+  const geo = useGeolocation();
+  const { data: nearbyPitches } = useQuery({
+    queryKey: ["home-pitches", sport, city, district, geo.granted, geo.lat, geo.lng],
+    queryFn: () =>
+      getNearbyPitches({
+        sport,
+        ...(geo.granted ? { lat: geo.lat, lng: geo.lng } : { city: city || undefined, district: district || undefined }),
+        limit: 10,
+      }),
+    enabled: geo.asked, // wait for the one-shot geolocation attempt to settle
   });
 
   useEffect(() => {
@@ -90,9 +99,9 @@ export default function HomePage() {
   }, []);
 
   const matches = data?.data ?? [];
-  const players = (nearbyPlayers ?? []).slice(0, 12);
-  const { hero, today, open } = deriveSections(matches);
-  const noMatches = !hero && today.length === 0 && open.length === 0;
+  const pitches = nearbyPitches ?? [];
+  const { hero, open, todaySpots } = deriveSections(matches);
+  const noMatches = !hero && todaySpots.length === 0 && open.length === 0;
   const filtersDirty = !!(date || timeOfDay || spotsOnly || district || matchType);
 
   function clearFilters() {
@@ -245,27 +254,24 @@ export default function HomePage() {
               </div>
             )}
 
-            {today.length > 0 && (
+            {pitches.length > 0 && (
               <section className="section-in" style={{ animationDelay: "40ms" }}>
-                <SectionHeader title={t("happeningToday")} />
-                <TodayCarousel matches={today} />
+                <SectionHeader title={t("pitchesNearYou")} />
+                <PitchesCarousel pitches={pitches} />
+              </section>
+            )}
+
+            {todaySpots.length > 0 && (
+              <section className="section-in" style={{ animationDelay: "80ms" }}>
+                <SectionHeader title={t("gamesTodayTitle")} />
+                <GamesTodayCarousel matches={todaySpots} />
               </section>
             )}
 
             {open.length > 0 && (
-              <section className="section-in" style={{ animationDelay: "80ms" }}>
+              <section className="section-in" style={{ animationDelay: "120ms" }}>
                 <SectionHeader title={t("openMatches")} />
                 <OpenMatchesCarousel matches={open} />
-              </section>
-            )}
-
-            {players.length > 0 && (
-              <section className="section-in" style={{ animationDelay: "120ms" }}>
-                <SectionHeader
-                  title={t("playersNearYou")}
-                  onSeeAll={() => router.push("/players")}
-                />
-                <PlayersCarousel players={players} />
               </section>
             )}
           </div>

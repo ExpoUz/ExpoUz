@@ -24,6 +24,7 @@ import { getMaxPlayers } from './format-caps';
 import { EscrowService } from '../escrow/escrow.service';
 import { MatchGateway } from '../gateway/match.gateway';
 import { WalletService } from '../payments/wallet/wallet.service';
+import { MessagesService } from '../messages/messages.service';
 import { syncPlayerCount } from './player-count';
 import { randomBytes } from 'crypto';
 
@@ -44,6 +45,7 @@ export class MatchesService {
     private escrow: EscrowService,
     private matchGateway: MatchGateway,
     private wallet: WalletService,
+    private messages: MessagesService,
   ) {}
 
   private generateShareCode(): string {
@@ -132,6 +134,7 @@ export class MatchesService {
     };
 
     if (sport) where.sport = sport;
+    if (query.pitchId) where.pitchId = query.pitchId;
     if (format) where.format = format;
     if (skillLevel) where.skillFilter = skillLevel;
     if (query.matchType) where.matchType = query.matchType;
@@ -282,7 +285,23 @@ export class MatchesService {
       where: { id },
       include: {
         pitch: { include: { amenities: true } },
-        host: { select: { id: true, firstName: true, lastName: true, avatarUrl: true, eloRating: true } },
+        host: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            avatarUrl: true,
+            bio: true,
+            eloRating: true,
+            skillLevel: true,
+            reliabilityScore: true,
+            padelLevel: true,
+            padelReliability: true,
+            padelInitialSet: true,
+            _count: { select: { hostMatches: true } },
+            ratingsReceived: { select: { thumbsUp: true } },
+          },
+        },
         positions: {
           include: {
             booking: {
@@ -318,6 +337,18 @@ export class MatchesService {
     });
 
     if (!match) throw new NotFoundException('Match not found');
+
+    // Derive host card stats and keep the payload clean (drop raw ratings rows).
+    const h: any = match.host;
+    if (h) {
+      const received = h.ratingsReceived ?? [];
+      const up = received.filter((r: any) => r.thumbsUp).length;
+      h.gamesHosted = h._count?.hostMatches ?? 0;
+      h.ratingCount = received.length;
+      h.ratingPercent = received.length ? Math.round((up / received.length) * 100) : null;
+      delete h.ratingsReceived;
+      delete h._count;
+    }
     return match;
   }
 
@@ -707,9 +738,20 @@ export class MatchesService {
     if (match.hostId !== hostId) throw new ForbiddenException('Not the host');
 
     const updateData: any = { ...dto };
+    const timeChanged =
+      !!dto.startTime && new Date(dto.startTime).getTime() !== new Date(match.startTime).getTime();
     if (dto.startTime) updateData.startTime = new Date(dto.startTime);
 
-    return this.prisma.match.update({ where: { id }, data: updateData });
+    const updated = await this.prisma.match.update({ where: { id }, data: updateData });
+
+    // Announce a time change to the match chat (client formats the ISO to local).
+    if (timeChanged) {
+      await this.messages
+        .postMatchSystemMessage(id, hostId, { t: 'timeChanged', iso: updated.startTime.toISOString() })
+        .catch(() => {});
+    }
+
+    return updated;
   }
 
   async cancel(id: string, actorId: string, isAdmin = false) {
@@ -973,6 +1015,15 @@ export class MatchesService {
       }
     }
 
+    // System message so the group sees who joined.
+    const joiner = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true },
+    });
+    await this.messages
+      .postMatchSystemMessage(matchId, userId, { t: 'joined', name: joiner?.firstName ?? '' })
+      .catch(() => {});
+
     // Schedule auto-release of escrow after the match ends (idempotent per
     // match) and broadcast the join to anyone viewing this match live.
     await this.escrow
@@ -1085,6 +1136,17 @@ export class MatchesService {
     });
 
     this.matchGateway.emitPlayerLeft(matchId, { userId });
+
+    // Membership derives from confirmed bookings — drop them from the match chat
+    // so they keep no access to new messages, and note the departure.
+    const leaver = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true },
+    });
+    await this.messages
+      .postMatchSystemMessage(matchId, userId, { t: 'left', name: leaver?.firstName ?? '' })
+      .catch(() => {});
+    await this.messages.removeFromMatchChat(matchId, userId).catch(() => {});
 
     return { message: 'Left match', refundAmount };
   }

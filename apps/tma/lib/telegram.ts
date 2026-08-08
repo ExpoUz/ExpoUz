@@ -161,6 +161,18 @@ export function shareToTelegram(link: string, text = "Join my game on ExpoUz! âš
   else if (typeof window !== "undefined") window.open(shareUrl, "_blank");
 }
 
+/**
+ * Open an external URL the right way from inside a Mini App. Uses Telegram's
+ * openLink (which hands off to the OS browser / maps app); falls back to
+ * window.open outside Telegram. Use this for maps/navigation â€” geo: schemes are
+ * unreliable inside the webview.
+ */
+export function openLink(url: string) {
+  const wa = getWebApp();
+  if (wa?.openLink) wa.openLink(url);
+  else if (typeof window !== "undefined") window.open(url, "_blank");
+}
+
 /** Copy text to clipboard; returns true on success. */
 export async function copyToClipboard(text: string): Promise<boolean> {
   try {

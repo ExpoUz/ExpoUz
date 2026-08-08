@@ -46,6 +46,11 @@ export class QueryMatchesDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  pitchId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   city?: string;
 
   @ApiPropertyOptional()

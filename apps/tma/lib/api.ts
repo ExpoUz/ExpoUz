@@ -64,6 +64,15 @@ export async function getMatch(id: string) {
   return data;
 }
 
+/** Host-only partial update (start time, duration, price, description). */
+export async function updateMatch(
+  id: string,
+  patch: { startTime?: string; durationMinutes?: number; pricePerPlayer?: number; description?: string },
+) {
+  const { data } = await api.patch(`/matches/${id}`, patch);
+  return data;
+}
+
 export async function getFormation(id: string): Promise<{ home: any[]; away: any[] }> {
   const { data } = await api.get(`/matches/${id}/formation`);
   return data;
@@ -246,6 +255,37 @@ export async function getCities(): Promise<{ city: string; districts: string[] }
 export async function getPitches(params?: Record<string, any>): Promise<any[]> {
   const { data } = await api.get("/pitches", { params: { limit: 50, ...params } });
   return Array.isArray(data) ? data : data?.data ?? [];
+}
+
+export interface NearbyPitch {
+  id: string;
+  name: string;
+  photo: string | null;
+  city: string;
+  district: string;
+  sport: string;
+  lat: number;
+  lng: number;
+  distance: number | null;
+  gamesToday: number;
+}
+
+/** Home-feed "Pitches near you". Passes lat/lng only when the user granted it. */
+export async function getNearbyPitches(params: {
+  lat?: number;
+  lng?: number;
+  sport?: string;
+  city?: string;
+  district?: string;
+  limit?: number;
+}): Promise<NearbyPitch[]> {
+  const { data } = await api.get("/pitches/nearby/home", { params });
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getPitch(id: string) {
+  const { data } = await api.get(`/pitches/${id}`);
+  return data;
 }
 
 // ─── Players / ranking / social ───────────────────────────────
@@ -432,15 +472,37 @@ export interface ChatMessage {
   conversationId: string;
   senderId: string;
   content: string;
+  type?: "USER" | "SYSTEM";
   readBy: string[];
   createdAt: string;
   sender?: ChatUser;
 }
 
+export interface MatchChatSummary {
+  conversationId: string | null;
+  memberCount: number;
+  unreadCount: number;
+  isMember: boolean;
+  readOnly: boolean;
+}
+
+/** State for the "Match chat" row on the event detail (safe for non-members). */
+export async function getMatchChatSummary(matchId: string): Promise<MatchChatSummary> {
+  const { data } = await api.get(`/messages/match/${matchId}/summary`);
+  return data;
+}
+
+/** Open the match group chat (403s for non-members). Returns members + readOnly. */
+export async function getMatchChat(matchId: string): Promise<any> {
+  const { data } = await api.get(`/messages/match/${matchId}`);
+  return data;
+}
+
 export interface Conversation {
   id: string;
-  type: "DIRECT" | "MATCH_GROUP" | "PITCH_HIRE" | "SUPPORT";
+  type: "DIRECT" | "MATCH_GROUP" | "PITCH_HIRE" | "SUPPORT" | "PUBLIC_GROUP";
   matchId?: string | null;
+  title?: string | null;
   lastMessage: ChatMessage | null;
   unreadCount: number;
   otherMember: ChatUser | null;
@@ -470,6 +532,35 @@ export async function sendChatMessage(id: string, content: string): Promise<Chat
 
 export async function startDirectConversation(userId: string): Promise<Conversation> {
   const { data } = await api.post(`/messages/direct/${userId}`);
+  return data;
+}
+
+export interface PublicGroup {
+  id: string;
+  title: string | null;
+  city: string | null;
+  sport: string | null;
+  memberCount: number;
+  joined: boolean;
+}
+
+export async function getPublicGroups(params?: { city?: string; sport?: string }): Promise<PublicGroup[]> {
+  const { data } = await api.get("/messages/groups", { params });
+  return Array.isArray(data) ? data : [];
+}
+
+export async function joinPublicGroup(id: string): Promise<{ joined: boolean; conversationId: string }> {
+  const { data } = await api.post(`/messages/groups/${id}/join`);
+  return data;
+}
+
+export async function leavePublicGroup(id: string): Promise<{ joined: boolean }> {
+  const { data } = await api.post(`/messages/groups/${id}/leave`);
+  return data;
+}
+
+export async function ensureSupport(): Promise<{ id: string }> {
+  const { data } = await api.post("/messages/support");
   return data;
 }
 

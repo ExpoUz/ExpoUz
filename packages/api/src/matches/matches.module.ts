@@ -8,9 +8,10 @@ import { EscrowModule } from '../escrow/escrow.module';
 import { GatewayModule } from '../gateway/gateway.module';
 import { WalletModule } from '../payments/wallet/wallet.module';
 import { PhoneModule } from '../phone/phone.module';
+import { MessagesModule } from '../messages/messages.module';
 
 @Module({
-  imports: [FormationModule, RemindersModule, NotificationsModule, EscrowModule, GatewayModule, WalletModule, PhoneModule],
+  imports: [FormationModule, RemindersModule, NotificationsModule, EscrowModule, GatewayModule, WalletModule, PhoneModule, MessagesModule],
   controllers: [MatchesController],
   providers: [MatchesService],
   exports: [MatchesService],

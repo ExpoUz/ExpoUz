@@ -52,7 +52,11 @@
     "featured": "Tavsiya",
     "happeningToday": "Bugun",
     "openMatches": "Ochiq o'yinlar",
-    "playersNearYou": "Yaqin o'yinchilar"
+    "playersNearYou": "Yaqin o'yinchilar",
+    "pitchesNearYou": "Yaqin maydonlar",
+    "gamesTodayTitle": "Bugungi o‘yinlar",
+    "gamesToday": "{count, plural, other {bugun # ta o‘yin}}",
+    "noGamesToday": "bugun o‘yin yo‘q"
   },
   "matches": {
     "full": "To'la",
@@ -135,7 +139,9 @@
     "CAFE": "Kafe",
     "SECURITY": "Xavfsizlik",
     "LIGHTS": "Yoritish",
-    "BATHROOM": "Hojatxona"
+    "BATHROOM": "Hojatxona",
+    "INDOOR": "Yopiq",
+    "COVERED": "Usti yopiq"
   },
   "status": {
     "OPEN": "Ochiq",
@@ -321,7 +327,26 @@
     "send": "Yuborish",
     "message": "Xabar",
     "opening": "Ochilmoqda…",
-    "noMessages": "Hozircha xabarlar yo'q. Salom ayting!"
+    "noMessages": "Hozircha xabarlar yo'q. Salom ayting!",
+    "directTab": "Shaxsiy",
+    "groupsTab": "Guruhlar",
+    "new": "Yangi",
+    "support": "ExpoUz yordam",
+    "supportHint": "Qanday yordam beramiz?",
+    "messagePlayer": "O‘yinchiga yozish",
+    "browseGroups": "Guruhlarni ko‘rish",
+    "noDirect": "Hozircha xabar yo‘q",
+    "noDirectHint": "O‘yinchi topib salomlashing.",
+    "noGroups": "Hozircha guruh yo‘q",
+    "noGroupsHint": "Suhbat uchun jamoaga qo‘shiling.",
+    "findPlayers": "O‘yinchilarni topish",
+    "group": "Guruh",
+    "members": "{count, plural, other {# a’zo}}",
+    "noGroupsYet": "Hozircha ommaviy guruh yo‘q.",
+    "open": "Ochish",
+    "join": "Qo‘shilish",
+    "searchPlayers": "O‘yinchi qidirish…",
+    "noPlayersFound": "O‘yinchi topilmadi."
   },
   "players": {
     "title": "O'yinchilar",
@@ -474,5 +499,50 @@
     "generic": "Xatolik yuz berdi. Qayta urinib ko'ring.",
     "network": "Tarmoq xatosi. Ulanishni tekshiring.",
     "notInTelegram": "Kirish uchun ilovani Telegram ichidan oching."
+  },
+  "venue": {
+    "upcomingHere": "Bu yerdagi o‘yinlar",
+    "noUpcoming": "Bu maydonda rejalashtirilgan o‘yin yo‘q."
+  },
+  "host": {
+    "hostedBy": "Tashkilotchi",
+    "host": "Tashkilotchi",
+    "rating": "reyting",
+    "hosted": "o‘tkazgan",
+    "reliability": "ishonchlilik",
+    "viewProfile": "Profil",
+    "message": "Yozish",
+    "editMatch": "O‘yinni tahrirlash"
+  },
+  "matchChat": {
+    "title": "Uchrashuv chati",
+    "subtitle": "Boshqa o‘yinchilar bilan gaplashing",
+    "joinToChat": "Yozish uchun o‘yinga qo‘shiling",
+    "empty": "Hozircha xabar yo‘q. Salomlashing!",
+    "closed": "Chat yopilgan — o‘yin tugadi.",
+    "typeMessage": "Xabar…",
+    "sys": {
+      "joined": "{name} o‘yinga qo‘shildi",
+      "left": "{name} o‘yindan chiqdi",
+      "confirmed": "Uchrashuv tasdiqlandi",
+      "timeChanged": "Vaqt {time} ga o‘zgartirildi"
+    }
+  },
+  "map": {
+    "whereYoullPlay": "Qayerda o‘ynaysiz",
+    "openInMaps": "Xaritada ochish",
+    "copyAddress": "Manzildan nusxa",
+    "addressCopied": "Manzil nusxalandi"
+  },
+  "editMatch": {
+    "title": "O‘yinni tahrirlash",
+    "startTime": "Boshlanish vaqti",
+    "duration": "Davomiyligi (daqiqa)",
+    "price": "Har o‘yinchi narxi (UZS)",
+    "description": "Tavsif",
+    "save": "Saqlash",
+    "saving": "Saqlanmoqda…",
+    "failed": "Saqlab bo‘lmadi",
+    "notHost": "Faqat tashkilotchi tahrirlashi mumkin."
   }
 }

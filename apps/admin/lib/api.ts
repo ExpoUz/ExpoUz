@@ -268,3 +268,14 @@ export async function setOwnerCrmFlags(
   const { data } = await adminApi.patch(`/admin/crm/owners/${ownerId}/flags`, flags);
   return data;
 }
+
+// ─── Public community groups ─────────────────────────────────
+export async function getPublicGroups(): Promise<any[]> {
+  const { data } = await adminApi.get("/messages/groups");
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createPublicGroup(body: { title: string; city?: string; sport?: string }) {
+  const { data } = await adminApi.post("/messages/groups", body);
+  return data;
+}
