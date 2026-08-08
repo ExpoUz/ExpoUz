@@ -474,6 +474,8 @@ export interface ChatMessage {
   content: string;
   type?: "USER" | "SYSTEM";
   readBy: string[];
+  editedAt?: string | null;
+  deletedAt?: string | null;
   createdAt: string;
   sender?: ChatUser;
 }
@@ -527,6 +529,21 @@ export async function getConversationMessages(
 
 export async function sendChatMessage(id: string, content: string): Promise<ChatMessage> {
   const { data } = await api.post(`/messages/conversations/${id}`, { content });
+  return data;
+}
+
+export async function editChatMessage(messageId: string, content: string): Promise<ChatMessage> {
+  const { data } = await api.patch(`/messages/message/${messageId}`, { content });
+  return data;
+}
+
+export async function deleteChatMessage(messageId: string): Promise<{ deleted: boolean }> {
+  const { data } = await api.delete(`/messages/message/${messageId}`);
+  return data;
+}
+
+export async function deleteConversation(conversationId: string): Promise<{ deleted: boolean }> {
+  const { data } = await api.delete(`/messages/conversations/${conversationId}`);
   return data;
 }
 

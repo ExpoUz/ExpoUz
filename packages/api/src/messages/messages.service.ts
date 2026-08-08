@@ -153,6 +153,76 @@ export class MessagesService {
     return message;
   }
 
+  /** Edit a message. Only the sender, only USER messages, not once deleted. */
+  async editMessage(messageId: string, userId: string, content: string) {
+    const text = (content ?? '').trim();
+    if (!text) throw new ForbiddenException({ code: 'EMPTY_MESSAGE' });
+
+    const msg = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      select: { senderId: true, type: true, deletedAt: true, conversationId: true },
+    });
+    if (!msg) throw new NotFoundException({ code: 'MESSAGE_NOT_FOUND' });
+    if (msg.senderId !== userId) throw new ForbiddenException({ code: 'NOT_YOUR_MESSAGE' });
+    if (msg.type !== 'USER' || msg.deletedAt) throw new ForbiddenException({ code: 'NOT_EDITABLE' });
+
+    const updated = await this.prisma.message.update({
+      where: { id: messageId },
+      data: { content: text.slice(0, 4000), editedAt: new Date() },
+      include: {
+        sender: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      },
+    });
+    this.gateway.emitMessageUpdate(msg.conversationId, updated);
+    return updated;
+  }
+
+  /** Soft-delete a message. Only the sender. Row is kept as a tombstone. */
+  async deleteMessage(messageId: string, userId: string) {
+    const msg = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      select: { senderId: true, type: true, deletedAt: true, conversationId: true },
+    });
+    if (!msg) throw new NotFoundException({ code: 'MESSAGE_NOT_FOUND' });
+    if (msg.senderId !== userId) throw new ForbiddenException({ code: 'NOT_YOUR_MESSAGE' });
+    if (msg.deletedAt) return { deleted: true };
+
+    const updated = await this.prisma.message.update({
+      where: { id: messageId },
+      data: { deletedAt: new Date(), content: '' },
+      include: {
+        sender: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      },
+    });
+    this.gateway.emitMessageUpdate(msg.conversationId, updated);
+    return { deleted: true, id: messageId };
+  }
+
+  /**
+   * "Delete chat" — removes the caller from the conversation (delete-for-me). If
+   * that leaves it empty, the conversation and its messages are removed. Match
+   * chats can't be deleted this way (membership derives from bookings).
+   */
+  async deleteConversation(conversationId: string, userId: string) {
+    const member = await this.prisma.conversationMember.findFirst({
+      where: { conversationId, userId },
+      select: { id: true, conversation: { select: { type: true } } },
+    });
+    if (!member) throw new ForbiddenException({ code: 'NOT_A_MEMBER' });
+    if (member.conversation.type === 'MATCH_GROUP') {
+      throw new ForbiddenException({ code: 'CANNOT_DELETE_MATCH_CHAT' });
+    }
+
+    await this.prisma.conversationMember.delete({ where: { id: member.id } });
+
+    const remaining = await this.prisma.conversationMember.count({ where: { conversationId } });
+    if (remaining === 0) {
+      // Cascade removes messages (Message.conversation onDelete: Cascade).
+      await this.prisma.conversation.delete({ where: { id: conversationId } });
+    }
+    return { deleted: true };
+  }
+
   async createOrGetDirect(userId1: string, userId2: string) {
     const existing = await this.prisma.conversation.findFirst({
       where: {

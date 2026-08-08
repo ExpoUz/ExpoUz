@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -54,6 +56,28 @@ export class MessagesController {
   @ApiOperation({ summary: 'Create or get a direct conversation with a user' })
   createOrGetDirect(@Param('userId') targetId: string, @CurrentUser() user: any) {
     return this.messagesService.createOrGetDirect(user.id, targetId);
+  }
+
+  @Patch('message/:id')
+  @ApiOperation({ summary: 'Edit your own message' })
+  editMessage(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body('content') content: string,
+  ) {
+    return this.messagesService.editMessage(id, user.id, content);
+  }
+
+  @Delete('message/:id')
+  @ApiOperation({ summary: 'Delete your own message' })
+  deleteMessage(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.messagesService.deleteMessage(id, user.id);
+  }
+
+  @Delete('conversations/:id')
+  @ApiOperation({ summary: 'Delete a chat (removes you; deletes it if empty)' })
+  deleteConversation(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.messagesService.deleteConversation(id, user.id);
   }
 
   // ─── Public community groups + support ────────────────────────────────────

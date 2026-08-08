@@ -5,17 +5,19 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
-import { Send } from "lucide-react";
+import { Send, MoreVertical, X, Check } from "lucide-react";
 import {
   getConversationMessages,
   sendChatMessage,
-  getConversations,
+  editChatMessage,
+  deleteChatMessage,
+  deleteConversation,
   getMe,
   chatUserName,
   type ChatMessage,
 } from "@/lib/api";
 import { useMessagesSocket } from "@/lib/useMessagesSocket";
-import { showBackButton, hapticImpact } from "@/lib/telegram";
+import { showBackButton, hapticImpact, showAlert } from "@/lib/telegram";
 
 export default function ConversationPage() {
   const params = useParams<{ id: string }>();
@@ -27,6 +29,9 @@ export default function ConversationPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [editing, setEditing] = useState<ChatMessage | null>(null);
+  const [actionMsg, setActionMsg] = useState<ChatMessage | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
@@ -35,31 +40,31 @@ export default function ConversationPage() {
     queryFn: () => getConversationMessages(id),
   });
 
-  // Title: pull from the conversations cache if we navigated from the list,
-  // otherwise derive from the first message sender that isn't me.
   const cachedConvos = qc.getQueryData<any[]>(["conversations"]);
   const cachedConvo = cachedConvos?.find((c) => c.id === id);
   const otherFromMsg = messages.find((m) => m.senderId !== me?.id)?.sender;
   const title =
-    cachedConvo?.type === "MATCH_GROUP"
-      ? t("matchGroup")
-      : chatUserName(cachedConvo?.otherMember ?? otherFromMsg);
+    cachedConvo?.type === "PUBLIC_GROUP"
+      ? cachedConvo?.title ?? t("group")
+      : cachedConvo?.type === "SUPPORT"
+        ? t("support")
+        : chatUserName(cachedConvo?.otherMember ?? otherFromMsg);
 
   useEffect(() => {
     if (page?.data) setMessages(page.data);
   }, [page]);
 
-  useEffect(() => {
-    const cleanup = showBackButton(() => router.back());
-    return cleanup;
-  }, [router]);
+  useEffect(() => showBackButton(() => router.back()), [router]);
 
-  // Live updates: append incoming, refresh the list cache so unread clears.
+  const upsert = (m: ChatMessage) =>
+    setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev.map((x) => (x.id === m.id ? m : x)) : [...prev, m]));
+
   useMessagesSocket(id, {
     onMessage: (m) => {
-      setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+      upsert(m);
       qc.invalidateQueries({ queryKey: ["conversations"] });
     },
+    onUpdate: (m) => setMessages((prev) => prev.map((x) => (x.id === m.id ? m : x))),
   });
 
   useEffect(() => {
@@ -73,23 +78,55 @@ export default function ConversationPage() {
     setDraft("");
     hapticImpact("light");
     try {
-      const msg = await sendChatMessage(id, content);
-      setMessages((prev) => (prev.some((x) => x.id === msg.id) ? prev : [...prev, msg]));
-      qc.invalidateQueries({ queryKey: ["conversations"] });
+      if (editing) {
+        const updated = await editChatMessage(editing.id, content);
+        setMessages((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+        setEditing(null);
+      } else {
+        const msg = await sendChatMessage(id, content);
+        upsert(msg);
+        qc.invalidateQueries({ queryKey: ["conversations"] });
+      }
     } catch {
-      setDraft(content); // restore on failure
+      setDraft(content);
     } finally {
       setSending(false);
+    }
+  };
+
+  const remove = async (m: ChatMessage) => {
+    setActionMsg(null);
+    hapticImpact("light");
+    try {
+      await deleteChatMessage(m.id);
+      setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, deletedAt: new Date().toISOString(), content: "" } : x)));
+    } catch {
+      showAlert(t("actionFailed"));
+    }
+  };
+
+  const removeChat = async () => {
+    setMenuOpen(false);
+    hapticImpact("light");
+    try {
+      await deleteConversation(id);
+      qc.invalidateQueries({ queryKey: ["conversations"] });
+      router.push("/messages");
+    } catch {
+      showAlert(t("actionFailed"));
     }
   };
 
   return (
     <div className="flex flex-col h-screen">
       <header
-        className="px-4 py-3 border-b shrink-0 sticky top-0 z-10"
+        className="px-4 py-3 border-b shrink-0 sticky top-0 z-10 flex items-center justify-between gap-2"
         style={{ background: "var(--tg-bg)", borderColor: "rgba(0,0,0,0.08)" }}
       >
         <h1 className="font-bold truncate">{title}</h1>
+        <button onClick={() => setMenuOpen(true)} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" aria-label={t("options")}>
+          <MoreVertical size={18} />
+        </button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
@@ -100,33 +137,36 @@ export default function ConversationPage() {
         ) : messages.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-3xl mb-2">👋</div>
-            <p className="font-medium">{t("noConversations")}</p>
-            <p className="text-sm mt-1" style={{ color: "var(--tg-hint)" }}>
-              {t("noMessages")}
-            </p>
+            <p className="text-sm" style={{ color: "var(--tg-hint)" }}>{t("noMessages")}</p>
           </div>
         ) : (
           messages.map((m) => {
             const mine = m.senderId === me?.id;
+            const deleted = !!m.deletedAt;
             return (
               <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                <div
-                  className="max-w-[78%] rounded-2xl px-3 py-2"
+                <button
+                  type="button"
+                  onClick={() => mine && !deleted && setActionMsg(m)}
+                  className="max-w-[78%] rounded-2xl px-3 py-2 text-left"
                   style={{
-                    background: mine ? "#00C853" : "var(--tg-card)",
-                    color: mine ? "#fff" : "var(--tg-text)",
-                    borderBottomRightRadius: mine ? 6 : undefined,
-                    borderBottomLeftRadius: mine ? undefined : 6,
+                    background: deleted ? "transparent" : mine ? "#00C853" : "var(--tg-card)",
+                    color: deleted ? "var(--tg-hint)" : mine ? "#fff" : "var(--tg-text)",
+                    border: deleted ? "1px dashed rgba(0,0,0,0.15)" : undefined,
+                    borderBottomRightRadius: mine && !deleted ? 6 : undefined,
+                    borderBottomLeftRadius: !mine && !deleted ? 6 : undefined,
                   }}
                 >
-                  <p className="text-[15px] whitespace-pre-wrap break-words">{m.content}</p>
-                  <div
-                    className="text-[10px] mt-0.5 text-right"
-                    style={{ color: mine ? "rgba(255,255,255,0.7)" : "var(--tg-hint)" }}
-                  >
+                  {deleted ? (
+                    <p className="text-[13px] italic">{t("deletedMessage")}</p>
+                  ) : (
+                    <p className="text-[15px] whitespace-pre-wrap break-words">{m.content}</p>
+                  )}
+                  <div className="text-[10px] mt-0.5 text-right" style={{ color: mine && !deleted ? "rgba(255,255,255,0.7)" : "var(--tg-hint)" }}>
+                    {m.editedAt && !deleted ? `${t("edited")} · ` : ""}
                     {dayjs(m.createdAt).format("HH:mm")}
                   </div>
-                </div>
+                </button>
               </div>
             );
           })
@@ -134,13 +174,16 @@ export default function ConversationPage() {
         <div ref={bottomRef} />
       </div>
 
+      {editing && (
+        <div className="px-3 py-1.5 flex items-center justify-between text-xs border-t" style={{ background: "var(--tg-card)", borderColor: "rgba(0,0,0,0.08)", color: "var(--tg-hint)" }}>
+          <span>{t("editing")}</span>
+          <button onClick={() => { setEditing(null); setDraft(""); }} className="font-semibold">{t("cancel")}</button>
+        </div>
+      )}
+
       <div
         className="shrink-0 flex items-end gap-2 px-3 py-2 border-t"
-        style={{
-          background: "var(--tg-bg)",
-          borderColor: "rgba(0,0,0,0.08)",
-          paddingBottom: "calc(8px + env(safe-area-inset-bottom))",
-        }}
+        style={{ background: "var(--tg-bg)", borderColor: "rgba(0,0,0,0.08)", paddingBottom: "calc(8px + env(safe-area-inset-bottom))" }}
       >
         <textarea
           value={draft}
@@ -162,9 +205,50 @@ export default function ConversationPage() {
           className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-40"
           style={{ background: "#00C853", color: "#fff" }}
         >
-          <Send size={18} />
+          {editing ? <Check size={18} /> : <Send size={18} />}
+        </button>
+      </div>
+
+      {/* Message action sheet (own messages) */}
+      {actionMsg && (
+        <Sheet onClose={() => setActionMsg(null)}>
+          <SheetBtn label={t("edit")} onClick={() => { setEditing(actionMsg); setDraft(actionMsg.content); setActionMsg(null); }} />
+          <SheetBtn label={t("delete")} danger onClick={() => remove(actionMsg)} />
+        </Sheet>
+      )}
+
+      {/* Conversation menu */}
+      {menuOpen && (
+        <Sheet onClose={() => setMenuOpen(false)}>
+          <SheetBtn label={t("deleteChat")} danger onClick={removeChat} />
+        </Sheet>
+      )}
+    </div>
+  );
+}
+
+function Sheet({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  const t = useTranslations("chat");
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={onClose}>
+      <div className="w-full rounded-t-3xl p-4 pb-8 space-y-2" style={{ background: "var(--tg-bg)" }} onClick={(e) => e.stopPropagation()}>
+        {children}
+        <button onClick={onClose} className="w-full rounded-2xl py-3 text-sm font-semibold flex items-center justify-center gap-2" style={{ background: "var(--tg-card)" }}>
+          <X size={15} /> {t("cancel")}
         </button>
       </div>
     </div>
+  );
+}
+
+function SheetBtn({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full rounded-2xl py-3 text-sm font-semibold"
+      style={{ background: "var(--tg-card)", color: danger ? "#FF5252" : "var(--tg-text)" }}
+    >
+      {label}
+    </button>
   );
 }
