@@ -52,7 +52,11 @@
     "featured": "Рекомендуем",
     "happeningToday": "Сегодня",
     "openMatches": "Открытые игры",
-    "playersNearYou": "Игроки рядом"
+    "playersNearYou": "Игроки рядом",
+    "pitchesNearYou": "Площадки рядом",
+    "gamesTodayTitle": "Игры сегодня",
+    "gamesToday": "{count, plural, one {# игра сегодня} few {# игры сегодня} other {# игр сегодня}}",
+    "noGamesToday": "сегодня нет игр"
   },
   "matches": {
     "full": "Заполнен",
@@ -135,7 +139,9 @@
     "CAFE": "Кафе",
     "SECURITY": "Охрана",
     "LIGHTS": "Освещение",
-    "BATHROOM": "Туалет"
+    "BATHROOM": "Туалет",
+    "INDOOR": "В помещении",
+    "COVERED": "Крытый"
   },
   "status": {
     "OPEN": "Открыт",
@@ -321,7 +327,26 @@
     "send": "Отправить",
     "message": "Написать",
     "opening": "Открываем…",
-    "noMessages": "Пока нет сообщений. Поздоровайтесь!"
+    "noMessages": "Пока нет сообщений. Поздоровайтесь!",
+    "directTab": "Личные",
+    "groupsTab": "Группы",
+    "new": "Новый",
+    "support": "Поддержка ExpoUz",
+    "supportHint": "Чем помочь?",
+    "messagePlayer": "Написать игроку",
+    "browseGroups": "Обзор групп",
+    "noDirect": "Сообщений пока нет",
+    "noDirectHint": "Найдите игрока и поздоровайтесь.",
+    "noGroups": "Групп пока нет",
+    "noGroupsHint": "Вступите в сообщество, чтобы общаться.",
+    "findPlayers": "Найти игроков",
+    "group": "Группа",
+    "members": "{count, plural, one {# участник} few {# участника} other {# участников}}",
+    "noGroupsYet": "Публичных групп пока нет.",
+    "open": "Открыть",
+    "join": "Вступить",
+    "searchPlayers": "Поиск игроков…",
+    "noPlayersFound": "Игроки не найдены."
   },
   "players": {
     "title": "Игроки",
@@ -474,5 +499,50 @@
     "generic": "Что-то пошло не так. Попробуйте снова.",
     "network": "Ошибка сети. Проверьте подключение.",
     "notInTelegram": "Откройте приложение внутри Telegram, чтобы войти."
+  },
+  "venue": {
+    "upcomingHere": "Ближайшие игры здесь",
+    "noUpcoming": "Здесь пока нет запланированных игр."
+  },
+  "host": {
+    "hostedBy": "Организатор",
+    "host": "Организатор",
+    "rating": "рейтинг",
+    "hosted": "проведено",
+    "reliability": "надёжность",
+    "viewProfile": "Профиль",
+    "message": "Написать",
+    "editMatch": "Изменить игру"
+  },
+  "matchChat": {
+    "title": "Чат матча",
+    "subtitle": "Общайтесь с другими игроками",
+    "joinToChat": "Присоединитесь к игре, чтобы писать",
+    "empty": "Сообщений пока нет. Поздоровайтесь!",
+    "closed": "Чат закрыт — матч завершён.",
+    "typeMessage": "Сообщение…",
+    "sys": {
+      "joined": "{name} присоединился к игре",
+      "left": "{name} покинул игру",
+      "confirmed": "Матч подтверждён",
+      "timeChanged": "Время изменено на {time}"
+    }
+  },
+  "map": {
+    "whereYoullPlay": "Где вы сыграете",
+    "openInMaps": "Открыть в картах",
+    "copyAddress": "Копировать адрес",
+    "addressCopied": "Адрес скопирован"
+  },
+  "editMatch": {
+    "title": "Изменить игру",
+    "startTime": "Время начала",
+    "duration": "Длительность (мин)",
+    "price": "Цена за игрока (UZS)",
+    "description": "Описание",
+    "save": "Сохранить",
+    "saving": "Сохранение…",
+    "failed": "Не удалось сохранить",
+    "notHost": "Только организатор может изменить игру."
   }
 }

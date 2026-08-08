@@ -51,6 +51,9 @@ export function deriveSections(matches: any[]) {
 
   const today = todayUpcoming.filter((m) => m.id !== heroId);
   const open = upcoming.filter((m) => m.id !== heroId && spotsLeft(m) > 0);
+  // "Games today" carousel: today's matches that still have open spots, soonest
+  // first (byStartAsc is already applied), minus the hero.
+  const todaySpots = todayWithSpots.filter((m) => m.id !== heroId);
 
-  return { hero, today, open };
+  return { hero, today, open, todaySpots };
 }

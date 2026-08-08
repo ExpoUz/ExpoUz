@@ -551,10 +551,14 @@ model PlayerRating {
 model Conversation {
   id              String               @id @default(cuid())
   type            ConvType             @default(DIRECT)
-  matchId         String?
+  matchId         String?              @unique
   pitchBookingId  String?              @unique
   telegramTopicId String?
   telegramChatId  String?
+  // Public community groups (type PUBLIC_GROUP): admin-created, city/sport based.
+  title           String?
+  city            String?
+  sport           Sport?
   members         ConversationMember[]
   messages        Message[]
   pitchBooking    PitchBooking?        @relation(fields: [pitchBookingId], references: [id])
@@ -566,6 +570,7 @@ enum ConvType {
   MATCH_GROUP
   PITCH_HIRE
   SUPPORT
+  PUBLIC_GROUP
 }
 
 model ConversationMember {
@@ -584,8 +589,16 @@ model Message {
   senderId       String
   sender         User         @relation(fields: [senderId], references: [id])
   content        String
+  // SYSTEM messages ("Aziz joined", "Match confirmed") carry a JSON code in
+  // `content` (e.g. {"t":"joined","name":"Aziz"}) so the client localizes them.
+  type           MessageType  @default(USER)
   readBy         String[]
   createdAt      DateTime     @default(now())
+}
+
+enum MessageType {
+  USER
+  SYSTEM
 }
 
 // ============ NOTIFICATIONS ============

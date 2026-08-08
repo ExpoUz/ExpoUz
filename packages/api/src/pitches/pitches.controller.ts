@@ -73,6 +73,33 @@ export class PitchesController {
     return this.pitchesService.findNearby(+lat, +lng, +radius);
   }
 
+  // NOTE: must precede the ':id' route so it isn't captured as a pitch id.
+  @Get('nearby/home')
+  @ApiOperation({ summary: 'Home-feed venues: distance when located, else city/district + gamesToday' })
+  @ApiQuery({ name: 'lat', required: false, type: Number })
+  @ApiQuery({ name: 'lng', required: false, type: Number })
+  @ApiQuery({ name: 'sport', required: false })
+  @ApiQuery({ name: 'city', required: false })
+  @ApiQuery({ name: 'district', required: false })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  findNearbyForHome(
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+    @Query('sport') sport?: string,
+    @Query('city') city?: string,
+    @Query('district') district?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.pitchesService.findNearbyForHome({
+      lat: lat !== undefined ? +lat : undefined,
+      lng: lng !== undefined ? +lng : undefined,
+      sport,
+      city,
+      district,
+      limit: limit ? +limit : 10,
+    });
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get pitch by ID' })
   findOne(@Param('id') id: string) {

@@ -13,7 +13,9 @@ export class MessagesService {
 
   async getConversations(userId: string) {
     const memberships = await this.prisma.conversationMember.findMany({
-      where: { userId },
+      // Match chats live on their event, NOT in the Chat tab. The tab is for
+      // direct messages, community groups and support only.
+      where: { userId, conversation: { type: { not: 'MATCH_GROUP' } } },
       include: {
         conversation: {
           include: {
@@ -111,6 +113,11 @@ export class MessagesService {
       where: { conversationId, userId: senderId },
     });
     if (!member) throw new ForbiddenException('Not a member of this conversation');
+
+    // Match chats go read-only 24h after the match ends.
+    if (await this.isMatchChatClosed(conversationId)) {
+      throw new ForbiddenException({ code: 'MATCH_CHAT_CLOSED' });
+    }
 
     const [message, conversation, sender] = await Promise.all([
       this.prisma.message.create({
@@ -230,6 +237,208 @@ export class MessagesService {
     const isMember = conversation.members.some((m) => m.userId === userId);
     if (!isMember) throw new ForbiddenException('Not a participant of this match');
 
-    return conversation;
+    return { ...conversation, readOnly: await this.isMatchChatClosed(conversation.id) };
+  }
+
+  /**
+   * Lightweight state for the "Match chat" row on the event detail — safe for
+   * everyone (members and non-members). Never creates the conversation.
+   */
+  async getMatchChatSummary(matchId: string, userId: string) {
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { type: 'MATCH_GROUP', matchId },
+      select: { id: true },
+    });
+
+    if (!conversation) {
+      // Not created yet: derive prospective membership from confirmed bookings +
+      // host so the row can still say who can chat and whether the viewer may.
+      const [confirmed, match] = await Promise.all([
+        this.prisma.booking.findMany({
+          where: { matchId, isGuestSlot: false, status: { in: ['CONFIRMED', 'COMPLETED'] } },
+          select: { userId: true },
+        }),
+        this.prisma.match.findUnique({ where: { id: matchId }, select: { hostId: true } }),
+      ]);
+      const ids = new Set([...confirmed.map((b) => b.userId), match?.hostId].filter(Boolean) as string[]);
+      return {
+        conversationId: null,
+        memberCount: ids.size,
+        unreadCount: 0,
+        isMember: ids.has(userId),
+        readOnly: await this.isMatchChatClosed(null, matchId),
+      };
+    }
+
+    const [memberCount, isMemberRow, unreadCount] = await Promise.all([
+      this.prisma.conversationMember.count({ where: { conversationId: conversation.id } }),
+      this.prisma.conversationMember.findFirst({
+        where: { conversationId: conversation.id, userId },
+        select: { id: true },
+      }),
+      this.prisma.message.count({
+        where: {
+          conversationId: conversation.id,
+          senderId: { not: userId },
+          NOT: { readBy: { has: userId } },
+        },
+      }),
+    ]);
+
+    return {
+      conversationId: conversation.id,
+      memberCount,
+      unreadCount: isMemberRow ? unreadCount : 0,
+      isMember: !!isMemberRow,
+      readOnly: await this.isMatchChatClosed(conversation.id, matchId),
+    };
+  }
+
+  /** True once a match chat has been closed (24h after the match ends). */
+  private async isMatchChatClosed(conversationId: string | null, matchId?: string): Promise<boolean> {
+    let mId = matchId;
+    if (!mId && conversationId) {
+      const conv = await this.prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { type: true, matchId: true },
+      });
+      if (!conv || conv.type !== 'MATCH_GROUP' || !conv.matchId) return false;
+      mId = conv.matchId;
+    }
+    if (!mId) return false;
+    const match = await this.prisma.match.findUnique({
+      where: { id: mId },
+      select: { startTime: true, durationMinutes: true },
+    });
+    if (!match) return false;
+    const endsAt = new Date(match.startTime).getTime() + (match.durationMinutes ?? 60) * 60 * 1000;
+    return Date.now() > endsAt + 24 * 60 * 60 * 1000;
+  }
+
+  /**
+   * Post a SYSTEM message ("Aziz joined the game", "Match confirmed", "Time
+   * changed"). Content is a JSON code the client localizes. `actorId` is any
+   * real member id (FK requirement); rendering keys off type, not the sender.
+   */
+  async postMatchSystemMessage(
+    matchId: string,
+    actorId: string,
+    payload: { t: string; [k: string]: any },
+  ) {
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { type: 'MATCH_GROUP', matchId },
+      select: { id: true },
+    });
+    if (!conversation) return null;
+    const message = await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: actorId,
+        content: JSON.stringify(payload),
+        type: 'SYSTEM',
+        readBy: [actorId],
+      },
+      include: {
+        sender: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      },
+    });
+    this.gateway.emitNewMessage(conversation.id, message);
+    return message;
+  }
+
+  // ─── Public community groups (admin-created, city/sport based) ─────────────
+
+  /** Admin creates a public group. Idempotent-ish on (title). */
+  async createPublicGroup(input: { title: string; city?: string; sport?: string }) {
+    const title = input.title?.trim();
+    if (!title) throw new ForbiddenException({ code: 'EMPTY_TITLE' });
+    return this.prisma.conversation.create({
+      data: {
+        type: 'PUBLIC_GROUP',
+        title,
+        city: input.city ?? null,
+        sport: (input.sport as any) ?? null,
+      },
+    });
+  }
+
+  /** Browse public groups (optionally filtered), each flagged joined + count. */
+  async listPublicGroups(userId: string, filter?: { city?: string; sport?: string }) {
+    const where: any = { type: 'PUBLIC_GROUP' };
+    if (filter?.city) where.city = filter.city;
+    if (filter?.sport) where.sport = filter.sport;
+    const groups = await this.prisma.conversation.findMany({
+      where,
+      include: {
+        _count: { select: { members: true } },
+        members: { where: { userId }, select: { id: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return groups.map((g) => ({
+      id: g.id,
+      title: g.title,
+      city: g.city,
+      sport: g.sport,
+      memberCount: g._count.members,
+      joined: g.members.length > 0,
+    }));
+  }
+
+  async joinPublicGroup(userId: string, groupId: string) {
+    const group = await this.prisma.conversation.findFirst({
+      where: { id: groupId, type: 'PUBLIC_GROUP' },
+      select: { id: true },
+    });
+    if (!group) throw new NotFoundException({ code: 'GROUP_NOT_FOUND' });
+    const existing = await this.prisma.conversationMember.findFirst({
+      where: { conversationId: groupId, userId },
+      select: { id: true },
+    });
+    if (!existing) {
+      await this.prisma.conversationMember.create({ data: { conversationId: groupId, userId } });
+    }
+    return { joined: true, conversationId: groupId };
+  }
+
+  async leavePublicGroup(userId: string, groupId: string) {
+    await this.prisma.conversationMember.deleteMany({
+      where: { conversationId: groupId, userId },
+    });
+    return { joined: false };
+  }
+
+  /**
+   * Ensure the user has a Support conversation (pinned at the top of the Chat
+   * tab). Lazily created with a welcome message.
+   */
+  async ensureSupportConversation(userId: string) {
+    let conv = await this.prisma.conversation.findFirst({
+      where: { type: 'SUPPORT', members: { some: { userId } } },
+      select: { id: true },
+    });
+    if (!conv) {
+      conv = await this.prisma.conversation.create({
+        data: {
+          type: 'SUPPORT',
+          title: 'ExpoUz Support',
+          members: { create: [{ userId }] },
+        },
+        select: { id: true },
+      });
+    }
+    return conv;
+  }
+
+  /** Remove a player from a match chat when they leave/cancel. */
+  async removeFromMatchChat(matchId: string, userId: string) {
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { type: 'MATCH_GROUP', matchId },
+      select: { id: true },
+    });
+    if (!conversation) return;
+    await this.prisma.conversationMember.deleteMany({
+      where: { conversationId: conversation.id, userId },
+    });
   }
 }

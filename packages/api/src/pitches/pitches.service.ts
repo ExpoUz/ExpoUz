@@ -78,6 +78,76 @@ export class PitchesService {
     return withDistance;
   }
 
+  /**
+   * Home-feed "Pitches near you" carousel. Uses live location when granted
+   * (distance-sorted); otherwise degrades to the user's city/district (no
+   * distance shown, never a wrong one — the carousel is never blocked on a
+   * location prompt). Each venue carries how many games are scheduled there
+   * TODAY so the card can say "3 games today".
+   */
+  async findNearbyForHome(opts: {
+    lat?: number;
+    lng?: number;
+    sport?: string;
+    city?: string;
+    district?: string;
+    limit?: number;
+  }) {
+    const { lat, lng, sport, city, district, limit = 10 } = opts;
+    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+
+    const where: any = { isActive: true };
+    if (sport) where.sport = sport;
+    // Only constrain by city/district in the no-location fallback path.
+    if (!hasCoords) {
+      if (city) where.city = city;
+      if (district) where.district = district;
+    }
+
+    const pitches = await this.prisma.pitch.findMany({
+      where,
+      include: { amenities: true },
+    });
+    if (pitches.length === 0) return [];
+
+    // Count today's games per pitch in one grouped query.
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+    const grouped = await this.prisma.match.groupBy({
+      by: ['pitchId'],
+      where: {
+        pitchId: { in: pitches.map((p) => p.id) },
+        startTime: { gte: startOfDay, lt: endOfDay },
+        status: { in: ['PUBLISHED', 'OPEN', 'FULL', 'CONFIRMED', 'IN_PROGRESS'] },
+      },
+      _count: { _all: true },
+    });
+    const gamesTodayByPitch = new Map(grouped.map((g) => [g.pitchId, g._count._all]));
+
+    const shaped = pitches.map((p) => ({
+      id: p.id,
+      name: p.name,
+      photo: p.photos?.[0] ?? null,
+      city: p.city,
+      district: p.district,
+      sport: p.sport,
+      lat: p.lat,
+      lng: p.lng,
+      distance: hasCoords ? haversine(lat as number, lng as number, p.lat, p.lng) : null,
+      gamesToday: gamesTodayByPitch.get(p.id) ?? 0,
+    }));
+
+    // Distance-sorted when we have coords; otherwise busiest-today first so the
+    // carousel still leads with the most useful venues.
+    shaped.sort((a, b) => {
+      if (hasCoords) return (a.distance ?? 0) - (b.distance ?? 0);
+      return b.gamesToday - a.gamesToday;
+    });
+
+    return shaped.slice(0, limit);
+  }
+
   async findOne(id: string) {
     const pitch = await this.prisma.pitch.findUnique({
       where: { id },

@@ -52,7 +52,11 @@
     "featured": "Featured",
     "happeningToday": "Happening today",
     "openMatches": "Open matches",
-    "playersNearYou": "Players near you"
+    "playersNearYou": "Players near you",
+    "pitchesNearYou": "Pitches near you",
+    "gamesTodayTitle": "Games today",
+    "gamesToday": "{count, plural, one {# game today} other {# games today}}",
+    "noGamesToday": "no games today"
   },
   "matches": {
     "full": "Full",
@@ -135,7 +139,9 @@
     "CAFE": "Café",
     "SECURITY": "Security",
     "LIGHTS": "Lights",
-    "BATHROOM": "Bathroom"
+    "BATHROOM": "Bathroom",
+    "INDOOR": "Indoor",
+    "COVERED": "Covered"
   },
   "status": {
     "OPEN": "Open",
@@ -321,7 +327,26 @@
     "send": "Send",
     "message": "Message",
     "opening": "Opening…",
-    "noMessages": "No messages yet. Say hi!"
+    "noMessages": "No messages yet. Say hi!",
+    "directTab": "Direct",
+    "groupsTab": "Groups",
+    "new": "New",
+    "support": "ExpoUz Support",
+    "supportHint": "How can we help?",
+    "messagePlayer": "Message a player",
+    "browseGroups": "Browse groups",
+    "noDirect": "No messages yet",
+    "noDirectHint": "Find a player and say hello.",
+    "noGroups": "No groups yet",
+    "noGroupsHint": "Join a community group to chat.",
+    "findPlayers": "Find players",
+    "group": "Group",
+    "members": "{count, plural, one {# member} other {# members}}",
+    "noGroupsYet": "No public groups yet.",
+    "open": "Open",
+    "join": "Join",
+    "searchPlayers": "Search players…",
+    "noPlayersFound": "No players found."
   },
   "players": {
     "title": "Players",
@@ -474,5 +499,50 @@
     "generic": "Something went wrong. Please try again.",
     "network": "Network error. Check your connection.",
     "notInTelegram": "Open this app from inside Telegram to sign in."
+  },
+  "venue": {
+    "upcomingHere": "Upcoming games here",
+    "noUpcoming": "No upcoming games at this venue."
+  },
+  "host": {
+    "hostedBy": "Hosted by",
+    "host": "Host",
+    "rating": "rating",
+    "hosted": "hosted",
+    "reliability": "reliability",
+    "viewProfile": "View profile",
+    "message": "Message",
+    "editMatch": "Edit match"
+  },
+  "matchChat": {
+    "title": "Match chat",
+    "subtitle": "Talk to the other players",
+    "joinToChat": "Join the game to chat",
+    "empty": "No messages yet. Say hello!",
+    "closed": "This chat is closed — the match has ended.",
+    "typeMessage": "Message…",
+    "sys": {
+      "joined": "{name} joined the game",
+      "left": "{name} left the game",
+      "confirmed": "Match confirmed",
+      "timeChanged": "Time changed to {time}"
+    }
+  },
+  "map": {
+    "whereYoullPlay": "Where you’ll play",
+    "openInMaps": "Open in Maps",
+    "copyAddress": "Copy address",
+    "addressCopied": "Address copied"
+  },
+  "editMatch": {
+    "title": "Edit match",
+    "startTime": "Start time",
+    "duration": "Duration (minutes)",
+    "price": "Price per player (UZS)",
+    "description": "Description",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "failed": "Could not save",
+    "notHost": "Only the host can edit this match."
   }
 }
