@@ -41,4 +41,9 @@ export class MessagesGateway {
   emitRead(conversationId: string, payload: { userId: string }) {
     this.server.to(`conversation:${conversationId}`).emit('message:read', payload);
   }
+
+  /** A message was edited or (soft) deleted — clients update it in place. */
+  emitMessageUpdate(conversationId: string, payload: any) {
+    this.server.to(`conversation:${conversationId}`).emit('message:update', payload);
+  }
 }

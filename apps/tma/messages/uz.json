@@ -346,7 +346,16 @@
     "open": "Ochish",
     "join": "Qo‘shilish",
     "searchPlayers": "O‘yinchi qidirish…",
-    "noPlayersFound": "O‘yinchi topilmadi."
+    "noPlayersFound": "O‘yinchi topilmadi.",
+    "cancel": "Bekor qilish",
+    "edit": "Tahrirlash",
+    "delete": "O‘chirish",
+    "deleteChat": "Chatni o‘chirish",
+    "editing": "Xabar tahrirlanmoqda",
+    "deletedMessage": "Bu xabar o‘chirildi",
+    "edited": "tahrirlandi",
+    "options": "Sozlamalar",
+    "actionFailed": "Xatolik yuz berdi. Qayta urining."
   },
   "players": {
     "title": "O'yinchilar",

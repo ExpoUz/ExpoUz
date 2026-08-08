@@ -5,27 +5,32 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
-import { Send } from "lucide-react";
+import { Send, Check } from "lucide-react";
 import {
   getMatchChat,
   getConversationMessages,
   sendChatMessage,
+  editChatMessage,
+  deleteChatMessage,
   getMe,
   type ChatMessage,
 } from "@/lib/api";
 import { useMessagesSocket } from "@/lib/useMessagesSocket";
-import { showBackButton, hapticImpact } from "@/lib/telegram";
+import { showBackButton, hapticImpact, showAlert } from "@/lib/telegram";
 
 export default function MatchChatPage() {
   const params = useParams();
   const router = useRouter();
   const qc = useQueryClient();
   const t = useTranslations("matchChat");
+  const tc = useTranslations("chat");
   const matchId = String(params.id);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [editing, setEditing] = useState<ChatMessage | null>(null);
+  const [actionMsg, setActionMsg] = useState<ChatMessage | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe });
@@ -61,6 +66,7 @@ export default function MatchChatPage() {
       setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
       qc.invalidateQueries({ queryKey: ["match-chat-summary", matchId] });
     },
+    onUpdate: (m: ChatMessage) => setMessages((prev) => prev.map((x) => (x.id === m.id ? m : x))),
   });
 
   useEffect(() => {
@@ -74,12 +80,29 @@ export default function MatchChatPage() {
     setDraft("");
     hapticImpact("light");
     try {
-      const msg = await sendChatMessage(conversationId, content);
-      setMessages((prev) => (prev.some((x) => x.id === msg.id) ? prev : [...prev, msg]));
+      if (editing) {
+        const updated = await editChatMessage(editing.id, content);
+        setMessages((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+        setEditing(null);
+      } else {
+        const msg = await sendChatMessage(conversationId, content);
+        setMessages((prev) => (prev.some((x) => x.id === msg.id) ? prev : [...prev, msg]));
+      }
     } catch {
       setDraft(content);
     } finally {
       setSending(false);
+    }
+  };
+
+  const remove = async (m: ChatMessage) => {
+    setActionMsg(null);
+    hapticImpact("light");
+    try {
+      await deleteChatMessage(m.id);
+      setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, deletedAt: new Date().toISOString(), content: "" } : x)));
+    } catch {
+      showAlert(t("actionFailed"));
     }
   };
 
@@ -108,10 +131,25 @@ export default function MatchChatPage() {
             <p className="text-sm" style={{ color: "var(--tg-hint)" }}>{t("empty")}</p>
           </div>
         ) : (
-          messages.map((m) => <MessageRow key={m.id} m={m} mineId={me?.id} hostId={hostId} />)
+          messages.map((m) => (
+            <MessageRow
+              key={m.id}
+              m={m}
+              mineId={me?.id}
+              hostId={hostId}
+              onAction={() => !readOnly && setActionMsg(m)}
+            />
+          ))
         )}
         <div ref={bottomRef} />
       </div>
+
+      {editing && (
+        <div className="px-3 py-1.5 flex items-center justify-between text-xs border-t" style={{ background: "var(--tg-card)", borderColor: "rgba(0,0,0,0.08)", color: "var(--tg-hint)" }}>
+          <span>{tc("editing")}</span>
+          <button onClick={() => { setEditing(null); setDraft(""); }} className="font-semibold">{tc("cancel")}</button>
+        </div>
+      )}
 
       {readOnly ? (
         <div
@@ -145,16 +183,42 @@ export default function MatchChatPage() {
             className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-40"
             style={{ background: "#00C853", color: "#fff" }}
           >
-            <Send size={18} />
+            {editing ? <Check size={18} /> : <Send size={18} />}
           </button>
+        </div>
+      )}
+
+      {/* Own-message actions */}
+      {actionMsg && (
+        <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={() => setActionMsg(null)}>
+          <div className="w-full rounded-t-3xl p-4 pb-8 space-y-2" style={{ background: "var(--tg-bg)" }} onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => { setEditing(actionMsg); setDraft(actionMsg.content); setActionMsg(null); }}
+              className="w-full rounded-2xl py-3 text-sm font-semibold"
+              style={{ background: "var(--tg-card)", color: "var(--tg-text)" }}
+            >
+              {tc("edit")}
+            </button>
+            <button
+              onClick={() => remove(actionMsg)}
+              className="w-full rounded-2xl py-3 text-sm font-semibold"
+              style={{ background: "var(--tg-card)", color: "#FF5252" }}
+            >
+              {tc("delete")}
+            </button>
+            <button onClick={() => setActionMsg(null)} className="w-full rounded-2xl py-3 text-sm font-semibold" style={{ background: "var(--tg-card)" }}>
+              {tc("cancel")}
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function MessageRow({ m, mineId, hostId }: { m: ChatMessage; mineId?: string; hostId: string | null }) {
+function MessageRow({ m, mineId, hostId, onAction }: { m: ChatMessage; mineId?: string; hostId: string | null; onAction: () => void }) {
   const t = useTranslations("matchChat");
+  const tc = useTranslations("chat");
 
   if (m.type === "SYSTEM") {
     let text = m.content;
@@ -178,6 +242,7 @@ function MessageRow({ m, mineId, hostId }: { m: ChatMessage; mineId?: string; ho
 
   const mine = m.senderId === mineId;
   const isHost = m.senderId === hostId;
+  const deleted = !!m.deletedAt;
   const name = `${m.sender?.firstName ?? ""} ${m.sender?.lastName ?? ""}`.trim() || "Player";
   const initial = (m.sender?.firstName?.[0] ?? "?").toUpperCase();
 
@@ -193,26 +258,34 @@ function MessageRow({ m, mineId, hostId }: { m: ChatMessage; mineId?: string; ho
           )}
         </div>
       )}
-      <div
-        className="max-w-[74%] rounded-2xl px-3 py-2"
+      <button
+        type="button"
+        onClick={() => mine && !deleted && onAction()}
+        className="max-w-[74%] rounded-2xl px-3 py-2 text-left"
         style={{
-          background: mine ? "#00C853" : "var(--tg-card)",
-          color: mine ? "#fff" : "var(--tg-text)",
-          borderBottomRightRadius: mine ? 6 : undefined,
-          borderBottomLeftRadius: mine ? undefined : 6,
+          background: deleted ? "transparent" : mine ? "#00C853" : "var(--tg-card)",
+          color: deleted ? "var(--tg-hint)" : mine ? "#fff" : "var(--tg-text)",
+          border: deleted ? "1px dashed rgba(0,0,0,0.15)" : undefined,
+          borderBottomRightRadius: mine && !deleted ? 6 : undefined,
+          borderBottomLeftRadius: !mine && !deleted ? 6 : undefined,
         }}
       >
-        {!mine && (
+        {!mine && !deleted && (
           <div className="flex items-center gap-1 mb-0.5">
             <span className="text-[11px] font-semibold" style={{ color: "#00875A" }}>{name}</span>
             {isHost && <span className="text-[10px]">👑</span>}
           </div>
         )}
-        <p className="text-[15px] whitespace-pre-wrap break-words">{m.content}</p>
-        <div className="text-[10px] mt-0.5 text-right" style={{ color: mine ? "rgba(255,255,255,0.7)" : "var(--tg-hint)" }}>
+        {deleted ? (
+          <p className="text-[13px] italic">{tc("deletedMessage")}</p>
+        ) : (
+          <p className="text-[15px] whitespace-pre-wrap break-words">{m.content}</p>
+        )}
+        <div className="text-[10px] mt-0.5 text-right" style={{ color: mine && !deleted ? "rgba(255,255,255,0.7)" : "var(--tg-hint)" }}>
+          {m.editedAt && !deleted ? `${tc("edited")} · ` : ""}
           {dayjs(m.createdAt).format("HH:mm")}
         </div>
-      </div>
+      </button>
     </div>
   );
 }

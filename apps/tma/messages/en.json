@@ -346,7 +346,16 @@
     "open": "Open",
     "join": "Join",
     "searchPlayers": "Search players…",
-    "noPlayersFound": "No players found."
+    "noPlayersFound": "No players found.",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteChat": "Delete chat",
+    "editing": "Editing message",
+    "deletedMessage": "This message was deleted",
+    "edited": "edited",
+    "options": "Options",
+    "actionFailed": "Something went wrong. Try again."
   },
   "players": {
     "title": "Players",

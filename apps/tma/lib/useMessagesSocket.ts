@@ -16,7 +16,11 @@ const SOCKET_URL = API_BASE.replace(/\/v1\/?$/, "");
  */
 export function useMessagesSocket(
   conversationId: string | undefined,
-  handlers: { onMessage?: (m: ChatMessage) => void; onRead?: (p: { userId: string }) => void },
+  handlers: {
+    onMessage?: (m: ChatMessage) => void;
+    onRead?: (p: { userId: string }) => void;
+    onUpdate?: (m: ChatMessage) => void;
+  },
 ) {
   const ref = useRef(handlers);
   ref.current = handlers;
@@ -29,6 +33,7 @@ export function useMessagesSocket(
       socket.on("connect", () => socket?.emit("join", { conversationId }));
       socket.on("message:new", (m: ChatMessage) => ref.current.onMessage?.(m));
       socket.on("message:read", (p: { userId: string }) => ref.current.onRead?.(p));
+      socket.on("message:update", (m: ChatMessage) => ref.current.onUpdate?.(m));
     } catch {
       // optional channel
     }

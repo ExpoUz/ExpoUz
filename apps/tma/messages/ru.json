@@ -346,7 +346,16 @@
     "open": "Открыть",
     "join": "Вступить",
     "searchPlayers": "Поиск игроков…",
-    "noPlayersFound": "Игроки не найдены."
+    "noPlayersFound": "Игроки не найдены.",
+    "cancel": "Отмена",
+    "edit": "Изменить",
+    "delete": "Удалить",
+    "deleteChat": "Удалить чат",
+    "editing": "Редактирование",
+    "deletedMessage": "Сообщение удалено",
+    "edited": "изменено",
+    "options": "Опции",
+    "actionFailed": "Что-то пошло не так. Повторите."
   },
   "players": {
     "title": "Игроки",

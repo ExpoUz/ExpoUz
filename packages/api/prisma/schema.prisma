@@ -593,6 +593,11 @@ model Message {
   // `content` (e.g. {"t":"joined","name":"Aziz"}) so the client localizes them.
   type           MessageType  @default(USER)
   readBy         String[]
+  // Soft-edit / soft-delete: senders can edit or delete their own messages; the
+  // row is kept so the thread stays intact and clients can show "(edited)" /
+  // "message deleted".
+  editedAt       DateTime?
+  deletedAt      DateTime?
   createdAt      DateTime     @default(now())
 }
 
