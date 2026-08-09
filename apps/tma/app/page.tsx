@@ -135,9 +135,13 @@ export default function HomePage() {
             <Menu size={22} />
           </button>
 
-          <div className="text-lg font-semibold tracking-tight">
-            <span className="text-[#00C853]">Expo</span>
-            <span style={{ color: "var(--tg-text)" }}>Uz</span>
+          <div className="flex items-center gap-1.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon-512.png" alt="" width={24} height={24} className="rounded-md" style={{ width: 24, height: 24 }} />
+            <div className="text-lg font-semibold tracking-tight">
+              <span className="text-[#00C853]">Expo</span>
+              <span style={{ color: "var(--tg-text)" }}>Uz</span>
+            </div>
           </div>
 
           <button

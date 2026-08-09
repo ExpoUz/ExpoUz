@@ -85,10 +85,12 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#0D1117] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         {/* Brand */}
-        <div className="text-center mb-8">
+        <div className="flex flex-col items-center text-center mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon-512.png" alt="ExpoUz" width={72} height={72} className="rounded-2xl mb-3" style={{ width: 72, height: 72 }} />
           <div className="text-3xl font-extrabold tracking-tight mb-1">
-            <span className="text-[#00C853]">EXPO</span>
-            <span className="text-white">UZ</span>
+            <span className="text-[#00C853]">Expo</span>
+            <span className="text-white">Uz</span>
           </div>
           <p className="text-gray-500 text-sm">Admin Panel</p>
         </div>
