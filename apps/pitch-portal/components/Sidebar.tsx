@@ -26,12 +26,16 @@ export function Sidebar() {
   return (
     <aside className="w-60 min-h-screen bg-[#0D1117] flex flex-col text-white flex-shrink-0">
       {/* Brand */}
-      <div className="px-6 py-5 border-b border-white/10">
-        <div className="text-lg font-bold tracking-tight">
-          <span className="text-[#00C853]">SCORE</span>
-          <span className="text-white"> WITH US</span>
+      <div className="px-6 py-5 border-b border-white/10 flex items-center gap-2.5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icon-512.png" alt="ExpoUz" width={32} height={32} className="rounded-lg" style={{ width: 32, height: 32 }} />
+        <div>
+          <div className="text-lg font-bold tracking-tight">
+            <span className="text-[#00C853]">Expo</span>
+            <span className="text-white">Uz</span>
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">Pitch Owner Portal</div>
         </div>
-        <div className="text-xs text-gray-500 mt-0.5">Pitch Owner Portal</div>
       </div>
 
       {/* Nav */}

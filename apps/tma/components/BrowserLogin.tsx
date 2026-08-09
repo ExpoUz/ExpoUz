@@ -58,10 +58,12 @@ export function BrowserLogin() {
     <div className="min-h-screen flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-sm">
         {/* Brand */}
-        <div className="text-center mb-8">
+        <div className="flex flex-col items-center text-center mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon-512.png" alt="ExpoUz" width={72} height={72} className="rounded-2xl mb-3" style={{ width: 72, height: 72 }} />
           <div className="text-2xl font-extrabold tracking-tight mb-1">
-            <span className="text-[#00C853]">SCORE</span>
-            <span> WITH US</span>
+            <span className="text-[#00C853]">Expo</span>
+            <span>Uz</span>
           </div>
           <p className="text-sm text-[color:var(--tg-hint)]">Sign in to continue</p>
         </div>
