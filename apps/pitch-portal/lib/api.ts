@@ -75,6 +75,17 @@ export async function setPitchAvailability(id: string, isActive: boolean) {
   return data;
 }
 
+export interface DayHours { open: string; close: string }
+export type OpeningHours = Partial<Record<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun", DayHours>>;
+
+export async function setOpeningHours(
+  id: string,
+  body: { openingHours?: OpeningHours | null; slotDuration?: number; courtCount?: number },
+) {
+  const { data } = await portalApi.patch(`/pitch-admin/pitches/${id}/opening-hours`, body);
+  return data;
+}
+
 // ─── Matches ─────────────────────────────────────────────────
 export async function getMatches(params?: { page?: number; limit?: number }): Promise<{
   data: any[];

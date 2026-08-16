@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
@@ -92,6 +92,26 @@ export default function CreateMatchPage() {
   });
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Prefill from the "Free courts" conversion path: /create?pitchId=&date=&time=
+  // Jump straight to the details step so the user just confirms.
+  const searchParams = useSearchParams();
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (prefilledRef.current) return;
+    const pitchId = searchParams.get("pitchId");
+    const date = searchParams.get("date");
+    const time = searchParams.get("time");
+    if (!pitchId && !date && !time) return;
+    prefilledRef.current = true;
+    setForm((f) => ({
+      ...f,
+      ...(pitchId ? { pitchId } : {}),
+      ...(date ? { date } : {}),
+      ...(time ? { time } : {}),
+    }));
+    if (pitchId) setStep(2); // pitch chosen → go to date/time/details
+  }, [searchParams]);
 
   // When the sport switches, reset format + cap and clear the chosen pitch
   // (pitches are sport-specific).

@@ -52,6 +52,16 @@ export class PitchAdminController {
     return this.pitchAdminService.updatePitchAvailability(user.id, id, isActive);
   }
 
+  @Patch('pitches/:id/opening-hours')
+  @ApiOperation({ summary: 'Set operating hours + slot/court config for a venue' })
+  updateOpeningHours(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: { openingHours?: any; slotDuration?: number; courtCount?: number },
+  ) {
+    return this.pitchAdminService.updateOpeningHours(user.id, id, body);
+  }
+
   @Get('matches')
   @ApiOperation({ summary: 'Get matches on owned pitches' })
   @ApiQuery({ name: 'page', required: false, type: Number })

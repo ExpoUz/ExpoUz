@@ -1,5 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+
+const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Keep only valid {open,close} day entries; drop malformed/closed days. */
+function sanitizeHours(input: any): Record<string, { open: string; close: string }> | null {
+  if (!input || typeof input !== 'object') return null;
+  const out: Record<string, { open: string; close: string }> = {};
+  for (const day of DAYS) {
+    const h = input[day];
+    if (h && typeof h.open === 'string' && typeof h.close === 'string' && HHMM.test(h.open) && HHMM.test(h.close)) {
+      out[day] = { open: h.open, close: h.close };
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
 
 @Injectable()
 export class PitchAdminService {
@@ -277,6 +294,38 @@ export class PitchAdminService {
       where: { id: pitch.id },
       data: { isActive },
     });
+  }
+
+  /**
+   * Owner sets operating hours + slot/court config for one of their venues.
+   * Ownership-scoped; validates the openingHours shape (bad days dropped, a
+   * missing day = closed). Powers the "Free courts" availability filter.
+   */
+  async updateOpeningHours(
+    ownerId: string,
+    pitchId: string,
+    body: { openingHours?: any; slotDuration?: number; courtCount?: number },
+  ) {
+    const pitch = await this.prisma.pitch.findFirstOrThrow({ where: { id: pitchId, ownerId } });
+
+    const data: any = {};
+    if (body.openingHours !== undefined) {
+      const clean = sanitizeHours(body.openingHours);
+      // Prisma needs DbNull (not JS null) to clear a nullable Json column.
+      data.openingHours = clean ?? Prisma.DbNull;
+    }
+    if (body.slotDuration !== undefined) {
+      const d = Number(body.slotDuration);
+      if (![30, 60, 90, 120].includes(d)) throw new BadRequestException('Invalid slotDuration');
+      data.slotDuration = d;
+    }
+    if (body.courtCount !== undefined) {
+      const c = Number(body.courtCount);
+      if (!Number.isInteger(c) || c < 1 || c > 20) throw new BadRequestException('Invalid courtCount');
+      data.courtCount = c;
+    }
+
+    return this.prisma.pitch.update({ where: { id: pitch.id }, data });
   }
 
   // ─── Users who have booked at this admin's pitches ───────────────────────

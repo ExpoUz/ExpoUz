@@ -117,6 +117,17 @@ export default function DashboardPage() {
             value={(dashboard?.unverifiedPhoneUsers ?? 0).toLocaleString()}
             color="#00B0FF"
           />
+          <StatCard
+            icon="⏰"
+            title="Venues Missing Hours"
+            value={`${dashboard?.venuesMissingHours ?? 0}${dashboard?.activeVenues != null ? ` / ${dashboard.activeVenues}` : ""}`}
+            color="#EF4444"
+            sub={
+              (dashboard?.venuesMissingHours ?? 0) > 0
+                ? "no free-slot data"
+                : "all set"
+            }
+          />
         </div>
       )}
 

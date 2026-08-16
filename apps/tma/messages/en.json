@@ -553,5 +553,30 @@
     "saving": "Saving…",
     "failed": "Could not save",
     "notHost": "Only the host can edit this match."
+  },
+  "slots": {
+    "title": "When do you want to play?",
+    "date": "Date",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "pick": "Pick",
+    "time": "Time",
+    "morning": "Morning",
+    "afternoon": "Afternoon",
+    "evening": "Evening",
+    "late": "Late",
+    "orChooseSlot": "Or choose a slot",
+    "free": "free",
+    "show": "Show",
+    "gamesToJoin": "Games to join",
+    "freeCourts": "Free courts",
+    "apply": "Apply",
+    "reset": "Reset",
+    "loading": "Loading…",
+    "freeCourtsTitle": "Free courts",
+    "noFreeCourts": "No free courts in this window.",
+    "changeTime": "Change time",
+    "freeTitle": "Free:",
+    "fromPerHr": "From {price}/hr"
   }
 }

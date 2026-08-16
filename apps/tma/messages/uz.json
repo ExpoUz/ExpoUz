@@ -553,5 +553,30 @@
     "saving": "Saqlanmoqda…",
     "failed": "Saqlab bo‘lmadi",
     "notHost": "Faqat tashkilotchi tahrirlashi mumkin."
+  },
+  "slots": {
+    "title": "Qachon o‘ynamoqchisiz?",
+    "date": "Sana",
+    "today": "Bugun",
+    "tomorrow": "Ertaga",
+    "pick": "Tanlash",
+    "time": "Vaqt",
+    "morning": "Ertalab",
+    "afternoon": "Kunduzi",
+    "evening": "Kechqurun",
+    "late": "Kech",
+    "orChooseSlot": "Yoki vaqtni tanlang",
+    "free": "bo‘sh",
+    "show": "Ko‘rsatish",
+    "gamesToJoin": "O‘yinlar",
+    "freeCourts": "Bo‘sh kortlar",
+    "apply": "Qo‘llash",
+    "reset": "Tozalash",
+    "loading": "Yuklanmoqda…",
+    "freeCourtsTitle": "Bo‘sh kortlar",
+    "noFreeCourts": "Bu vaqtda bo‘sh kort yo‘q.",
+    "changeTime": "Vaqtni o‘zgartirish",
+    "freeTitle": "Bo‘sh:",
+    "fromPerHr": "{price}/soatdan"
   }
 }

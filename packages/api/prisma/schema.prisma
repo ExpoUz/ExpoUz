@@ -268,12 +268,19 @@ model Pitch {
   // Padel court attributes
   courtType       PadelCourtType  @default(PANORAMIC)
   isCovered       Boolean         @default(false)
+  // Availability: per-day open/close (JSON: {mon:{open,close},...}; missing day = closed),
+  // minutes per bookable slot, and how many parallel courts this venue can run.
+  openingHours    Json?
+  slotDuration    Int             @default(60)
+  courtCount      Int             @default(1)
   locationId      String?
   location        Location?       @relation(fields: [locationId], references: [id])
   createdAt       DateTime        @default(now())
   matches         Match[]
   followers       PitchFollower[]
   pitchBookings   PitchBooking[]
+
+  @@index([sport, city, isActive])
 }
 
 enum SurfaceType {
@@ -369,6 +376,10 @@ model Match {
   ratings       PlayerRating[]
   notifications Notification[]
   result        MatchResult?
+
+  // Availability filtering hits these hot paths.
+  @@index([pitchId, startTime])
+  @@index([sport, startTime])
 }
 
 model MatchResult {

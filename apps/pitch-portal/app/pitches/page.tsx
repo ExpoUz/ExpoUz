@@ -1,9 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Users, CalendarDays, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { getPitches, setPitchAvailability, formatUZS } from "@/lib/api";
 import { PageHeader, Spinner, EmptyState } from "@/components/ui";
+import { OpeningHoursModal } from "@/components/OpeningHoursModal";
+
+function hasHours(p: any): boolean {
+  return !!p.openingHours && Object.keys(p.openingHours).length > 0;
+}
 
 function VerificationBadge({ pitch }: { pitch: any }) {
   if (pitch.isVerified) {
@@ -29,6 +35,7 @@ function VerificationBadge({ pitch }: { pitch: any }) {
 
 export default function PitchesPage() {
   const qc = useQueryClient();
+  const [hoursPitch, setHoursPitch] = useState<any | null>(null);
   const { data: pitches, isLoading } = useQuery({
     queryKey: ["portal-pitches"],
     queryFn: getPitches,
@@ -103,23 +110,43 @@ export default function PitchesPage() {
                     {formatUZS(p.pricePerHour ?? p.hourlyRate ?? 0)} / hr
                   </div>
 
-                  <button
-                    onClick={() => toggle.mutate({ id: p.id, isActive: !p.isActive })}
-                    disabled={toggle.isPending}
-                    className={`mt-4 w-full py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
-                      p.isActive
-                        ? "bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB]"
-                        : "bg-[#00C853] text-black hover:bg-[#00b34a]"
-                    }`}
-                  >
-                    {p.isActive ? "Set inactive" : "Set active"}
-                  </button>
+                  {/* Opening-hours prompt — needed for the "free courts" filter */}
+                  {!hasHours(p) && (
+                    <button
+                      onClick={() => setHoursPitch(p)}
+                      className="mt-3 w-full py-2 rounded-xl text-xs font-semibold bg-[#FEF3C7] text-[#92400E] hover:bg-[#FDE68A]"
+                    >
+                      ⏰ Add opening hours so players can find your free slots
+                    </button>
+                  )}
+
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => setHoursPitch(p)}
+                      className="flex-1 py-2 rounded-xl text-sm font-semibold bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB] inline-flex items-center justify-center gap-1"
+                    >
+                      <Clock size={14} /> {hasHours(p) ? "Edit hours" : "Set hours"}
+                    </button>
+                    <button
+                      onClick={() => toggle.mutate({ id: p.id, isActive: !p.isActive })}
+                      disabled={toggle.isPending}
+                      className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
+                        p.isActive
+                          ? "bg-[#F3F4F6] text-[#374151] hover:bg-[#E5E7EB]"
+                          : "bg-[#00C853] text-black hover:bg-[#00b34a]"
+                      }`}
+                    >
+                      {p.isActive ? "Set inactive" : "Set active"}
+                    </button>
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {hoursPitch && <OpeningHoursModal pitch={hoursPitch} onClose={() => setHoursPitch(null)} />}
     </div>
   );
 }

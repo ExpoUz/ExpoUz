@@ -9,9 +9,10 @@ import { GatewayModule } from '../gateway/gateway.module';
 import { WalletModule } from '../payments/wallet/wallet.module';
 import { PhoneModule } from '../phone/phone.module';
 import { MessagesModule } from '../messages/messages.module';
+import { AvailabilityModule } from '../availability/availability.module';
 
 @Module({
-  imports: [FormationModule, RemindersModule, NotificationsModule, EscrowModule, GatewayModule, WalletModule, PhoneModule, MessagesModule],
+  imports: [FormationModule, RemindersModule, NotificationsModule, EscrowModule, GatewayModule, WalletModule, PhoneModule, MessagesModule, AvailabilityModule],
   controllers: [MatchesController],
   providers: [MatchesService],
   exports: [MatchesService],

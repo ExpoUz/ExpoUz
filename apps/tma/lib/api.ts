@@ -288,6 +288,29 @@ export async function getPitch(id: string) {
   return data;
 }
 
+// ─── Time-slot availability ──────────────────────────────────
+export interface SlotChip { slot: string; games: number; free: boolean }
+export interface SlotCounts { chips: SlotChip[]; freeCourtsAvailable: boolean }
+export interface FreeCourt {
+  pitch: { id: string; name: string; district: string; city: string; photo: string | null; lat: number; lng: number; hourlyRate: number };
+  slots: string[];
+}
+
+export async function getSlotCounts(params: { sport: string; date: string; city?: string; district?: string }): Promise<SlotCounts> {
+  const { data } = await api.get("/availability/counts", { params });
+  return data;
+}
+
+export async function getFreeCourts(params: { sport: string; date: string; from?: string; to?: string; city?: string; district?: string; duration?: number }): Promise<FreeCourt[]> {
+  const { data } = await api.get("/availability/slots", { params });
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getJoinableGames(params: { sport: string; date: string; from?: string; to?: string; city?: string; district?: string }): Promise<any[]> {
+  const { data } = await api.get("/availability/games", { params });
+  return Array.isArray(data) ? data : [];
+}
+
 // ─── Players / ranking / social ───────────────────────────────
 export async function searchPlayers(q: string, city?: string): Promise<any[]> {
   const { data } = await api.get("/users/search", { params: { q, ...(city ? { city } : {}) } });

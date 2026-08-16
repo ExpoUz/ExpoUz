@@ -25,6 +25,8 @@ import { EscrowService } from '../escrow/escrow.service';
 import { MatchGateway } from '../gateway/match.gateway';
 import { WalletService } from '../payments/wallet/wallet.service';
 import { MessagesService } from '../messages/messages.service';
+import { AvailabilityService } from '../availability/availability.service';
+import { SettingsService } from '../settings/settings.service';
 import { syncPlayerCount } from './player-count';
 import { randomBytes } from 'crypto';
 
@@ -46,7 +48,20 @@ export class MatchesService {
     private matchGateway: MatchGateway,
     private wallet: WalletService,
     private messages: MessagesService,
+    private availability: AvailabilityService,
+    private settings: SettingsService,
   ) {}
+
+  /** Best-effort: clear cached slot counts for the venue's city after a change. */
+  private async invalidateAvailability(pitchId: string, sport: string, startTime: Date) {
+    try {
+      const pitch = await this.prisma.pitch.findUnique({ where: { id: pitchId }, select: { city: true } });
+      const date = `${startTime.getFullYear()}-${String(startTime.getMonth() + 1).padStart(2, '0')}-${String(startTime.getDate()).padStart(2, '0')}`;
+      await this.availability.invalidateForCity(sport, pitch?.city ?? null, date);
+    } catch {
+      /* cache self-heals within its 60s TTL */
+    }
+  }
 
   private generateShareCode(): string {
     return randomBytes(4).toString('hex').toUpperCase().slice(0, 6);
@@ -568,6 +583,7 @@ export class MatchesService {
       this.telegramService.createMatchTopic(match.id, autoTitle).catch(() => {});
     }
 
+    await this.invalidateAvailability(match.pitchId, match.sport, match.startTime);
     return match;
   }
 
@@ -808,6 +824,7 @@ export class MatchesService {
       this.telegramService.closeTopic(conversation.telegramTopicId, 'Match cancelled').catch(() => {});
     }
 
+    await this.invalidateAvailability(match.pitchId, match.sport, match.startTime);
     return { message: 'Match cancelled, refunds processed' };
   }
 
@@ -913,6 +930,8 @@ export class MatchesService {
     }
 
     const price = Number(match.pricePerPlayer ?? 0);
+    // Platform fee rate from the single source of truth (Super Admin settings).
+    const { platformFeeRate } = await this.settings.get();
 
     // Slot allocation AND payment happen in one transaction — if either fails,
     // no money moves and no slot is taken.
@@ -979,7 +998,7 @@ export class MatchesService {
               userId,
               bookingId: b.id,
               amount: price,
-              platformFee: price * PLATFORM_FEE_RATE,
+              platformFee: price * platformFeeRate,
               gateway: 'WALLET',
               status: 'HELD',
               heldAt: new Date(),
@@ -1072,6 +1091,12 @@ export class MatchesService {
     const hoursBeforeMatch =
       (new Date(booking.match.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
 
+    // Cancellation policy from the single source of truth (Super Admin settings).
+    // Per-match deadline still wins if the host set a stricter one at creation.
+    const { cancellationFeeRate, cancellationWindowHours } = await this.settings.get();
+    const deadlineHours = booking.match.cancellationDeadlineHours ?? cancellationWindowHours;
+    const refundKeepRate = 1 - cancellationFeeRate;
+
     // Only money that actually left the wallet can come back: a PENDING
     // transaction was never paid, so it must never produce a refund credit.
     const paidTransaction =
@@ -1085,9 +1110,9 @@ export class MatchesService {
     if (hoursBeforeMatch <= 0) {
       newStatus = 'NO_SHOW';
       refundAmount = null;
-    } else if (hoursBeforeMatch <= booking.match.cancellationDeadlineHours) {
+    } else if (hoursBeforeMatch <= deadlineHours) {
       newStatus = 'CANCELLED_PENALTY';
-      refundAmount = paidTransaction ? Number(paidTransaction.amount) * 0.5 : null;
+      refundAmount = paidTransaction ? Number(paidTransaction.amount) * refundKeepRate : null;
     }
 
     await this.prisma.$transaction(async (tx) => {

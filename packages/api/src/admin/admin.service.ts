@@ -1,8 +1,10 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LevelService } from '../level/level.service';
 import { WalletService } from '../payments/wallet/wallet.service';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class AdminService {
@@ -11,6 +13,7 @@ export class AdminService {
     private notificationsService: NotificationsService,
     private level: LevelService,
     private wallet: WalletService,
+    private settings: SettingsService,
   ) {}
 
   /**
@@ -66,6 +69,8 @@ export class AdminService {
       padelPitches,
       assessedPadelPlayers,
       unverifiedPhoneUsers,
+      venuesMissingHours,
+      activeVenues,
     ] = await Promise.all([
       this.prisma.user.count({ where: { deletedAt: null, isBanned: false } }),
       this.prisma.match.count({ where: { status: { in: ['OPEN', 'FULL', 'CONFIRMED', 'IN_PROGRESS'] } } }),
@@ -99,6 +104,9 @@ export class AdminService {
       this.prisma.user.count({
         where: { deletedAt: null, isBanned: false, phoneVerified: false },
       }),
+      // Active venues with no operating hours set — can't appear in "free courts".
+      this.prisma.pitch.count({ where: { isActive: true, openingHours: { equals: Prisma.DbNull } } }),
+      this.prisma.pitch.count({ where: { isActive: true } }),
     ]);
 
     return {
@@ -110,6 +118,8 @@ export class AdminService {
       failedTransactions,
       unverifiedPhoneUsers,
       dailyActiveUsers: activeBookingsToday,
+      venuesMissingHours,
+      activeVenues,
       sportBreakdown: {
         football: { matches: footballMatches, pitches: footballPitches },
         padel: { matches: padelMatches, pitches: padelPitches, assessedPlayers: assessedPadelPlayers },
@@ -456,11 +466,13 @@ export class AdminService {
   }
 
   async updateCommission(rate: number) {
-    return this.prisma.appSettings.upsert({
+    const row = await this.prisma.appSettings.upsert({
       where: { id: 'singleton' },
       update: { commissionRate: rate },
       create: { id: 'singleton', commissionRate: rate, platformFeeRate: 0.05 },
     });
+    this.settings.invalidate(); // apply to booking math immediately
+    return row;
   }
 
   /** Read platform settings, creating the singleton row with defaults if absent. */
@@ -489,11 +501,13 @@ export class AdminService {
     if (Object.keys(data).length === 0) {
       throw new BadRequestException('No valid settings provided');
     }
-    return this.prisma.appSettings.upsert({
+    const row = await this.prisma.appSettings.upsert({
       where: { id: 'singleton' },
       update: data,
       create: { id: 'singleton', ...data },
     });
+    this.settings.invalidate(); // apply to booking math immediately
+    return row;
   }
 
   async createAnnouncement(dto: {

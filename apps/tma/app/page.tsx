@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Calendar, Clock, Check, Menu } from "lucide-react";
 import dayjs from "dayjs";
-import { getMatches, getCities, getNearbyPitches } from "@/lib/api";
+import { getMatches, getCities, getNearbyPitches, getFreeCourts, getJoinableGames } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/lib/auth";
 import { useSportStore, setSport, setCity as setStoreCity, sportMeta, type Sport } from "@/lib/sport-store";
@@ -17,15 +17,10 @@ import { SectionHeader } from "@/components/home/SectionHeader";
 import { GamesTodayCarousel } from "@/components/home/GamesTodayCarousel";
 import { OpenMatchesCarousel } from "@/components/home/OpenMatchesCarousel";
 import { PitchesCarousel } from "@/components/home/PitchesCarousel";
+import { SlotSheet, slotFilterLabel, type SlotFilter } from "@/components/home/SlotSheet";
+import { FreeCourtCard } from "@/components/home/FreeCourtCard";
 import { deriveSections } from "@/components/home/matchHelpers";
 import { initialsOf } from "@/components/home/PhotoOrInitials";
-
-const TIME_KEYS = [
-  { key: "", label: "anyTime" },
-  { key: "MORNING", label: "morning" },
-  { key: "AFTERNOON", label: "afternoon" },
-  { key: "EVENING", label: "evening" },
-] as const;
 
 export default function HomePage() {
   const router = useRouter();
@@ -41,29 +36,78 @@ export default function HomePage() {
   const [city, setCity] = useState(storeCity || "Tashkent");
   const [district, setDistrict] = useState("");
   const [date, setDate] = useState("");
-  const [timeOfDay, setTimeOfDay] = useState("");
   const [spotsOnly, setSpotsOnly] = useState(false);
   const [matchType, setMatchType] = useState(""); // "" | COMPETITIVE | CASUAL
+  const [slotFilter, setSlotFilter] = useState<SlotFilter | null>(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [timeOpen, setTimeOpen] = useState(false);
+  const [slotOpen, setSlotOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+
+  const tSlots = useTranslations("slots");
+
+  // Window bounds derived from the slot filter: explicit slots → min..max+1h,
+  // else the chosen preset window. Feeds both the games and free-courts queries.
+  const slotWindow = (() => {
+    if (!slotFilter) return null;
+    if (slotFilter.slots.length > 0) {
+      const sorted = [...slotFilter.slots].sort();
+      const last = sorted[sorted.length - 1];
+      const to = `${String((parseInt(last) + 1) % 24).padStart(2, "0")}:00`;
+      return { from: sorted[0], to: to === "00:00" ? "23:59" : to };
+    }
+    if (slotFilter.from && slotFilter.to) return { from: slotFilter.from, to: slotFilter.to };
+    return null;
+  })();
+  const slotDate = slotFilter?.date ?? "";
+  const freeMode = slotFilter?.mode === "free";
 
   const { data: cities } = useQuery({ queryKey: ["cities"], queryFn: getCities });
 
+  // A slot filter with a date overrides the plain date pill.
+  const effectiveDate = slotDate || date;
+  // When a time window is chosen, use the availability/games endpoint (it
+  // filters by window and counts real open spots); otherwise the normal list.
+  const useSlotGames = !!slotWindow || (freeMode === false && !!slotFilter && !!slotDate);
   const { data, isLoading } = useQuery({
-    queryKey: ["tma-matches", sport, city, district, date, timeOfDay, spotsOnly, matchType],
-    queryFn: () =>
-      getMatches({
+    queryKey: ["tma-matches", sport, city, district, effectiveDate, slotWindow, spotsOnly, matchType, useSlotGames],
+    queryFn: async () => {
+      if (useSlotGames) {
+        const arr = await getJoinableGames({
+          sport,
+          date: slotDate || dayjs().format("YYYY-MM-DD"),
+          ...(city ? { city } : {}),
+          ...(district ? { district } : {}),
+          ...(slotWindow ? { from: slotWindow.from, to: slotWindow.to } : {}),
+        });
+        // Apply padel match-type client-side (availability endpoint is sport-only).
+        const filtered = isPadel && matchType ? arr.filter((m: any) => m.matchType === matchType) : arr;
+        return { data: filtered, total: filtered.length, page: 1, limit: filtered.length };
+      }
+      return getMatches({
         sport,
         ...(city ? { city } : {}),
         ...(district ? { district } : {}),
-        ...(date ? { date: dayjs(date).toISOString() } : {}),
-        ...(timeOfDay ? { timeOfDay } : {}),
+        ...(effectiveDate ? { date: dayjs(effectiveDate).toISOString() } : {}),
         ...(spotsOnly ? { minSpotsAvailable: 1 } : {}),
-        // Match type only applies to padel.
         ...(isPadel && matchType ? { matchType } : {}),
+      });
+    },
+    enabled: !freeMode,
+  });
+
+  // Free courts — only when the "Free courts" mode is selected.
+  const { data: freeCourts } = useQuery({
+    queryKey: ["free-courts", sport, city, district, slotDate, slotWindow],
+    queryFn: () =>
+      getFreeCourts({
+        sport,
+        date: slotDate || dayjs().format("YYYY-MM-DD"),
+        ...(city ? { city } : {}),
+        ...(district ? { district } : {}),
+        ...(slotWindow ? { from: slotWindow.from, to: slotWindow.to } : {}),
       }),
+    enabled: freeMode,
   });
 
   // Pitches near you — live location when granted (distance-sorted), else
@@ -102,11 +146,12 @@ export default function HomePage() {
   const pitches = nearbyPitches ?? [];
   const { hero, open, todaySpots } = deriveSections(matches);
   const noMatches = !hero && todaySpots.length === 0 && open.length === 0;
-  const filtersDirty = !!(date || timeOfDay || spotsOnly || district || matchType);
+  const filtersDirty = !!(date || slotFilter || spotsOnly || district || matchType);
+  const courts = freeCourts ?? [];
 
   function clearFilters() {
     setDate("");
-    setTimeOfDay("");
+    setSlotFilter(null);
     setSpotsOnly(false);
     setDistrict("");
     setMatchType("");
@@ -175,19 +220,15 @@ export default function HomePage() {
             />
           </label>
           <button
-            className={`pill ${timeOfDay ? "pill-active" : ""}`}
+            className={`pill ${slotFilter ? "pill-active" : ""}`}
             onClick={() => {
               hapticImpact("light");
-              setTimeOpen(true);
+              setSlotOpen(true);
             }}
           >
             <Clock size={15} />
-            <span>
-              {(() => {
-                const found = TIME_KEYS.find((x) => x.key === timeOfDay);
-                return found ? t(found.label) : t("time");
-              })()}
-            </span>
+            <span>{slotFilter ? slotFilterLabel(slotFilter, tSlots) : t("time")}</span>
+            {slotFilter && <span className="ml-0.5">▾</span>}
           </button>
           {isPadel && (
             <>
@@ -230,7 +271,25 @@ export default function HomePage() {
 
       {/* Body */}
       <main className="pt-3">
-        {isLoading ? (
+        {freeMode ? (
+          // ── Free courts mode ──
+          <div className="space-y-3">
+            <SectionHeader title={tSlots("freeCourtsTitle")} />
+            {courts.length === 0 ? (
+              <div className="text-center py-14 px-8">
+                <div className="text-4xl mb-2">🎾</div>
+                <p className="font-medium">{tSlots("noFreeCourts")}</p>
+                <button onClick={() => setSlotOpen(true)} className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold bg-[#00C853] text-white">
+                  {tSlots("changeTime")}
+                </button>
+              </div>
+            ) : (
+              courts.map((c) => (
+                <FreeCourtCard key={c.pitch.id} court={c} date={slotDate || dayjs().format("YYYY-MM-DD")} />
+              ))
+            )}
+          </div>
+        ) : isLoading ? (
           <HomeSkeleton />
         ) : (
           <div className="space-y-7">
@@ -347,21 +406,16 @@ export default function HomePage() {
         </Sheet>
       )}
 
-      {/* Time-of-day sheet */}
-      {timeOpen && (
-        <Sheet title={t("timeOfDay")} onClose={() => setTimeOpen(false)}>
-          {TIME_KEYS.map((x) => (
-            <SheetRow
-              key={x.key}
-              label={t(x.label)}
-              selected={timeOfDay === x.key}
-              onClick={() => {
-                setTimeOfDay(x.key);
-                setTimeOpen(false);
-              }}
-            />
-          ))}
-        </Sheet>
+      {/* Slot availability sheet */}
+      {slotOpen && (
+        <SlotSheet
+          sport={sport}
+          city={city || undefined}
+          district={district || undefined}
+          initial={slotFilter}
+          onApply={setSlotFilter}
+          onClose={() => setSlotOpen(false)}
+        />
       )}
 
       <BottomNav />

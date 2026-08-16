@@ -11,6 +11,8 @@ import { UsersModule } from './users/users.module';
 import { PhoneModule } from './phone/phone.module';
 import { PitchesModule } from './pitches/pitches.module';
 import { MatchesModule } from './matches/matches.module';
+import { AvailabilityModule } from './availability/availability.module';
+import { SettingsModule } from './settings/settings.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { PitchBookingsModule } from './pitch-bookings/pitch-bookings.module';
 import { PaymentsModule } from './payments/payments.module';
@@ -73,6 +75,8 @@ import { HealthController } from './health.controller';
     PhoneModule,
     PitchesModule,
     MatchesModule,
+    AvailabilityModule,
+    SettingsModule,
     BookingsModule,
     PitchBookingsModule,
     PaymentsModule,
