@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { Modal, useToast } from "@expouz/ui";
 import { setOpeningHours, type OpeningHours, type DayHours } from "@/lib/api";
 
 const DAYS: { key: keyof OpeningHours; label: string }[] = [
@@ -22,6 +22,7 @@ const DAYS: { key: keyof OpeningHours; label: string }[] = [
  */
 export function OpeningHoursModal({ pitch, onClose }: { pitch: any; onClose: () => void }) {
   const qc = useQueryClient();
+  const toast = useToast();
   const initial: OpeningHours = pitch.openingHours ?? {};
   const [hours, setHours] = useState<Record<string, DayHours | undefined>>(() => {
     const h: Record<string, DayHours | undefined> = {};
@@ -46,8 +47,10 @@ export function OpeningHoursModal({ pitch, onClose }: { pitch: any; onClose: () 
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["portal-pitches"] });
+      toast.success("Opening hours saved");
       onClose();
     },
+    onError: () => toast.error("Could not save opening hours"),
   });
 
   const toggleDay = (key: string, on: boolean) =>
@@ -64,17 +67,21 @@ export function OpeningHoursModal({ pitch, onClose }: { pitch: any; onClose: () 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E7EB] sticky top-0 bg-white">
-          <div>
-            <h2 className="font-bold text-[#0D1117]">Opening hours</h2>
-            <p className="text-xs text-[#6B7280]">{pitch.name}</p>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-[#F3F4F6] flex items-center justify-center"><X size={16} /></button>
-        </div>
-
-        <div className="p-5 space-y-4">
+    <Modal
+      title="Opening hours"
+      subtitle={pitch.name}
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-[#374151] hover:bg-[#F3F4F6]">Cancel</button>
+          <button onClick={() => save.mutate()} disabled={save.isPending}
+            className="px-5 py-2 rounded-xl text-sm font-semibold bg-[#00C853] text-white hover:bg-[#00b34a] disabled:opacity-50">
+            {save.isPending ? "Saving…" : "Save hours"}
+          </button>
+        </>
+      }
+    >
+        <div className="space-y-4">
           <p className="text-xs text-[#6B7280] bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl px-3 py-2">
             Add your opening hours so players can find your free slots and book a game.
           </p>
@@ -124,15 +131,6 @@ export function OpeningHoursModal({ pitch, onClose }: { pitch: any; onClose: () 
             </label>
           </div>
         </div>
-
-        <div className="px-5 py-4 border-t border-[#E5E7EB] flex justify-end gap-2 sticky bottom-0 bg-white">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-[#374151] hover:bg-[#F3F4F6]">Cancel</button>
-          <button onClick={() => save.mutate()} disabled={save.isPending}
-            className="px-5 py-2 rounded-xl text-sm font-semibold bg-[#00C853] text-white hover:bg-[#00b34a] disabled:opacity-50">
-            {save.isPending ? "Saving…" : "Save hours"}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
