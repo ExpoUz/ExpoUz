@@ -1,48 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { StatCard } from "@expouz/ui";
 import { getDashboard, getMatches, getUsers } from "@/lib/api";
 import dayjs from "dayjs";
-
-function StatCard({
-  title,
-  value,
-  sub,
-  color,
-  icon,
-}: {
-  title: string;
-  value: string | number;
-  sub?: string;
-  color?: string;
-  icon: string;
-}) {
-  return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-      <div className="flex items-start justify-between mb-3">
-        <div className="text-2xl">{icon}</div>
-        {sub && (
-          <span
-            className={`text-xs font-semibold px-2 py-1 rounded-full ${
-              sub.startsWith("+")
-                ? "bg-green-50 text-green-600"
-                : "bg-red-50 text-red-500"
-            }`}
-          >
-            {sub}
-          </span>
-        )}
-      </div>
-      <div
-        className="text-3xl font-extrabold mb-1"
-        style={{ color: color ?? "#0D1117" }}
-      >
-        {value}
-      </div>
-      <div className="text-sm text-gray-500">{title}</div>
-    </div>
-  );
-}
 
 export default function DashboardPage() {
   const { data: dashboard, isLoading: dbLoading } = useQuery({
@@ -84,28 +45,28 @@ export default function DashboardPage() {
         <div className="grid grid-cols-4 gap-5 mb-8">
           <StatCard
             icon="👥"
-            title="Total Users"
+            label="Total Users"
             value={(dashboard?.totalUsers ?? 0).toLocaleString()}
-            color="#2563EB"
+            accent="#2563EB"
           />
           <StatCard
             icon="🏟"
-            title="Verified Pitches"
+            label="Verified Pitches"
             value={dashboard?.activePitches ?? dashboard?.totalPitches ?? 0}
-            color="#00C853"
+            accent="#00C853"
           />
           <StatCard
             icon="⚽"
-            title="Active Matches"
+            label="Active Matches"
             value={dashboard?.activeMatches ?? dashboard?.totalMatches ?? 0}
-            color="#7C3AED"
+            accent="#7C3AED"
           />
           <StatCard
             icon="⏳"
-            title="Pending Pitches"
+            label="Pending Pitches"
             value={dashboard?.pendingPitches ?? 0}
-            color="#F59E0B"
-            sub={
+            accent="#F59E0B"
+            delta={
               (dashboard?.pendingPitches ?? 0) > 0
                 ? `+${dashboard?.pendingPitches} review`
                 : undefined
@@ -113,16 +74,16 @@ export default function DashboardPage() {
           />
           <StatCard
             icon="📱"
-            title="Unverified Phones"
+            label="Unverified Phones"
             value={(dashboard?.unverifiedPhoneUsers ?? 0).toLocaleString()}
-            color="#00B0FF"
+            accent="#00B0FF"
           />
           <StatCard
             icon="⏰"
-            title="Venues Missing Hours"
+            label="Venues Missing Hours"
             value={`${dashboard?.venuesMissingHours ?? 0}${dashboard?.activeVenues != null ? ` / ${dashboard.activeVenues}` : ""}`}
-            color="#EF4444"
-            sub={
+            accent="#EF4444"
+            hint={
               (dashboard?.venuesMissingHours ?? 0) > 0
                 ? "no free-slot data"
                 : "all set"
@@ -136,21 +97,21 @@ export default function DashboardPage() {
         <div className="grid grid-cols-3 gap-5 mb-8">
           <StatCard
             icon="💰"
-            title="Revenue Today"
+            label="Revenue Today"
             value={`${Number(dashboard?.revenueToday ?? 0).toLocaleString()} UZS`}
-            color="#00C853"
+            accent="#00C853"
           />
           <StatCard
             icon="📋"
-            title="Revenue This Month"
+            label="Revenue This Month"
             value={`${Number(dashboard?.revenueMonth ?? 0).toLocaleString()} UZS`}
-            color="#7C3AED"
+            accent="#7C3AED"
           />
           <StatCard
             icon="⚠️"
-            title="Failed Transactions"
+            label="Failed Transactions"
             value={dashboard?.failedTransactions ?? 0}
-            color="#EF4444"
+            accent="#EF4444"
           />
         </div>
       )}

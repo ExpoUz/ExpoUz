@@ -20,6 +20,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@expouz/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@tanstack/react-query':
         specifier: ^5.45.0
         version: 5.100.11(react@18.2.0)
@@ -202,6 +205,9 @@ importers:
 
   apps/pitch-portal:
     dependencies:
+      '@expouz/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@tanstack/react-query':
         specifier: ^5.45.0
         version: 5.100.11(react@18.2.0)
@@ -469,6 +475,28 @@ importers:
 
   packages/shared:
     devDependencies:
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+
+  packages/ui:
+    dependencies:
+      react-dom:
+        specifier: ^18
+        version: 18.3.1(react@18.2.0)
+    devDependencies:
+      '@types/react':
+        specifier: ^18
+        version: 18.2.79
+      '@types/react-dom':
+        specifier: ^18
+        version: 18.3.7(@types/react@18.2.79)
+      lucide-react:
+        specifier: ^0.395.0
+        version: 0.395.0(react@18.2.0)
+      react:
+        specifier: ^18
+        version: 18.2.0
       typescript:
         specifier: ^5.4.5
         version: 5.9.3
@@ -12241,7 +12269,6 @@ packages:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0
     dependencies:
       react: 18.2.0
-    dev: false
 
   /luxon@3.7.2:
     resolution: {integrity: sha512-vtEhXh/gNjI9Yg1u4jX/0YVPMvxzHuGgCm6tC5kZyb08yjGWGnqAjGJvcXbqQR2P3MyMEFnRbpcdFS6PBcLqew==}

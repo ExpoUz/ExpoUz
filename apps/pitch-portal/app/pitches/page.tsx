@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Users, CalendarDays, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { getPitches, setPitchAvailability, formatUZS } from "@/lib/api";
 import { PageHeader, Spinner, EmptyState } from "@/components/ui";
+import { ConfirmModal, useToast } from "@expouz/ui";
 import { OpeningHoursModal } from "@/components/OpeningHoursModal";
 
 function hasHours(p: any): boolean {
@@ -35,7 +36,9 @@ function VerificationBadge({ pitch }: { pitch: any }) {
 
 export default function PitchesPage() {
   const qc = useQueryClient();
+  const toast = useToast();
   const [hoursPitch, setHoursPitch] = useState<any | null>(null);
+  const [confirmPitch, setConfirmPitch] = useState<any | null>(null);
   const { data: pitches, isLoading } = useQuery({
     queryKey: ["portal-pitches"],
     queryFn: getPitches,
@@ -44,7 +47,12 @@ export default function PitchesPage() {
   const toggle = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       setPitchAvailability(id, isActive),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["portal-pitches"] }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["portal-pitches"] });
+      toast.success(vars.isActive ? "Venue set active" : "Venue set inactive");
+      setConfirmPitch(null);
+    },
+    onError: () => toast.error("Could not update venue. Try again."),
   });
 
   return (
@@ -128,7 +136,7 @@ export default function PitchesPage() {
                       <Clock size={14} /> {hasHours(p) ? "Edit hours" : "Set hours"}
                     </button>
                     <button
-                      onClick={() => toggle.mutate({ id: p.id, isActive: !p.isActive })}
+                      onClick={() => setConfirmPitch(p)}
                       disabled={toggle.isPending}
                       className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
                         p.isActive
@@ -147,6 +155,23 @@ export default function PitchesPage() {
       )}
 
       {hoursPitch && <OpeningHoursModal pitch={hoursPitch} onClose={() => setHoursPitch(null)} />}
+
+      {confirmPitch && (
+        <ConfirmModal
+          title={confirmPitch.isActive ? "Set venue inactive?" : "Set venue active?"}
+          message={confirmPitch.name}
+          impact={
+            confirmPitch.isActive
+              ? "Players won't be able to book new games at this venue."
+              : "This venue becomes bookable and can appear in the free-courts filter."
+          }
+          confirmLabel={confirmPitch.isActive ? "Set inactive" : "Set active"}
+          danger={confirmPitch.isActive}
+          loading={toggle.isPending}
+          onConfirm={() => toggle.mutate({ id: confirmPitch.id, isActive: !confirmPitch.isActive })}
+          onClose={() => setConfirmPitch(null)}
+        />
+      )}
     </div>
   );
 }

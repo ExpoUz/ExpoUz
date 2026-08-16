@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@expouz/ui": "workspace:*",
     "@tanstack/react-query": "^5.45.0",
     "axios": "^1.7.2",
     "dayjs": "^1.11.11",

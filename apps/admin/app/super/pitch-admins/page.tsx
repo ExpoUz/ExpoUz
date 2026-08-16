@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ConfirmModal, useToast } from "@expouz/ui";
 import {
   getPitchAdmins,
   createPitchAdmin,
@@ -14,9 +15,11 @@ dayjs.extend(relativeTime);
 
 export default function PitchAdminsPage() {
   const qc = useQueryClient();
+  const toast = useToast();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ phone: "", firstName: "", lastName: "" });
   const [formError, setFormError] = useState("");
+  const [removeTarget, setRemoveTarget] = useState<any | null>(null);
 
   const { data: pitchAdmins, isLoading } = useQuery({
     queryKey: ["pitch-admins"],
@@ -36,7 +39,12 @@ export default function PitchAdminsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deletePitchAdmin(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["pitch-admins"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["pitch-admins"] });
+      toast.success("Pitch owner removed");
+      setRemoveTarget(null);
+    },
+    onError: () => toast.error("Could not remove pitch owner"),
   });
 
   return (
@@ -150,10 +158,7 @@ export default function PitchAdminsPage() {
                     PITCH OWNER
                   </span>
                   <button
-                    onClick={() => {
-                      if (confirm(`Remove ${pa.firstName}?`))
-                        deleteMutation.mutate(pa.id);
-                    }}
+                    onClick={() => setRemoveTarget(pa)}
                     disabled={deleteMutation.isPending}
                     className="text-xs text-red-500 hover:text-red-700 border border-red-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
                   >
@@ -170,6 +175,19 @@ export default function PitchAdminsPage() {
           </div>
         )}
       </div>
+
+      {removeTarget && (
+        <ConfirmModal
+          title="Remove pitch owner?"
+          message={`${removeTarget.firstName ?? ""} ${removeTarget.lastName ?? ""}`.trim()}
+          impact="They lose access to the Pitch Portal. Their venues and bookings are kept."
+          confirmLabel="Remove"
+          danger
+          loading={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(removeTarget.id)}
+          onClose={() => setRemoveTarget(null)}
+        />
+      )}
     </div>
   );
 }

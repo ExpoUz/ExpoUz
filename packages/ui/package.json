@@ -1,0 +1,22 @@
+{
+  "name": "@expouz/ui",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "eslint src --ext .ts,.tsx"
+  },
+  "peerDependencies": {
+    "lucide-react": "*",
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "lucide-react": "^0.395.0",
+    "react": "^18",
+    "typescript": "^5.4.5"
+  }
+}

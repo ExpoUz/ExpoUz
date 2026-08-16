@@ -218,7 +218,5 @@ export async function getRevenue(): Promise<RevenueBreakdown> {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
-export function formatUZS(value: number | string | null | undefined): string {
-  const n = Number(value ?? 0);
-  return `${n.toLocaleString("en-US")} UZS`;
-}
+// Currency formatting is shared across both admin panels — single source of truth.
+export { formatUZS } from "@expouz/ui";

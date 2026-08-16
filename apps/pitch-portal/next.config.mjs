@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  transpilePackages: ["@expouz/ui"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.unsplash.com" },
