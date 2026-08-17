@@ -5,9 +5,10 @@ import { CrmController } from './crm.controller';
 import { VenuePrivacyController } from './venue-privacy.controller';
 import { CrmService } from './crm.service';
 import { MessagesModule } from '../messages/messages.module';
+import { OrgModule } from '../org/org.module';
 
 @Module({
-  imports: [MessagesModule],
+  imports: [MessagesModule, OrgModule],
   controllers: [PitchAdminController, CrmController, VenuePrivacyController],
   providers: [PitchAdminService, CrmService],
   exports: [PitchAdminService, CrmService],

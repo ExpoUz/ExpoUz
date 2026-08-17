@@ -75,12 +75,15 @@ export default function DashboardPage() {
               icon={<Users size={18} />}
               accent="#8B5CF6"
             />
-            <StatCard
-              label="Revenue (held + released)"
-              value={formatUZS(stats?.totalRevenue ?? 0)}
-              icon={<Wallet size={18} />}
-              accent="#F59E0B"
-            />
+            {/* Revenue is hidden for STAFF (server returns null for that role). */}
+            {stats?.totalRevenue != null && (
+              <StatCard
+                label="Revenue (held + released)"
+                value={formatUZS(stats.totalRevenue)}
+                icon={<Wallet size={18} />}
+                accent="#F59E0B"
+              />
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -2,17 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { useI18n, LANGS } from "@/lib/i18n";
+import { getPortalContext, type OrgRole } from "@/lib/api";
 
-const NAV_ITEMS = [
-  { href: "/", key: "nav.dashboard", icon: "📊" },
-  { href: "/pitches", key: "nav.pitches", icon: "🏟" },
-  { href: "/schedule", key: "nav.schedule", icon: "🗓" },
-  { href: "/players", key: "nav.players", icon: "👥" },
-  { href: "/insights", key: "nav.insights", icon: "📈" },
-  { href: "/broadcast", key: "nav.broadcast", icon: "📣" },
-  { href: "/revenue", key: "nav.revenue", icon: "💰" },
+// Which org roles may see each nav item. STAFF is limited to schedule + check-in.
+const NAV_ITEMS: { href: string; key: string; icon: string; roles: OrgRole[] }[] = [
+  { href: "/", key: "nav.dashboard", icon: "📊", roles: ["OWNER", "MANAGER", "STAFF"] },
+  { href: "/schedule", key: "nav.schedule", icon: "🗓", roles: ["OWNER", "MANAGER", "STAFF"] },
+  { href: "/pitches", key: "nav.pitches", icon: "🏟", roles: ["OWNER", "MANAGER"] },
+  { href: "/players", key: "nav.players", icon: "👥", roles: ["OWNER", "MANAGER"] },
+  { href: "/insights", key: "nav.insights", icon: "📈", roles: ["OWNER", "MANAGER"] },
+  { href: "/broadcast", key: "nav.broadcast", icon: "📣", roles: ["OWNER", "MANAGER"] },
+  { href: "/revenue", key: "nav.revenue", icon: "💰", roles: ["OWNER", "MANAGER"] },
+  { href: "/staff", key: "nav.staff", icon: "🧑‍💼", roles: ["OWNER"] },
 ];
 
 export function Sidebar() {
@@ -20,27 +24,47 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const { t, lang, setLang } = useI18n();
 
+  // Org identity + role drive the panel branding and which nav items appear.
+  const { data: ctx } = useQuery({ queryKey: ["portal-context"], queryFn: getPortalContext });
+  const role: OrgRole = ctx?.role ?? "OWNER";
+  const items = NAV_ITEMS.filter((i) => i.roles.includes(role));
+
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (
     <aside className="w-60 min-h-screen bg-[#0D1117] flex flex-col text-white flex-shrink-0">
-      {/* Brand */}
+      {/* Brand — the org's own workspace identity */}
       <div className="px-6 py-5 border-b border-white/10 flex items-center gap-2.5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icon-512.png" alt="ExpoUz" width={32} height={32} className="rounded-lg" style={{ width: 32, height: 32 }} />
-        <div>
-          <div className="text-lg font-bold tracking-tight">
-            <span className="text-[#00C853]">Expo</span>
-            <span className="text-white">Uz</span>
+        <img
+          src={ctx?.org?.logoUrl || "/icon-512.png"}
+          alt={ctx?.org?.name || "ExpoUz"}
+          width={32}
+          height={32}
+          className="rounded-lg object-cover"
+          style={{ width: 32, height: 32 }}
+        />
+        <div className="min-w-0">
+          <div className="text-lg font-bold tracking-tight truncate">
+            {ctx?.org ? (
+              <span className="text-white">{ctx.org.name}</span>
+            ) : (
+              <>
+                <span className="text-[#00C853]">Expo</span>
+                <span className="text-white">Uz</span>
+              </>
+            )}
           </div>
-          <div className="text-xs text-gray-500 mt-0.5">Pitch Owner Portal</div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            {ctx?.role ? `${ctx.role.charAt(0)}${ctx.role.slice(1).toLowerCase()} · Partner Panel` : "Partner Panel"}
+          </div>
         </div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map(({ href, key, icon }) => (
+        {items.map(({ href, key, icon }) => (
           <Link
             key={href}
             href={href}

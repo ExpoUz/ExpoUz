@@ -46,11 +46,51 @@ portalApi.interceptors.response.use(
   }
 );
 
+// ─── Org context (org identity + role for the panel shell) ───
+export type OrgRole = "OWNER" | "MANAGER" | "STAFF";
+
+export interface PortalContext {
+  org: { id: string; name: string; logoUrl: string | null } | null;
+  role: OrgRole;
+  legacy: boolean;
+}
+
+export async function getPortalContext(): Promise<PortalContext> {
+  const { data } = await portalApi.get("/pitch-admin/context");
+  return data;
+}
+
+// ─── Staff management (OWNER only) ───────────────────────────
+export async function getStaff(): Promise<{ members: any[]; invites: any[] }> {
+  const { data } = await portalApi.get("/pitch-admin/staff");
+  return data;
+}
+
+export async function inviteStaff(dto: { phone?: string; telegramId?: string; role?: OrgRole }) {
+  const { data } = await portalApi.post("/pitch-admin/staff/invites", dto);
+  return data;
+}
+
+export async function revokeStaffInvite(inviteId: string) {
+  const { data } = await portalApi.delete(`/pitch-admin/staff/invites/${inviteId}`);
+  return data;
+}
+
+export async function changeStaffRole(memberId: string, role: OrgRole) {
+  const { data } = await portalApi.patch(`/pitch-admin/staff/${memberId}`, { role });
+  return data;
+}
+
+export async function removeStaff(memberId: string) {
+  const { data } = await portalApi.delete(`/pitch-admin/staff/${memberId}`);
+  return data;
+}
+
 // ─── Dashboard ───────────────────────────────────────────────
 export interface DashboardStats {
   totalPitches: number;
   matchesThisMonth: number;
-  totalRevenue: number;
+  totalRevenue: number | null; // null for STAFF (revenue hidden)
   uniquePlayers: number;
 }
 

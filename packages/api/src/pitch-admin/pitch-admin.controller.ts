@@ -24,10 +24,47 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 export class PitchAdminController {
   constructor(private readonly pitchAdminService: PitchAdminService) {}
 
+  @Get('context')
+  @ApiOperation({ summary: 'Resolve the org identity + role for the partner panel shell' })
+  getContext(@CurrentUser() user: any) {
+    return this.pitchAdminService.getContext(user.id);
+  }
+
   @Get('dashboard')
   @ApiOperation({ summary: 'Pitch owner dashboard stats' })
   getDashboard(@CurrentUser() user: any) {
     return this.pitchAdminService.getDashboard(user.id);
+  }
+
+  // ─── Staff management (OWNER only) ────────────────────────────────────────
+  @Get('staff')
+  @ApiOperation({ summary: 'List org members + pending invites (OWNER only)' })
+  getStaff(@CurrentUser() user: any) {
+    return this.pitchAdminService.getStaff(user.id);
+  }
+
+  @Post('staff/invites')
+  @ApiOperation({ summary: 'Invite a staff member by phone or Telegram (OWNER only)' })
+  inviteStaff(@CurrentUser() user: any, @Body() dto: any) {
+    return this.pitchAdminService.inviteStaff(user.id, dto);
+  }
+
+  @Delete('staff/invites/:inviteId')
+  @ApiOperation({ summary: 'Revoke a pending invite (OWNER only)' })
+  revokeInvite(@CurrentUser() user: any, @Param('inviteId') inviteId: string) {
+    return this.pitchAdminService.revokeInvite(user.id, inviteId);
+  }
+
+  @Patch('staff/:memberId')
+  @ApiOperation({ summary: 'Change a member role (OWNER only)' })
+  changeStaffRole(@CurrentUser() user: any, @Param('memberId') memberId: string, @Body('role') role: any) {
+    return this.pitchAdminService.changeStaffRole(user.id, memberId, role);
+  }
+
+  @Delete('staff/:memberId')
+  @ApiOperation({ summary: 'Remove a member (OWNER only)' })
+  removeStaff(@CurrentUser() user: any, @Param('memberId') memberId: string) {
+    return this.pitchAdminService.removeStaff(user.id, memberId);
   }
 
   @Get('pitches')

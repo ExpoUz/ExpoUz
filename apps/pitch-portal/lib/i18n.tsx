@@ -26,6 +26,7 @@ const EN: Dict = {
   "nav.insights": "Insights",
   "nav.broadcast": "Broadcast",
   "nav.revenue": "Revenue",
+  "nav.staff": "Staff",
   "nav.signout": "Sign out",
   // players list
   "players.title": "My Players",
@@ -114,6 +115,7 @@ const RU: Dict = {
   "nav.insights": "Аналитика",
   "nav.broadcast": "Рассылка",
   "nav.revenue": "Доход",
+  "nav.staff": "Сотрудники",
   "nav.signout": "Выйти",
   "players.title": "Мои игроки",
   "players.subtitle": "Люди, которые играют на ваших площадках",
@@ -195,6 +197,7 @@ const UZ: Dict = {
   "nav.insights": "Tahlil",
   "nav.broadcast": "Xabar yuborish",
   "nav.revenue": "Daromad",
+  "nav.staff": "Xodimlar",
   "nav.signout": "Chiqish",
   "players.title": "Mening o‘yinchilarim",
   "players.subtitle": "Maydonlaringizda o‘ynaydigan odamlar",

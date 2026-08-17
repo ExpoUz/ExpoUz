@@ -1,10 +1,25 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { OrgRole } from '@prisma/client';
+import { OrgRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface OrgContext {
   orgId: string;
   role: OrgRole;
+}
+
+/**
+ * The scope the pitch-portal operates under. Either:
+ *  - a real org membership (`legacy: false`), scoping by organizationId, or
+ *  - a legacy owner with no membership yet (`legacy: true`), scoping by
+ *    ownerId so existing owners keep working BEFORE the personal-org migration.
+ * The `pitchWhere` fragment is the tenant boundary for every portal query.
+ */
+export interface PortalContext {
+  legacy: boolean;
+  orgId: string | null;
+  role: OrgRole; // legacy owners are treated as OWNER of their own venues
+  org: { id: string; name: string; logoUrl: string | null } | null;
+  pitchWhere: Prisma.PitchWhereInput;
 }
 
 /**
@@ -57,5 +72,51 @@ export class OrgContextService {
   async pitchesForCaller(userId: string) {
     const { orgId } = await this.resolveOrgContext(userId);
     return this.prisma.pitch.findMany({ where: { organizationId: orgId } });
+  }
+
+  /**
+   * Resolve the pitch-portal scope for a caller. Distinguishes three cases:
+   *  - member of an ACTIVE org  → org-scoped { organizationId }
+   *  - member of a non-ACTIVE org (SUSPENDED/ARCHIVED) → locked out (throws)
+   *  - no membership at all      → legacy owner, scoped by { ownerId }
+   * This is what makes suspending an org lock its staff out immediately while
+   * not breaking owners who haven't been migrated to a personal org yet.
+   */
+  async resolvePortalContext(userId: string): Promise<PortalContext> {
+    const memberships = await this.prisma.orgMember.findMany({
+      where: { userId },
+      include: { org: { select: { id: true, name: true, logoUrl: true, status: true } } },
+      orderBy: [{ role: 'asc' }, { joinedAt: 'desc' }],
+    });
+
+    if (memberships.length === 0) {
+      return {
+        legacy: true,
+        orgId: null,
+        role: 'OWNER',
+        org: null,
+        pitchWhere: { ownerId: userId },
+      };
+    }
+
+    const active = memberships.find((m) => m.org.status === 'ACTIVE');
+    if (!active) {
+      throw new ForbiddenException('Your organization is suspended');
+    }
+
+    return {
+      legacy: false,
+      orgId: active.orgId,
+      role: active.role,
+      org: { id: active.org.id, name: active.org.name, logoUrl: active.org.logoUrl },
+      pitchWhere: { organizationId: active.orgId },
+    };
+  }
+
+  /** STAFF may only see the schedule + check-in — never revenue or CRM. */
+  assertNotStaff(role: OrgRole, feature = 'this feature') {
+    if (role === 'STAFF') {
+      throw new ForbiddenException(`Your role cannot access ${feature}`);
+    }
   }
 }
