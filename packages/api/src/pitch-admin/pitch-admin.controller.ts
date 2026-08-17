@@ -12,14 +12,15 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { PitchAdminService } from './pitch-admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
+// Access is authorized by ORG MEMBERSHIP (or legacy venue ownership), resolved
+// server-side per request — not by platform UserRole. So an invited MANAGER/STAFF
+// who is otherwise a PLAYER can use the panel. JWT only here; every handler's
+// service call runs through resolvePortalContext, which 403s non-members.
 @ApiTags('pitch-admin')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('PITCH_OWNER', 'ADMIN', 'SUPER_ADMIN')
+@UseGuards(JwtAuthGuard)
 @Controller('pitch-admin')
 export class PitchAdminController {
   constructor(private readonly pitchAdminService: PitchAdminService) {}

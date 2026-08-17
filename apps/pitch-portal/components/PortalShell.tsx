@@ -5,9 +5,10 @@ import { Sidebar } from "./Sidebar";
 
 export function PortalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isLoginPage = pathname === "/login";
+  // Login and the invite-join page render standalone (no sidebar/shell).
+  const isStandalone = pathname === "/login" || pathname === "/join";
 
-  if (isLoginPage) {
+  if (isStandalone) {
     return <>{children}</>;
   }
 

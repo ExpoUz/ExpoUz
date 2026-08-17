@@ -90,6 +90,13 @@ export class OrgContextService {
     });
 
     if (memberships.length === 0) {
+      // Legacy path: only genuine venue owners (own at least one pitch) get in.
+      // A random user with no membership and no venues gets a clear no-access
+      // state rather than an empty panel.
+      const ownsVenue = await this.prisma.pitch.count({ where: { ownerId: userId } });
+      if (ownsVenue === 0) {
+        throw new ForbiddenException('You do not have access to a partner workspace');
+      }
       return {
         legacy: true,
         orgId: null,

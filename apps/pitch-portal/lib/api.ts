@@ -60,6 +60,20 @@ export async function getPortalContext(): Promise<PortalContext> {
   return data;
 }
 
+// ─── Invite acceptance (join an organization) ────────────────
+export async function previewInvite(token: string): Promise<
+  | { valid: false; reason: string }
+  | { valid: true; orgName: string; orgLogoUrl: string | null; role: OrgRole }
+> {
+  const { data } = await portalApi.get(`/org/invites/${token}`);
+  return data;
+}
+
+export async function acceptInvite(token: string): Promise<{ orgId: string; role: OrgRole }> {
+  const { data } = await portalApi.post(`/org/invites/${token}/accept`);
+  return data;
+}
+
 // ─── Staff management (OWNER only) ───────────────────────────
 export async function getStaff(): Promise<{ members: any[]; invites: any[] }> {
   const { data } = await portalApi.get("/pitch-admin/staff");
