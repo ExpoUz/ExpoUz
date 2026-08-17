@@ -25,6 +25,7 @@ import { FormationModule } from './formation/formation.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { ActivityModule } from './activity/activity.module';
+import { OrgModule } from './org/org.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { RankingModule } from './ranking/ranking.module';
 import { LevelModule } from './level/level.module';
@@ -66,6 +67,7 @@ import { HealthController } from './health.controller';
     PrismaModule,
     RedisModule,
     I18nModule,
+    OrgModule,
     ActivityModule,
     RankingModule,
     LevelModule,

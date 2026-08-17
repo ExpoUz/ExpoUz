@@ -101,6 +101,7 @@ model User {
   matchResults               MatchResult[]             @relation("PlayerResults")
   walletTransactions         WalletTransaction[]
   phoneVerifications         PhoneVerification[]
+  orgMemberships             OrgMember[]
 }
 
 // ============ PHONE VERIFICATION ============
@@ -275,12 +276,18 @@ model Pitch {
   courtCount      Int             @default(1)
   locationId      String?
   location        Location?       @relation(fields: [locationId], references: [id])
+  // Multi-tenant owner. `organizationId` is the authoritative tenant boundary for
+  // all partner-facing queries; `ownerId` is retained for legacy/back-compat only
+  // (see the migration that back-fills a personal org for every existing owner).
+  organizationId  String?
+  organization    Organization?   @relation(fields: [organizationId], references: [id])
   createdAt       DateTime        @default(now())
   matches         Match[]
   followers       PitchFollower[]
   pitchBookings   PitchBooking[]
 
   @@index([sport, city, isActive])
+  @@index([organizationId])
 }
 
 enum SurfaceType {
@@ -740,6 +747,119 @@ model Location {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   pitches   Pitch[]
+}
+
+// ============ ORGANIZATIONS (MULTI-TENANT) ============
+// A partner organization is the tenant boundary: it owns venues, staff and its
+// own CRM. Isolation is ALWAYS resolved server-side from OrgMember — never from a
+// client-supplied org id. See org-context.service.ts / OrgGuard.
+model Organization {
+  id           String    @id @default(cuid())
+  name         String
+  slug         String    @unique // "padel-tashkent"
+  logoUrl      String?
+  contactEmail String?
+  contactPhone String?
+  address      String?
+  status       OrgStatus @default(ACTIVE)
+
+  // Commercial terms — per-partner, override the platform defaults in AppSettings.
+  // null on a rate means "use the platform default".
+  commissionRate    Decimal?  @db.Decimal(5, 2)
+  playerFeeRate     Decimal?  @db.Decimal(5, 2)
+  contractStartDate DateTime?
+  contractEndDate   DateTime?
+  notes             String?
+
+  // Partner-relationship CRM (superadmin-facing, see Part 3).
+  pipelineStage  OrgPipelineStage @default(ACTIVE)
+  followUpDate   DateTime?
+  followUpUserId String? // which superadmin owns the next follow-up
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String // which superadmin created it
+
+  members  OrgMember[]
+  pitches  Pitch[]
+  invites  OrgInvite[]
+  contacts OrgContactLog[]
+
+  @@index([status])
+  @@index([pipelineStage])
+}
+
+enum OrgStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+  ARCHIVED
+}
+
+// Sales/partner-relationship pipeline for an organization (Part 3 CRM).
+enum OrgPipelineStage {
+  LEAD
+  CONTACTED
+  DEMO
+  NEGOTIATING
+  ACTIVE
+  CHURNED
+}
+
+model OrgMember {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  role      OrgRole      @default(STAFF)
+  invitedBy String?
+  joinedAt  DateTime     @default(now())
+
+  @@unique([orgId, userId])
+  @@index([userId])
+}
+
+enum OrgRole {
+  OWNER // full control of the org, can manage members and venues
+  MANAGER // venues, schedule, CRM, revenue — cannot manage members or billing
+  STAFF // schedule and check-in only, no revenue, no CRM
+}
+
+model OrgInvite {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  phone       String?
+  telegramId  String?
+  role        OrgRole      @default(STAFF)
+  token       String       @unique @default(cuid())
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdById String
+  createdAt   DateTime     @default(now())
+
+  @@index([orgId])
+}
+
+// Superadmin CRM contact log entry for a partner organization (Part 3).
+model OrgContactLog {
+  id        String         @id @default(cuid())
+  orgId     String
+  org       Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  authorId  String // superadmin who logged it
+  type      OrgContactType @default(NOTE)
+  summary   String
+  createdAt DateTime       @default(now())
+
+  @@index([orgId])
+}
+
+enum OrgContactType {
+  CALL
+  MEETING
+  EMAIL
+  NOTE
 }
 
 // ============ ACTIVITY LOG ============
