@@ -86,6 +86,16 @@ function buildDescription(
   if (path.includes('/disputes')) return `Resolved dispute for match ${id}`;
   if (path.includes('matches') && method === 'DELETE')
     return `Force-cancelled match ${id}`;
+  if (path.includes('organizations') && path.includes('/status'))
+    return `Changed organization ${id} status`;
+  if (path.includes('organizations') && path.includes('/venues'))
+    return `Assigned/moved a venue for organization ${id}`;
+  if (path.includes('organizations') && path.includes('/staff'))
+    return `Managed staff for organization ${id}`;
+  if (path.includes('organizations') && path.includes('/invites'))
+    return `Managed an invite for organization ${id}`;
+  if (path.includes('organizations') && method === 'POST') return 'Created an organization';
+  if (path.includes('organizations')) return `Updated organization ${id}`;
   if (path.includes('settings')) return 'Updated platform settings';
   if (path.includes('announcements')) return 'Sent an announcement';
   if (path.includes('pitch-admins')) return `Managed pitch admin ${id}`;

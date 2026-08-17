@@ -279,3 +279,84 @@ export async function createPublicGroup(body: { title: string; city?: string; sp
   const { data } = await adminApi.post("/messages/groups", body);
   return data;
 }
+
+// ─── Organizations (multi-tenant partners) ───────────────────
+export async function getOrganizations(params?: { search?: string; status?: string }): Promise<any[]> {
+  const { data } = await adminApi.get("/admin/organizations", { params });
+  return Array.isArray(data) ? data : data?.data ?? [];
+}
+
+export async function createOrganization(dto: any) {
+  const { data } = await adminApi.post("/admin/organizations", dto);
+  return data;
+}
+
+export async function getOrganization(id: string) {
+  const { data } = await adminApi.get(`/admin/organizations/${id}`);
+  return data;
+}
+
+export async function updateOrganization(id: string, dto: any) {
+  const { data } = await adminApi.patch(`/admin/organizations/${id}`, dto);
+  return data;
+}
+
+export async function setOrganizationStatus(id: string, status: string) {
+  const { data } = await adminApi.patch(`/admin/organizations/${id}/status`, { status });
+  return data;
+}
+
+export async function getOrganizationVenues(id: string): Promise<{ venues: any[]; unassigned: any[] }> {
+  const { data } = await adminApi.get(`/admin/organizations/${id}/venues`);
+  return data;
+}
+
+export async function assignOrganizationVenue(id: string, pitchId: string, confirmMove = false) {
+  const { data } = await adminApi.post(`/admin/organizations/${id}/venues`, { pitchId, confirmMove });
+  return data;
+}
+
+export async function removeOrganizationVenue(id: string, pitchId: string) {
+  const { data } = await adminApi.delete(`/admin/organizations/${id}/venues/${pitchId}`);
+  return data;
+}
+
+export async function getOrganizationStaff(id: string): Promise<{ members: any[]; invites: any[] }> {
+  const { data } = await adminApi.get(`/admin/organizations/${id}/staff`);
+  return data;
+}
+
+export async function inviteOrganizationStaff(id: string, dto: { phone?: string; telegramId?: string; role?: string }) {
+  const { data } = await adminApi.post(`/admin/organizations/${id}/invites`, dto);
+  return data;
+}
+
+export async function revokeOrganizationInvite(id: string, inviteId: string) {
+  const { data } = await adminApi.delete(`/admin/organizations/${id}/invites/${inviteId}`);
+  return data;
+}
+
+export async function attachOrganizationUser(id: string, userId: string, role: string) {
+  const { data } = await adminApi.post(`/admin/organizations/${id}/staff`, { userId, role });
+  return data;
+}
+
+export async function changeOrganizationMemberRole(id: string, memberId: string, role: string) {
+  const { data } = await adminApi.patch(`/admin/organizations/${id}/staff/${memberId}`, { role });
+  return data;
+}
+
+export async function removeOrganizationMember(id: string, memberId: string) {
+  const { data } = await adminApi.delete(`/admin/organizations/${id}/staff/${memberId}`);
+  return data;
+}
+
+export async function getOrganizationPlayers(id: string): Promise<any[]> {
+  const { data } = await adminApi.get(`/admin/organizations/${id}/players`);
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getOrganizationRevenue(id: string) {
+  const { data } = await adminApi.get(`/admin/organizations/${id}/revenue`);
+  return data;
+}
