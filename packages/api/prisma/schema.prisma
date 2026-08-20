@@ -922,10 +922,14 @@ model UserSession {
 // playerId are plain user ids (no relation fields — these are aux/log tables
 // queried only by those scalars).
 
-// A private note an owner writes about a player. Visible only to that owner.
+// A note about a player. Org-scoped: when `orgId` is set the note is shared
+// across the org's MANAGER/OWNER staff and attributed to `authorId`. `ownerId`
+// stays populated (= the author) for legacy/back-compat queries.
 model VenuePlayerNote {
   id        String   @id @default(cuid())
   ownerId   String
+  orgId     String?
+  authorId  String?
   playerId  String
   pitchId   String?
   note      String
@@ -933,30 +937,37 @@ model VenuePlayerNote {
   updatedAt DateTime @updatedAt
 
   @@index([ownerId, playerId])
+  @@index([orgId, playerId])
 }
 
-// Audit trail: every time an owner reveals a player's phone number.
+// Audit trail: every time a member reveals a player's phone number. Recorded
+// against both the acting member (`ownerId`) and the organization (`orgId`).
 model ContactReveal {
   id        String   @id @default(cuid())
   ownerId   String
+  orgId     String?
   playerId  String
   reason    String
   createdAt DateTime @default(now())
 
   @@index([ownerId])
+  @@index([orgId])
   @@index([playerId])
 }
 
-// Log of every segment broadcast an owner sends (for rate-limiting + admin oversight).
+// Log of every segment broadcast (for rate-limiting + admin oversight). The
+// weekly limit is enforced per ORGANIZATION when `orgId` is set, else per owner.
 model VenueBroadcast {
   id             String   @id @default(cuid())
   ownerId        String
+  orgId          String?
   segment        String
   message        String
   recipientCount Int
   createdAt      DateTime @default(now())
 
   @@index([ownerId])
+  @@index([orgId, createdAt])
   @@index([createdAt])
 }
 

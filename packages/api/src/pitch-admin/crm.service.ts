@@ -3,8 +3,22 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MessagesService } from '../messages/messages.service';
+import { OrgContextService } from '../org/org-context.service';
+
+/**
+ * The CRM tenant boundary for one caller. `pitchWhere` scopes the accessible
+ * venues (organizationId for members, ownerId for legacy owners); `orgId` is
+ * set for members and makes notes/reveals/broadcasts org-level; `actorId` is
+ * the acting member (author/attribution + legacy key).
+ */
+interface CrmScope {
+  pitchWhere: Prisma.PitchWhereInput;
+  orgId: string | null;
+  actorId: string;
+}
 
 /**
  * Venue Owner CRM — a club owner's private, customer-relationship view of the
@@ -65,25 +79,37 @@ export class CrmService {
   constructor(
     private prisma: PrismaService,
     private messages: MessagesService,
+    private orgContext: OrgContextService,
   ) {}
 
-  // ─── Ownership scoping (server-side, non-negotiable) ───────────────────────
+  // ─── Scoping (server-side, non-negotiable) ─────────────────────────────────
 
-  private async ownedPitchIds(ownerId: string): Promise<string[]> {
+  /**
+   * Resolve the caller's CRM scope. Organization-scoped for members (STAFF are
+   * rejected — no CRM), legacy owner-scoped otherwise. This is the ONLY place
+   * the accessible venue set is decided.
+   */
+  private async scope(userId: string): Promise<CrmScope> {
+    const ctx = await this.orgContext.resolvePortalContext(userId);
+    this.orgContext.assertNotStaff(ctx.role, 'CRM');
+    return { pitchWhere: ctx.pitchWhere, orgId: ctx.orgId, actorId: userId };
+  }
+
+  private async ownedPitchIds(scope: CrmScope): Promise<string[]> {
     const pitches = await this.prisma.pitch.findMany({
-      where: { ownerId },
+      where: scope.pitchWhere,
       select: { id: true },
     });
     return pitches.map((p) => p.id);
   }
 
-  /** Throws unless `playerId` has a real booking at one of the owner's venues. */
-  private async assertOwnsPlayerRelationship(ownerId: string, playerId: string) {
+  /** Throws unless `playerId` has a real booking at one of the scoped venues. */
+  private async assertOwnsPlayerRelationship(scope: CrmScope, playerId: string) {
     const link = await this.prisma.booking.findFirst({
       where: {
         userId: playerId,
         isGuestSlot: false,
-        match: { pitch: { ownerId } },
+        match: { pitch: scope.pitchWhere },
         status: { in: ['CONFIRMED', 'COMPLETED', 'NO_SHOW'] },
       },
       select: { id: true },
@@ -91,18 +117,18 @@ export class CrmService {
     if (!link) throw new ForbiddenException({ code: 'NO_PLAYER_RELATIONSHIP' });
   }
 
-  private async assertCrmEnabled(ownerId: string) {
+  private async assertCrmEnabled(actorId: string) {
     const owner = await this.prisma.user.findUnique({
-      where: { id: ownerId },
+      where: { id: actorId },
       select: { crmDisabled: true },
     });
     if (owner?.crmDisabled) throw new ForbiddenException({ code: 'CRM_DISABLED' });
   }
 
-  // ─── Core aggregation (one pass over this owner's bookings) ─────────────────
+  // ─── Core aggregation (one pass over the scoped venues' bookings) ──────────
 
-  private async computeAggregates(ownerId: string): Promise<Map<string, PlayerAgg>> {
-    const pitchIds = await this.ownedPitchIds(ownerId);
+  private async computeAggregates(scope: CrmScope): Promise<Map<string, PlayerAgg>> {
+    const pitchIds = await this.ownedPitchIds(scope);
     const byPlayer = new Map<string, PlayerAgg>();
     if (pitchIds.length === 0) return byPlayer;
 
@@ -235,13 +261,14 @@ export class CrmService {
   // ─── Endpoints ─────────────────────────────────────────────────────────────
 
   async listPlayers(
-    ownerId: string,
+    userId: string,
     opts: { search?: string; segment?: string; sort?: string; page?: number; limit?: number },
   ) {
-    await this.assertCrmEnabled(ownerId);
+    const scope = await this.scope(userId);
+    await this.assertCrmEnabled(scope.actorId);
     const { search, segment, sort = 'recent', page = 1, limit = 50 } = opts;
 
-    const aggregates = await this.computeAggregates(ownerId);
+    const aggregates = await this.computeAggregates(scope);
     let cards = [...aggregates.values()].map((a) => this.toCard(a));
 
     if (search) {
@@ -264,9 +291,10 @@ export class CrmService {
     return { data: cards.slice(start, start + limit), total, page, limit };
   }
 
-  async getSegments(ownerId: string) {
-    await this.assertCrmEnabled(ownerId);
-    const aggregates = await this.computeAggregates(ownerId);
+  async getSegments(userId: string) {
+    const scope = await this.scope(userId);
+    await this.assertCrmEnabled(scope.actorId);
+    const aggregates = await this.computeAggregates(scope);
     const counts: Record<string, number> = {
       ALL: 0,
       NEW: 0,
@@ -283,25 +311,27 @@ export class CrmService {
     return counts;
   }
 
-  async getPlayerDetail(ownerId: string, playerId: string) {
-    await this.assertCrmEnabled(ownerId);
-    await this.assertOwnsPlayerRelationship(ownerId, playerId);
+  async getPlayerDetail(userId: string, playerId: string) {
+    const scope = await this.scope(userId);
+    await this.assertCrmEnabled(scope.actorId);
+    await this.assertOwnsPlayerRelationship(scope, playerId);
 
-    const aggregates = await this.computeAggregates(ownerId);
+    const aggregates = await this.computeAggregates(scope);
     const agg = aggregates.get(playerId);
     if (!agg) throw new NotFoundException({ code: 'NO_PLAYER_RELATIONSHIP' });
 
-    const notes = await this.listNotes(ownerId, playerId);
+    const notes = await this.notesForScope(scope, playerId);
     return {
       ...this.toCard(agg),
-      contactAvailable: await this.isContactWindowOpen(ownerId, playerId),
+      contactAvailable: await this.isContactWindowOpen(scope, playerId),
       notes,
     };
   }
 
-  async getPlayerHistory(ownerId: string, playerId: string) {
-    await this.assertOwnsPlayerRelationship(ownerId, playerId);
-    const pitchIds = await this.ownedPitchIds(ownerId);
+  async getPlayerHistory(userId: string, playerId: string) {
+    const scope = await this.scope(userId);
+    await this.assertOwnsPlayerRelationship(scope, playerId);
+    const pitchIds = await this.ownedPitchIds(scope);
     const bookings = await this.prisma.booking.findMany({
       where: {
         userId: playerId,
@@ -339,29 +369,54 @@ export class CrmService {
     }));
   }
 
-  // ─── Notes (private to the owner who wrote them) ───────────────────────────
+  // ─── Notes (org-level for members; owner-private for legacy) ───────────────
 
-  async addNote(ownerId: string, playerId: string, note: string, pitchId?: string) {
-    await this.assertOwnsPlayerRelationship(ownerId, playerId);
+  /** Public endpoint entry: resolves scope, then reads the org/owner notes. */
+  async listNotes(userId: string, playerId: string) {
+    const scope = await this.scope(userId);
+    await this.assertOwnsPlayerRelationship(scope, playerId);
+    return this.notesForScope(scope, playerId);
+  }
+
+  async addNote(userId: string, playerId: string, note: string, pitchId?: string) {
+    const scope = await this.scope(userId);
+    await this.assertOwnsPlayerRelationship(scope, playerId);
     const trimmed = (note ?? '').trim();
     if (!trimmed) throw new NotFoundException({ code: 'EMPTY_NOTE' });
     return this.prisma.venuePlayerNote.create({
-      data: { ownerId, playerId, note: trimmed.slice(0, 2000), pitchId: pitchId ?? null },
+      data: {
+        // ownerId stays = author for legacy queries; orgId makes it org-shared.
+        ownerId: scope.actorId,
+        orgId: scope.orgId,
+        authorId: scope.actorId,
+        playerId,
+        note: trimmed.slice(0, 2000),
+        pitchId: pitchId ?? null,
+      },
     });
   }
 
-  async listNotes(ownerId: string, playerId: string) {
-    // Scoped to this owner — an owner never sees another owner's notes.
-    return this.prisma.venuePlayerNote.findMany({
-      where: { ownerId, playerId },
+  /** Org members share notes (any MANAGER/OWNER); legacy owners see their own. */
+  private async notesForScope(scope: CrmScope, playerId: string) {
+    const notes = await this.prisma.venuePlayerNote.findMany({
+      where: scope.orgId ? { orgId: scope.orgId, playerId } : { ownerId: scope.actorId, playerId },
       orderBy: { createdAt: 'desc' },
     });
+    if (notes.length === 0) return notes;
+    // Attribute each note to its author (org notes may be written by any member).
+    const authorIds = [...new Set(notes.map((n) => n.authorId ?? n.ownerId))];
+    const authors = await this.prisma.user.findMany({
+      where: { id: { in: authorIds } },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    const nameById = new Map(authors.map((a) => [a.id, `${a.firstName} ${a.lastName}`.trim()]));
+    return notes.map((n) => ({ ...n, authorName: nameById.get(n.authorId ?? n.ownerId) ?? 'Staff' }));
   }
 
   // ─── Phone reveal (window-gated + audit-logged) ────────────────────────────
 
-  private async isContactWindowOpen(ownerId: string, playerId: string): Promise<boolean> {
-    const pitchIds = await this.ownedPitchIds(ownerId);
+  private async isContactWindowOpen(scope: CrmScope, playerId: string): Promise<boolean> {
+    const pitchIds = await this.ownedPitchIds(scope);
     const from = new Date(Date.now() - 7 * DAY);
     const to = new Date(Date.now() + 7 * DAY);
     const inWindow = await this.prisma.booking.findFirst({
@@ -376,18 +431,24 @@ export class CrmService {
     return !!inWindow;
   }
 
-  async revealContact(ownerId: string, playerId: string, reason: string) {
-    await this.assertCrmEnabled(ownerId);
-    await this.assertOwnsPlayerRelationship(ownerId, playerId);
+  async revealContact(userId: string, playerId: string, reason: string) {
+    const scope = await this.scope(userId);
+    await this.assertCrmEnabled(scope.actorId);
+    await this.assertOwnsPlayerRelationship(scope, playerId);
 
-    if (!(await this.isContactWindowOpen(ownerId, playerId))) {
-      // Outside ±7 days of a booking the owner can only reach the player in-app.
+    if (!(await this.isContactWindowOpen(scope, playerId))) {
+      // Outside ±7 days of a booking the venue can only reach the player in-app.
       throw new ForbiddenException({ code: 'CONTACT_WINDOW_CLOSED' });
     }
 
-    // Audit EVERY reveal before returning the number.
+    // Audit EVERY reveal against both the acting member AND the org.
     await this.prisma.contactReveal.create({
-      data: { ownerId, playerId, reason: (reason ?? 'contact player').slice(0, 300) },
+      data: {
+        ownerId: scope.actorId,
+        orgId: scope.orgId,
+        playerId,
+        reason: (reason ?? 'contact player').slice(0, 300),
+      },
     });
 
     const player = await this.prisma.user.findUnique({
@@ -399,20 +460,22 @@ export class CrmService {
 
   // ─── In-app message ────────────────────────────────────────────────────────
 
-  async messagePlayer(ownerId: string, playerId: string, content: string) {
-    await this.assertOwnsPlayerRelationship(ownerId, playerId);
+  async messagePlayer(userId: string, playerId: string, content: string) {
+    const scope = await this.scope(userId);
+    await this.assertOwnsPlayerRelationship(scope, playerId);
     const text = (content ?? '').trim();
     if (!text) throw new NotFoundException({ code: 'EMPTY_MESSAGE' });
-    const conversation = await this.messages.createOrGetDirect(ownerId, playerId);
-    await this.messages.sendMessage(conversation.id, ownerId, text.slice(0, 2000));
+    const conversation = await this.messages.createOrGetDirect(scope.actorId, playerId);
+    await this.messages.sendMessage(conversation.id, scope.actorId, text.slice(0, 2000));
     return { conversationId: conversation.id };
   }
 
   // ─── Insights ──────────────────────────────────────────────────────────────
 
-  async getInsights(ownerId: string) {
-    await this.assertCrmEnabled(ownerId);
-    const aggregates = await this.computeAggregates(ownerId);
+  async getInsights(userId: string) {
+    const scope = await this.scope(userId);
+    await this.assertCrmEnabled(scope.actorId);
+    const aggregates = await this.computeAggregates(scope);
     const players = [...aggregates.values()];
     const now = Date.now();
     const monthStart = new Date();
@@ -464,11 +527,12 @@ export class CrmService {
 
   // ─── Broadcast (rate-limited, mute-aware, admin-logged) ────────────────────
 
-  /** Per-segment recipient counts EXCLUDING muted players (what the owner sees). */
-  async getBroadcastCounts(ownerId: string) {
-    await this.assertCrmEnabled(ownerId);
-    const aggregates = await this.computeAggregates(ownerId);
-    const muted = await this.mutedPlayerIds(ownerId);
+  /** Per-segment recipient counts EXCLUDING muted players (what the sender sees). */
+  async getBroadcastCounts(userId: string) {
+    const scope = await this.scope(userId);
+    await this.assertCrmEnabled(scope.actorId);
+    const aggregates = await this.computeAggregates(scope);
+    const muted = await this.mutedPlayerIds(scope);
 
     const counts: Record<string, number> = {
       ALL: 0,
@@ -484,25 +548,44 @@ export class CrmService {
       const seg = this.computeSegment(agg);
       if (seg in counts) counts[seg]++;
     }
-    const weekAgo = new Date(Date.now() - 7 * DAY);
-    const sentThisWeek = await this.prisma.venueBroadcast.count({
-      where: { ownerId, createdAt: { gte: weekAgo } },
-    });
-    return { counts, sentThisWeek, weeklyLimit: 2 };
+    return { counts, sentThisWeek: await this.broadcastsThisWeek(scope), weeklyLimit: 2 };
   }
 
-  private async mutedPlayerIds(ownerId: string): Promise<Set<string>> {
+  /** Weekly broadcast count — per ORGANISATION for members, per owner otherwise. */
+  private async broadcastsThisWeek(scope: CrmScope): Promise<number> {
+    const weekAgo = new Date(Date.now() - 7 * DAY);
+    return this.prisma.venueBroadcast.count({
+      where: scope.orgId
+        ? { orgId: scope.orgId, createdAt: { gte: weekAgo } }
+        : { ownerId: scope.actorId, createdAt: { gte: weekAgo } },
+    });
+  }
+
+  /**
+   * Muted players for the scope. For an org, a mute against ANY member of the
+   * org suppresses the org's broadcasts to that player.
+   */
+  private async mutedPlayerIds(scope: CrmScope): Promise<Set<string>> {
+    let ownerIds = [scope.actorId];
+    if (scope.orgId) {
+      const members = await this.prisma.orgMember.findMany({
+        where: { orgId: scope.orgId },
+        select: { userId: true },
+      });
+      ownerIds = members.map((m) => m.userId);
+    }
     const mutes = await this.prisma.venueBroadcastMute.findMany({
-      where: { ownerId },
+      where: { ownerId: { in: ownerIds } },
       select: { playerId: true },
     });
     return new Set(mutes.map((m) => m.playerId));
   }
 
-  async broadcast(ownerId: string, segment: string, message: string) {
-    await this.assertCrmEnabled(ownerId);
+  async broadcast(userId: string, segment: string, message: string) {
+    const scope = await this.scope(userId);
+    await this.assertCrmEnabled(scope.actorId);
     const owner = await this.prisma.user.findUnique({
-      where: { id: ownerId },
+      where: { id: scope.actorId },
       select: { broadcastDisabled: true, firstName: true },
     });
     if (owner?.broadcastDisabled) throw new ForbiddenException({ code: 'BROADCAST_DISABLED' });
@@ -510,32 +593,37 @@ export class CrmService {
     const text = (message ?? '').trim();
     if (!text) throw new NotFoundException({ code: 'EMPTY_MESSAGE' });
 
-    // Weekly rate limit: max 2 broadcasts per owner per rolling 7 days.
-    const weekAgo = new Date(Date.now() - 7 * DAY);
-    const sentThisWeek = await this.prisma.venueBroadcast.count({
-      where: { ownerId, createdAt: { gte: weekAgo } },
-    });
-    if (sentThisWeek >= 2) throw new ForbiddenException({ code: 'BROADCAST_LIMIT' });
+    // Weekly rate limit: 2 broadcasts per ORGANISATION per rolling 7 days, so
+    // one member cannot silently spend the whole quota.
+    if ((await this.broadcastsThisWeek(scope)) >= 2) {
+      throw new ForbiddenException({ code: 'BROADCAST_LIMIT' });
+    }
 
     // Resolve recipients from the segment, excluding muted players.
-    const aggregates = await this.computeAggregates(ownerId);
-    const muted = await this.mutedPlayerIds(ownerId);
+    const aggregates = await this.computeAggregates(scope);
+    const muted = await this.mutedPlayerIds(scope);
     const recipients = [...aggregates.values()].filter((agg) => {
       if (muted.has(agg.id)) return false;
       return segment === 'ALL' || this.computeSegment(agg) === segment;
     });
 
-    // Log first (admin oversight + rate limit basis).
+    // Log first (admin oversight + rate limit basis), against member and org.
     await this.prisma.venueBroadcast.create({
-      data: { ownerId, segment, message: text.slice(0, 1000), recipientCount: recipients.length },
+      data: {
+        ownerId: scope.actorId,
+        orgId: scope.orgId,
+        segment,
+        message: text.slice(0, 1000),
+        recipientCount: recipients.length,
+      },
     });
 
-    // Deliver as a real in-app direct message from the owner to each recipient.
+    // Deliver as a real in-app direct message from the sender to each recipient.
     const body = `📣 ${owner?.firstName ?? 'Your venue'}: ${text.slice(0, 1000)}`;
     for (const r of recipients) {
       try {
-        const conv = await this.messages.createOrGetDirect(ownerId, r.id);
-        await this.messages.sendMessage(conv.id, ownerId, body);
+        const conv = await this.messages.createOrGetDirect(scope.actorId, r.id);
+        await this.messages.sendMessage(conv.id, scope.actorId, body);
       } catch {
         // best-effort per recipient; one failure never aborts the batch
       }

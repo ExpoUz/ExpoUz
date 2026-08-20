@@ -11,18 +11,16 @@ import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler';
 import { CrmService } from './crm.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 /**
- * Venue Owner CRM endpoints. Every route is scoped to the authenticated owner's
- * own venues inside the service — a client-supplied id can never widen access.
+ * Venue CRM endpoints. Scoped to the caller's ORGANISATION (or legacy owned
+ * venues) inside the service — a client-supplied id can never widen access, and
+ * STAFF are rejected there. Access is by membership, so JWT-only here.
  */
 @ApiTags('pitch-admin-crm')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('PITCH_OWNER', 'ADMIN', 'SUPER_ADMIN')
+@UseGuards(JwtAuthGuard)
 @Controller('pitch-admin')
 export class CrmController {
   constructor(private readonly crm: CrmService) {}
