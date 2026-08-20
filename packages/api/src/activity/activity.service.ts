@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ActivityCategory, Prisma } from '@prisma/client';
+import { ActivityCategory, ActorType, Prisma } from '@prisma/client';
 
 /**
  * User-facing activity logging, persisted to the shared ActivityLog table.
@@ -17,20 +17,59 @@ export class ActivityService {
     description: string,
     meta?: Record<string, any>,
     ipAddress?: string,
+    // Optional attribution (PART 4). Player activity is the default; pass
+    // ORG_STAFF/SYSTEM and an orgId/target for partner and system events.
+    opts?: {
+      actorType?: ActorType;
+      orgId?: string | null;
+      entityType?: string;
+      entityId?: string;
+    },
   ) {
     try {
       return await this.prisma.activityLog.create({
         data: {
           userId,
+          actorType: opts?.actorType ?? 'PLAYER',
+          orgId: opts?.orgId ?? undefined,
           action: category,
           category,
           description,
+          entityType: opts?.entityType,
+          entityId: opts?.entityId,
           meta: (meta as Prisma.InputJsonValue) ?? undefined,
           ipAddress,
         },
       });
     } catch {
       // Activity logging must never break the primary flow.
+      return null;
+    }
+  }
+
+  /**
+   * Log a SYSTEM event (escrow release, refund processed, job failure, webhook
+   * error) — no human actor. Best-effort; never throws.
+   */
+  async logSystem(
+    action: string,
+    description: string,
+    opts?: { orgId?: string | null; entityType?: string; entityId?: string; meta?: Record<string, any> },
+  ) {
+    try {
+      return await this.prisma.activityLog.create({
+        data: {
+          userId: null,
+          actorType: 'SYSTEM',
+          orgId: opts?.orgId ?? undefined,
+          action,
+          description,
+          entityType: opts?.entityType,
+          entityId: opts?.entityId,
+          meta: (opts?.meta as Prisma.InputJsonValue) ?? undefined,
+        },
+      });
+    } catch {
       return null;
     }
   }

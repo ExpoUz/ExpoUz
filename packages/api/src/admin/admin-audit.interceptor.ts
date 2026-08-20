@@ -35,12 +35,17 @@ export class AdminAuditInterceptor implements NestInterceptor {
         const action = `${req.method} ${routePath}`;
         const targetId =
           req.params?.id || req.params?.matchId || req.params?.transactionId || undefined;
+        // Org routes are /admin/organizations/:id/... — attribute the action to
+        // that tenant so it surfaces in the org's activity view.
+        const orgId = routePath.includes('organizations') ? req.params?.id : undefined;
 
         // Fire-and-forget: an audit write must never fail the admin action.
         this.prisma.activityLog
           .create({
             data: {
               userId: adminId,
+              actorType: 'SUPERADMIN',
+              orgId,
               action,
               category: 'ADMIN_ACTION',
               description: buildDescription(req.method, routePath, req.params),

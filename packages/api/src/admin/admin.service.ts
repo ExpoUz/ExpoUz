@@ -975,27 +975,56 @@ export class AdminService {
   // SUPER ADMIN — Activity Log & Online Status
   // ═══════════════════════════════════════════════════════════════════════════
 
-  async getActivityLog(filters: {
+  private activityWhere(filters: {
     userId?: string;
+    orgId?: string;
+    actorType?: string;
     entityType?: string;
+    entityId?: string;
     action?: string;
     category?: string;
+    search?: string;
+    from?: string;
+    to?: string;
+  }) {
+    const where: any = {};
+    if (filters.userId) where.userId = filters.userId;
+    if (filters.orgId) where.orgId = filters.orgId;
+    if (filters.actorType) where.actorType = filters.actorType as any;
+    if (filters.entityType) where.entityType = filters.entityType;
+    if (filters.entityId) where.entityId = filters.entityId;
+    if (filters.category) where.category = filters.category as any;
+    if (filters.action) where.action = { contains: filters.action, mode: 'insensitive' };
+    if (filters.search) {
+      where.OR = [
+        { description: { contains: filters.search, mode: 'insensitive' } },
+        { action: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
+    if (filters.from || filters.to) {
+      where.createdAt = {};
+      if (filters.from) where.createdAt.gte = new Date(filters.from);
+      if (filters.to) where.createdAt.lte = new Date(filters.to);
+    }
+    return where;
+  }
+
+  async getActivityLog(filters: {
+    userId?: string;
+    orgId?: string;
+    actorType?: string;
+    entityType?: string;
+    entityId?: string;
+    action?: string;
+    category?: string;
+    search?: string;
     from?: string;
     to?: string;
     page?: number;
     limit?: number;
   }) {
-    const { userId, entityType, action, category, from, to, page = 1, limit = 30 } = filters;
-    const where: any = {};
-    if (userId) where.userId = userId;
-    if (entityType) where.entityType = entityType;
-    if (category) where.category = category as any;
-    if (action) where.action = { contains: action, mode: 'insensitive' };
-    if (from || to) {
-      where.createdAt = {};
-      if (from) where.createdAt.gte = new Date(from);
-      if (to) where.createdAt.lte = new Date(to);
-    }
+    const { page = 1, limit = 30 } = filters;
+    const where = this.activityWhere(filters);
 
     const skip = (page - 1) * limit;
     const [logs, total] = await Promise.all([
@@ -1012,6 +1041,40 @@ export class AdminService {
     ]);
 
     return { data: logs, total, page, limit };
+  }
+
+  /** Export the (filtered) activity log as CSV for a date range. */
+  async exportActivityLog(filters: Parameters<AdminService['getActivityLog']>[0]): Promise<string> {
+    const where = this.activityWhere(filters);
+    const logs = await this.prisma.activityLog.findMany({
+      where,
+      include: { user: { select: { firstName: true, lastName: true, role: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 10000, // cap the export
+    });
+
+    const esc = (v: unknown) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = ['createdAt', 'actorType', 'actor', 'orgId', 'action', 'category', 'description', 'entityType', 'entityId', 'ipAddress'];
+    const rows = logs.map((l) =>
+      [
+        l.createdAt.toISOString(),
+        l.actorType ?? '',
+        l.user ? `${l.user.firstName} ${l.user.lastName}`.trim() : '',
+        l.orgId ?? '',
+        l.action,
+        l.category ?? '',
+        l.description ?? '',
+        l.entityType ?? '',
+        l.entityId ?? '',
+        l.ipAddress ?? '',
+      ]
+        .map(esc)
+        .join(','),
+    );
+    return [header.join(','), ...rows].join('\n');
   }
 
   async recordActivity(

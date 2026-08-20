@@ -63,19 +63,39 @@ export async function getUserById(id: string) {
 }
 
 // ─── Activity ────────────────────────────────────────────────
-export async function getActivityLog(params?: {
+export type ActivityFilters = {
   userId?: string;
+  orgId?: string;
+  actorType?: string;
   category?: string;
   action?: string;
+  search?: string;
   from?: string;
   to?: string;
   page?: number;
   limit?: number;
-}): Promise<{ data: any[]; total: number; page: number; limit: number }> {
+};
+
+export async function getActivityLog(
+  params?: ActivityFilters,
+): Promise<{ data: any[]; total: number; page: number; limit: number }> {
   const { data } = await adminApi.get("/admin/activity-log", {
     params: { limit: 50, ...params },
   });
   return data?.data ? data : { data: data ?? [], total: 0, page: 1, limit: 50 };
+}
+
+/** Download the filtered activity log as a CSV file. */
+export async function exportActivityLog(params?: ActivityFilters) {
+  const res = await adminApi.get("/admin/activity-log/export", { params, responseType: "blob" });
+  const url = URL.createObjectURL(res.data as Blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `activity-log-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function changeUserRole(id: string, role: string) {

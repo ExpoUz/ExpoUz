@@ -24,9 +24,10 @@ import {
   addOrganizationContact,
   setOrganizationPipeline,
   setOrganizationFollowUp,
+  getActivityLog,
 } from "@/lib/api";
 
-const TABS = ["Overview", "Venues", "Staff", "Players", "Revenue", "CRM", "Settings"] as const;
+const TABS = ["Overview", "Venues", "Staff", "Players", "Revenue", "CRM", "Activity", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
 const ROLES = ["OWNER", "MANAGER", "STAFF"];
@@ -103,6 +104,7 @@ export default function OrganizationDetailPage() {
       {tab === "Players" && <PlayersTab id={id} />}
       {tab === "Revenue" && <RevenueTab id={id} />}
       {tab === "CRM" && <CrmTab id={id} />}
+      {tab === "Activity" && <ActivityTab id={id} />}
       {tab === "Settings" && <SettingsTab org={org} />}
     </div>
   );
@@ -416,6 +418,42 @@ function RevenueTab({ id }: { id: string }) {
             )}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function ActivityTab({ id }: { id: string }) {
+  const { data } = useQuery({
+    queryKey: ["org-activity", id],
+    queryFn: () => getActivityLog({ orgId: id, limit: 100 }),
+    refetchInterval: 30000,
+  });
+  const rows = data?.data ?? [];
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-gray-900">Activity ({data?.total ?? 0})</h3>
+        <Link href={`/activity?orgId=${id}`} className="text-sm font-semibold text-primary hover:underline">
+          Open full feed →
+        </Link>
+      </div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+        {rows.length === 0 && <div className="p-8 text-center text-gray-400">No activity recorded for this organization yet.</div>}
+        {rows.map((a: any) => (
+          <div key={a.id} className="flex items-center gap-3 px-5 py-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm text-gray-800">{a.description ?? a.action}</div>
+              <div className="text-xs text-gray-400 mt-0.5">
+                {a.actorType ? `${a.actorType.replace("_", " ")} · ` : ""}
+                {a.user ? `${a.user.firstName} ${a.user.lastName}` : "system"}
+              </div>
+            </div>
+            <div className="text-xs text-gray-400 shrink-0" title={dayjs(a.createdAt).format("MMM D, YYYY HH:mm")}>
+              {dayjs(a.createdAt).format("MMM D, HH:mm")}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

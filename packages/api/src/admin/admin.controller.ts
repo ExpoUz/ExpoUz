@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  Header,
   UseGuards,
   UseInterceptors,
   Req,
@@ -456,27 +457,57 @@ export class AdminController {
 
   @Get('activity-log')
   @Roles('SUPER_ADMIN')
-  @ApiOperation({ summary: 'Paginated platform activity log' })
+  @ApiOperation({ summary: 'Paginated platform activity log (PART 4)' })
   @ApiQuery({ name: 'userId', required: false })
+  @ApiQuery({ name: 'orgId', required: false })
+  @ApiQuery({ name: 'actorType', required: false })
   @ApiQuery({ name: 'entityType', required: false })
+  @ApiQuery({ name: 'entityId', required: false })
   @ApiQuery({ name: 'action', required: false })
   @ApiQuery({ name: 'category', required: false })
+  @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'from', required: false })
   @ApiQuery({ name: 'to', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getActivityLog(
     @Query('userId') userId?: string,
+    @Query('orgId') orgId?: string,
+    @Query('actorType') actorType?: string,
     @Query('entityType') entityType?: string,
+    @Query('entityId') entityId?: string,
     @Query('action') action?: string,
     @Query('category') category?: string,
+    @Query('search') search?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('page') page = 1,
     @Query('limit') limit = 30,
   ) {
     return this.adminService.getActivityLog({
-      userId, entityType, action, category, from, to, page: +page, limit: +limit,
+      userId, orgId, actorType, entityType, entityId, action, category, search,
+      from, to, page: +page, limit: +limit,
+    });
+  }
+
+  @Get('activity-log/export')
+  @Roles('SUPER_ADMIN')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="activity-log.csv"')
+  @ApiOperation({ summary: 'Export the filtered activity log as CSV (PART 4)' })
+  exportActivityLog(
+    @Query('userId') userId?: string,
+    @Query('orgId') orgId?: string,
+    @Query('actorType') actorType?: string,
+    @Query('entityType') entityType?: string,
+    @Query('action') action?: string,
+    @Query('category') category?: string,
+    @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.adminService.exportActivityLog({
+      userId, orgId, actorType, entityType, action, category, search, from, to,
     });
   }
 

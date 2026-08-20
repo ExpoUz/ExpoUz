@@ -863,24 +863,39 @@ enum OrgContactType {
 }
 
 // ============ ACTIVITY LOG ============
-// Immutable audit trail: every admin/super-admin action is recorded here
+// Immutable, append-only audit trail (PART 4). Records player, partner-staff,
+// superadmin and system actions. Never edited or deleted — including by
+// superadmins. `userId` is the actor and is nullable so SYSTEM events (escrow,
+// refunds, jobs) can be logged with no human actor.
 model ActivityLog {
   id          String            @id @default(cuid())
-  userId      String
-  user        User              @relation(fields: [userId], references: [id])
+  userId      String? // the acting user; null for SYSTEM events
+  user        User?             @relation(fields: [userId], references: [id])
+  actorType   ActorType? // PLAYER | ORG_STAFF | SUPERADMIN | SYSTEM
+  orgId       String? // organization context, when the action belongs to a tenant
   action      String // e.g. "BAN_USER", "VERIFY_PITCH", "MATCH_JOINED"
   category    ActivityCategory? // typed classification for user-facing activity feeds
   description String? // human-readable summary shown in history feeds
-  entityType  String? // e.g. "User", "Pitch", "Match"
+  entityType  String? // target type, e.g. "User", "Pitch", "Match", "organization"
   entityId    String?
   meta        Json? // arbitrary payload snapshot
   ipAddress   String?
   createdAt   DateTime          @default(now())
 
   @@index([userId])
+  @@index([orgId])
+  @@index([actorType])
   @@index([category])
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+// Who performed a logged action (PART 4).
+enum ActorType {
+  PLAYER
+  ORG_STAFF
+  SUPERADMIN
+  SYSTEM
 }
 
 enum ActivityCategory {
