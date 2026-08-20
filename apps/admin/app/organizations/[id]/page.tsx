@@ -20,12 +20,23 @@ import {
   removeOrganizationMember,
   getOrganizationPlayers,
   getOrganizationRevenue,
+  getOrganizationCrm,
+  addOrganizationContact,
+  setOrganizationPipeline,
+  setOrganizationFollowUp,
 } from "@/lib/api";
 
-const TABS = ["Overview", "Venues", "Staff", "Players", "Revenue", "Settings"] as const;
+const TABS = ["Overview", "Venues", "Staff", "Players", "Revenue", "CRM", "Settings"] as const;
 type Tab = (typeof TABS)[number];
 
 const ROLES = ["OWNER", "MANAGER", "STAFF"];
+const PIPELINE = ["LEAD", "CONTACTED", "DEMO", "NEGOTIATING", "ACTIVE", "CHURNED"];
+const CONTACT_TYPES = ["NOTE", "CALL", "MEETING", "EMAIL"];
+const FLAG_BADGE: Record<string, string> = {
+  AT_RISK: "bg-red-100 text-red-600",
+  DORMANT: "bg-gray-200 text-gray-600",
+  RENEWAL_DUE: "bg-amber-100 text-amber-700",
+};
 const STATUS_BADGE: Record<string, string> = {
   ACTIVE: "bg-green-100 text-green-700",
   PENDING: "bg-yellow-100 text-yellow-700",
@@ -91,6 +102,7 @@ export default function OrganizationDetailPage() {
       {tab === "Staff" && <StaffTab id={id} />}
       {tab === "Players" && <PlayersTab id={id} />}
       {tab === "Revenue" && <RevenueTab id={id} />}
+      {tab === "CRM" && <CrmTab id={id} />}
       {tab === "Settings" && <SettingsTab org={org} />}
     </div>
   );
@@ -404,6 +416,135 @@ function RevenueTab({ id }: { id: string }) {
             )}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function trendIcon(t: string) {
+  if (t === "up") return <span className="text-green-600">▲ up</span>;
+  if (t === "down") return <span className="text-red-500">▼ down</span>;
+  return <span className="text-gray-400">— flat</span>;
+}
+
+function CrmTab({ id }: { id: string }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ["org-crm", id], queryFn: () => getOrganizationCrm(id) });
+  const [contact, setContact] = useState({ type: "NOTE", summary: "", followUpDate: "" });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["org-crm", id] });
+
+  const pipelineMut = useMutation({
+    mutationFn: (stage: string) => setOrganizationPipeline(id, stage),
+    onSuccess: invalidate,
+  });
+  const followUpMut = useMutation({
+    mutationFn: (date: string | null) => setOrganizationFollowUp(id, { date }),
+    onSuccess: invalidate,
+  });
+  const contactMut = useMutation({
+    mutationFn: () =>
+      addOrganizationContact(id, {
+        type: contact.type,
+        summary: contact.summary,
+        followUpDate: contact.followUpDate || undefined,
+      }),
+    onSuccess: () => { invalidate(); setContact({ type: "NOTE", summary: "", followUpDate: "" }); },
+  });
+
+  const input = "rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30";
+  if (!data) return <div className="text-gray-400">Loading…</div>;
+  const h = data.health;
+
+  return (
+    <div className="space-y-6">
+      {/* Health + flags */}
+      <div className="flex flex-wrap items-center gap-2">
+        {h.flags.length === 0 && <span className="text-sm text-gray-400">No health flags — this partner looks healthy.</span>}
+        {h.flags.map((f: string) => (
+          <span key={f} className={`text-xs px-2.5 py-1 rounded-full font-semibold ${FLAG_BADGE[f] ?? "bg-gray-100 text-gray-600"}`}>
+            {f.replace("_", " ")}
+          </span>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Stat label="Venues active" value={`${h.venuesActive}/${h.venuesListed}`} />
+        <Stat label="Bookings 30d" value={<span>{h.bookingsLast30} <span className="text-sm font-normal">{trendIcon(h.bookingsTrend)}</span></span>} />
+        <Stat label="Revenue 30d" value={<span>{money(h.revenueLast30)} <span className="text-sm font-normal">{trendIcon(h.revenueTrend)}</span></span>} />
+        <Stat label="Open disputes" value={h.unresolvedDisputes} />
+      </div>
+
+      {/* Pipeline + follow-up */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h3 className="font-bold text-gray-900 mb-3">Pipeline stage</h3>
+          <select value={data.pipelineStage} onChange={(e) => pipelineMut.mutate(e.target.value)} className={`${input} w-full`}>
+            {PIPELINE.map((s) => (<option key={s} value={s}>{s}</option>))}
+          </select>
+          <p className="text-xs text-gray-400 mt-2">Last activity: {h.lastActivityAt ? dayjs(h.lastActivityAt).format("MMM D, YYYY") : "never"}</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h3 className="font-bold text-gray-900 mb-3">Next follow-up</h3>
+          <div className="flex gap-2">
+            <input
+              type="date"
+              defaultValue={data.followUpDate ? dayjs(data.followUpDate).format("YYYY-MM-DD") : ""}
+              onChange={(e) => followUpMut.mutate(e.target.value || null)}
+              className={`${input} flex-1`}
+            />
+            {data.followUpDate && (
+              <button onClick={() => followUpMut.mutate(null)} className="text-xs font-semibold text-red-500 hover:underline">Clear</button>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 mt-2">Contract ends: {data.contractEndDate ? dayjs(data.contractEndDate).format("MMM D, YYYY") : "—"}</p>
+        </div>
+      </div>
+
+      {/* Log a contact */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <h3 className="font-bold text-gray-900 mb-3">Log contact</h3>
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <select value={contact.type} onChange={(e) => setContact({ ...contact, type: e.target.value })} className={input}>
+              {CONTACT_TYPES.map((t) => (<option key={t} value={t}>{t}</option>))}
+            </select>
+            <input
+              type="date"
+              value={contact.followUpDate}
+              onChange={(e) => setContact({ ...contact, followUpDate: e.target.value })}
+              className={input}
+              title="Optional: set the next follow-up"
+            />
+          </div>
+          <textarea
+            rows={2}
+            className={input}
+            placeholder="What was discussed?"
+            value={contact.summary}
+            onChange={(e) => setContact({ ...contact, summary: e.target.value })}
+          />
+          <button
+            onClick={() => contactMut.mutate()}
+            disabled={!contact.summary.trim() || contactMut.isPending}
+            className="self-start rounded-xl bg-primary px-4 py-2 text-sm font-bold text-white hover:opacity-90 disabled:opacity-40"
+          >
+            Save entry
+          </button>
+        </div>
+      </div>
+
+      {/* Contact log */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+        {(data.contacts ?? []).length === 0 && <div className="p-8 text-center text-gray-400">No contact history yet.</div>}
+        {(data.contacts ?? []).map((c: any) => (
+          <div key={c.id} className="px-5 py-3">
+            <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+              <span className="font-semibold text-gray-600">{c.type}</span>
+              <span>{c.authorName} · {dayjs(c.createdAt).format("MMM D, YYYY HH:mm")}</span>
+            </div>
+            <p className="text-sm text-gray-800 whitespace-pre-wrap">{c.summary}</p>
+          </div>
+        ))}
       </div>
     </div>
   );

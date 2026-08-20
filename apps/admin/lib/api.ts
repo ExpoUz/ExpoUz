@@ -360,3 +360,32 @@ export async function getOrganizationRevenue(id: string) {
   const { data } = await adminApi.get(`/admin/organizations/${id}/revenue`);
   return data;
 }
+
+// ─── Partner CRM (PART 3) ───────────────────
+export async function getOrganizationCrm(id: string) {
+  const { data } = await adminApi.get(`/admin/organizations/${id}/crm`);
+  return data;
+}
+
+export async function addOrganizationContact(
+  id: string,
+  dto: { type?: string; summary: string; followUpDate?: string | null },
+) {
+  const { data } = await adminApi.post(`/admin/organizations/${id}/contacts`, dto);
+  return data;
+}
+
+export async function setOrganizationPipeline(id: string, stage: string) {
+  const { data } = await adminApi.patch(`/admin/organizations/${id}/pipeline`, { stage });
+  return data;
+}
+
+export async function setOrganizationFollowUp(id: string, dto: { date: string | null; userId?: string | null }) {
+  const { data } = await adminApi.patch(`/admin/organizations/${id}/followup`, dto);
+  return data;
+}
+
+export async function getOrganizationsInsights() {
+  const { data } = await adminApi.get(`/admin/organizations/insights`);
+  return data;
+}

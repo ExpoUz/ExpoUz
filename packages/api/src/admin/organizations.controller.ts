@@ -12,7 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { OrgRole, OrgStatus } from '@prisma/client';
+import { OrgContactType, OrgPipelineStage, OrgRole, OrgStatus } from '@prisma/client';
 import { OrganizationsService } from './organizations.service';
 import { AdminAuditInterceptor } from './admin-audit.interceptor';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -45,6 +45,14 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Create an organization (optionally with a first OWNER)' })
   create(@Req() req: any, @Body() dto: any) {
     return this.orgs.create(req.user.id, dto);
+  }
+
+  // ---- partner CRM portfolio (PART 3) — declared before :id so it isn't
+  // swallowed by the :id route ----
+  @Get('insights')
+  @ApiOperation({ summary: 'Portfolio: revenue leaderboard, at-risk, renewals due, funnel' })
+  insights() {
+    return this.orgs.insights();
   }
 
   @Get(':id')
@@ -145,5 +153,37 @@ export class OrganizationsController {
   @ApiOperation({ summary: 'Revenue + commission per venue' })
   getRevenue(@Param('id') id: string) {
     return this.orgs.getRevenue(id);
+  }
+
+  // ---- partner CRM (PART 3) ----
+  @Get(':id/crm')
+  @ApiOperation({ summary: 'Contact log + follow-up + health indicators' })
+  getCrm(@Param('id') id: string) {
+    return this.orgs.getCrm(id);
+  }
+
+  @Post(':id/contacts')
+  @ApiOperation({ summary: 'Log a call / meeting / email / note (optionally set follow-up)' })
+  addContact(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: { type?: OrgContactType; summary: string; followUpDate?: string | null },
+  ) {
+    return this.orgs.addContact(id, req.user.id, dto);
+  }
+
+  @Patch(':id/pipeline')
+  @ApiOperation({ summary: 'Move the org along the sales pipeline' })
+  setPipeline(@Param('id') id: string, @Body('stage') stage: OrgPipelineStage) {
+    return this.orgs.setPipeline(id, stage);
+  }
+
+  @Patch(':id/followup')
+  @ApiOperation({ summary: 'Set / clear the next follow-up and its owner' })
+  setFollowUp(
+    @Param('id') id: string,
+    @Body() dto: { date: string | null; userId?: string | null },
+  ) {
+    return this.orgs.setFollowUp(id, dto);
   }
 }

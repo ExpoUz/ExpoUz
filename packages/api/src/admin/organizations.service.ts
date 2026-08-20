@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { OrgRole, OrgStatus, Prisma } from '@prisma/client';
+import { OrgContactType, OrgPipelineStage, OrgRole, OrgStatus, Prisma } from '@prisma/client';
 import * as dayjs from 'dayjs';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -440,6 +440,250 @@ export class OrganizationsService {
       totalGross,
       totalCommission,
       totalPayout: totalGross - totalCommission,
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PART 3 — Partner-relationship CRM (managing the partner, not their players)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /** Contact log + follow-up + computed health for one org's CRM screen. */
+  async getCrm(id: string) {
+    const org = await this.prisma.organization.findUnique({ where: { id } });
+    if (!org) throw new NotFoundException('Organization not found');
+    const [contacts, health] = await Promise.all([this.listContacts(id), this.computeHealth(id, org)]);
+    return {
+      id: org.id,
+      name: org.name,
+      pipelineStage: org.pipelineStage,
+      followUpDate: org.followUpDate,
+      followUpUserId: org.followUpUserId,
+      contractStartDate: org.contractStartDate,
+      contractEndDate: org.contractEndDate,
+      contacts,
+      health,
+    };
+  }
+
+  async listContacts(id: string) {
+    const logs = await this.prisma.orgContactLog.findMany({
+      where: { orgId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    if (!logs.length) return [];
+    const authors = await this.prisma.user.findMany({
+      where: { id: { in: [...new Set(logs.map((l) => l.authorId))] } },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    const nameById = new Map(authors.map((a) => [a.id, `${a.firstName} ${a.lastName}`.trim()]));
+    return logs.map((l) => ({ ...l, authorName: nameById.get(l.authorId) ?? 'Admin' }));
+  }
+
+  async addContact(
+    id: string,
+    authorId: string,
+    dto: { type?: OrgContactType; summary: string; followUpDate?: string | null },
+  ) {
+    await this.mustExist(id);
+    const summary = (dto.summary ?? '').trim();
+    if (!summary) throw new BadRequestException('A summary is required');
+    const log = await this.prisma.orgContactLog.create({
+      data: { orgId: id, authorId, type: dto.type ?? 'NOTE', summary: summary.slice(0, 2000) },
+    });
+    // Logging a contact may also set the next follow-up in one step.
+    if (dto.followUpDate !== undefined) {
+      await this.prisma.organization.update({
+        where: { id },
+        data: {
+          followUpDate: dto.followUpDate ? new Date(dto.followUpDate) : null,
+          followUpUserId: dto.followUpDate ? authorId : null,
+        },
+      });
+    }
+    return log;
+  }
+
+  /** Move an org along the sales pipeline (LEAD → … → ACTIVE → CHURNED). */
+  async setPipeline(id: string, stage: OrgPipelineStage) {
+    await this.mustExist(id);
+    return this.prisma.organization.update({ where: { id }, data: { pipelineStage: stage } });
+  }
+
+  /** Set/clear the next follow-up and the superadmin who owns it. */
+  async setFollowUp(id: string, dto: { date: string | null; userId?: string | null }) {
+    await this.mustExist(id);
+    return this.prisma.organization.update({
+      where: { id },
+      data: {
+        followUpDate: dto.date ? new Date(dto.date) : null,
+        followUpUserId: dto.date ? dto.userId ?? null : null,
+      },
+    });
+  }
+
+  // ---- health indicators ----
+
+  /** Bookings count at the org's venues within [from, to). */
+  private async bookingsInWindow(pitchIds: string[], from: Date, to: Date): Promise<number> {
+    if (!pitchIds.length) return 0;
+    return this.prisma.booking.count({
+      where: {
+        match: { pitchId: { in: pitchIds } },
+        isGuestSlot: false,
+        status: { in: ['CONFIRMED', 'COMPLETED', 'NO_SHOW'] },
+        createdAt: { gte: from, lt: to },
+      },
+    });
+  }
+
+  private async revenueInWindow(pitchIds: string[], from: Date, to: Date): Promise<number> {
+    if (!pitchIds.length) return 0;
+    const agg = await this.prisma.transaction.aggregate({
+      where: {
+        status: { in: ['HELD', 'RELEASED'] },
+        createdAt: { gte: from, lt: to },
+        OR: [
+          { booking: { match: { pitchId: { in: pitchIds } } } },
+          { pitchBooking: { pitchId: { in: pitchIds } } },
+        ],
+      },
+      _sum: { amount: true },
+    });
+    return Math.round(Number(agg._sum.amount ?? 0));
+  }
+
+  /** up / flat / down comparing a recent window to the one before it. */
+  private trend(recent: number, previous: number): 'up' | 'flat' | 'down' {
+    if (previous === 0) return recent > 0 ? 'up' : 'flat';
+    const ratio = recent / previous;
+    if (ratio <= 0.6) return 'down'; // 40%+ decline
+    if (ratio >= 1.1) return 'up';
+    return 'flat';
+  }
+
+  /**
+   * Health snapshot for the partner-CRM: venue utilisation, 30-day booking and
+   * revenue trends, last activity, unresolved disputes, and the derived flags a
+   * superadmin scans to answer "which partner needs attention this week".
+   */
+  private async computeHealth(
+    id: string,
+    org: { contractEndDate: Date | null },
+  ) {
+    const pitchIds = await this.pitchIds(id);
+    const now = Date.now();
+    const d30 = new Date(now - 30 * 24 * 3600 * 1000);
+    const d60 = new Date(now - 60 * 24 * 3600 * 1000);
+    const nowDate = new Date(now);
+
+    const [venuesListed, venuesActiveRows, last30, prev30, rev30, revPrev30, lastBooking, disputes] =
+      await Promise.all([
+        this.prisma.pitch.count({ where: { organizationId: id } }),
+        pitchIds.length
+          ? this.prisma.booking.findMany({
+              where: {
+                match: { pitchId: { in: pitchIds } },
+                isGuestSlot: false,
+                status: { in: ['CONFIRMED', 'COMPLETED', 'NO_SHOW'] },
+                createdAt: { gte: d30 },
+              },
+              select: { match: { select: { pitchId: true } } },
+              distinct: ['matchId'],
+            })
+          : Promise.resolve([]),
+        this.bookingsInWindow(pitchIds, d30, nowDate),
+        this.bookingsInWindow(pitchIds, d60, d30),
+        this.revenueInWindow(pitchIds, d30, nowDate),
+        this.revenueInWindow(pitchIds, d60, d30),
+        pitchIds.length
+          ? this.prisma.booking.findFirst({
+              where: { match: { pitchId: { in: pitchIds } }, isGuestSlot: false },
+              orderBy: { createdAt: 'desc' },
+              select: { createdAt: true },
+            })
+          : Promise.resolve(null),
+        pitchIds.length
+          ? this.prisma.matchResult.count({
+              where: { isDisputed: true, isConfirmed: false, match: { pitchId: { in: pitchIds } } },
+            })
+          : Promise.resolve(0),
+      ]);
+
+    const venuesActive = new Set(venuesActiveRows.map((b) => b.match.pitchId)).size;
+    const bookingsTrend = this.trend(last30, prev30);
+    const revenueTrend = this.trend(rev30, revPrev30);
+    const lastActivityAt = lastBooking?.createdAt ?? null;
+    const dormant = !lastActivityAt || lastActivityAt.getTime() < now - 30 * 24 * 3600 * 1000;
+    const renewalDue =
+      !!org.contractEndDate &&
+      org.contractEndDate.getTime() > now &&
+      org.contractEndDate.getTime() < now + 30 * 24 * 3600 * 1000;
+
+    const flags: string[] = [];
+    if (bookingsTrend === 'down' && prev30 > 0) flags.push('AT_RISK');
+    if (dormant) flags.push('DORMANT');
+    if (renewalDue) flags.push('RENEWAL_DUE');
+
+    return {
+      venuesListed,
+      venuesActive,
+      bookingsLast30: last30,
+      bookingsPrev30: prev30,
+      bookingsTrend,
+      revenueLast30: rev30,
+      revenuePrev30: revPrev30,
+      revenueTrend,
+      lastActivityAt,
+      unresolvedDisputes: disputes,
+      flags,
+    };
+  }
+
+  /**
+   * Portfolio view across all organizations: revenue leaderboard, at-risk and
+   * renewals-due lists, and the onboarding funnel by pipeline stage.
+   */
+  async insights() {
+    const orgs = await this.prisma.organization.findMany({
+      where: { status: { not: 'ARCHIVED' } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const rows = await Promise.all(
+      orgs.map(async (org) => {
+        const health = await this.computeHealth(org.id, org);
+        return {
+          id: org.id,
+          name: org.name,
+          logoUrl: org.logoUrl,
+          status: org.status,
+          pipelineStage: org.pipelineStage,
+          contractEndDate: org.contractEndDate,
+          followUpDate: org.followUpDate,
+          ...health,
+        };
+      }),
+    );
+
+    const funnel: Record<OrgPipelineStage, number> = {
+      LEAD: 0,
+      CONTACTED: 0,
+      DEMO: 0,
+      NEGOTIATING: 0,
+      ACTIVE: 0,
+      CHURNED: 0,
+    };
+    for (const r of rows) funnel[r.pipelineStage]++;
+
+    return {
+      revenueByOrg: [...rows].sort((a, b) => b.revenueLast30 - a.revenueLast30),
+      atRisk: rows.filter((r) => r.flags.includes('AT_RISK')),
+      dormant: rows.filter((r) => r.flags.includes('DORMANT')),
+      renewalsDue: rows
+        .filter((r) => r.flags.includes('RENEWAL_DUE'))
+        .sort((a, b) => (a.contractEndDate?.getTime() ?? 0) - (b.contractEndDate?.getTime() ?? 0)),
+      onboardingFunnel: funnel,
     };
   }
 

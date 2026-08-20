@@ -44,12 +44,20 @@ export default function OrganizationsPage() {
             {(orgs ?? []).length} partner {orgs?.length === 1 ? "organization" : "organizations"}
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white hover:opacity-90"
-        >
-          + New organization
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/organizations/insights"
+            className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50"
+          >
+            Insights
+          </Link>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white hover:opacity-90"
+          >
+            + New organization
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
