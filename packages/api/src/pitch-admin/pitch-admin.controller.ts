@@ -13,14 +13,19 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { PitchAdminService } from './pitch-admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { OrgGuard } from '../org/org.guard';
+import { OrgRoles } from '../org/decorators/org-roles.decorator';
 
 // Access is authorized by ORG MEMBERSHIP (or legacy venue ownership), resolved
-// server-side per request — not by platform UserRole. So an invited MANAGER/STAFF
-// who is otherwise a PLAYER can use the panel. JWT only here; every handler's
-// service call runs through resolvePortalContext, which 403s non-members.
+// server-side per request by OrgGuard — not by platform UserRole. So an invited
+// MANAGER/STAFF who is otherwise a PLAYER can use the panel. OrgGuard 403s
+// non-members and suspended orgs; @OrgRoles gates the role-restricted routes
+// (revenue/CRM/venue-editing = OWNER|MANAGER, staff management = OWNER). Routes
+// with no @OrgRoles are open to any member, including STAFF (schedule/check-in).
+// Services still re-resolve + assert roles (defence in depth).
 @ApiTags('pitch-admin')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgGuard)
 @Controller('pitch-admin')
 export class PitchAdminController {
   constructor(private readonly pitchAdminService: PitchAdminService) {}
@@ -39,30 +44,35 @@ export class PitchAdminController {
 
   // ─── Staff management (OWNER only) ────────────────────────────────────────
   @Get('staff')
+  @OrgRoles('OWNER')
   @ApiOperation({ summary: 'List org members + pending invites (OWNER only)' })
   getStaff(@CurrentUser() user: any) {
     return this.pitchAdminService.getStaff(user.id);
   }
 
   @Post('staff/invites')
+  @OrgRoles('OWNER')
   @ApiOperation({ summary: 'Invite a staff member by phone or Telegram (OWNER only)' })
   inviteStaff(@CurrentUser() user: any, @Body() dto: any) {
     return this.pitchAdminService.inviteStaff(user.id, dto);
   }
 
   @Delete('staff/invites/:inviteId')
+  @OrgRoles('OWNER')
   @ApiOperation({ summary: 'Revoke a pending invite (OWNER only)' })
   revokeInvite(@CurrentUser() user: any, @Param('inviteId') inviteId: string) {
     return this.pitchAdminService.revokeInvite(user.id, inviteId);
   }
 
   @Patch('staff/:memberId')
+  @OrgRoles('OWNER')
   @ApiOperation({ summary: 'Change a member role (OWNER only)' })
   changeStaffRole(@CurrentUser() user: any, @Param('memberId') memberId: string, @Body('role') role: any) {
     return this.pitchAdminService.changeStaffRole(user.id, memberId, role);
   }
 
   @Delete('staff/:memberId')
+  @OrgRoles('OWNER')
   @ApiOperation({ summary: 'Remove a member (OWNER only)' })
   removeStaff(@CurrentUser() user: any, @Param('memberId') memberId: string) {
     return this.pitchAdminService.removeStaff(user.id, memberId);
@@ -81,7 +91,8 @@ export class PitchAdminController {
   }
 
   @Patch('pitches/:id/availability')
-  @ApiOperation({ summary: 'Toggle pitch active/inactive' })
+  @OrgRoles('OWNER', 'MANAGER')
+  @ApiOperation({ summary: 'Toggle pitch active/inactive (no STAFF)' })
   updatePitchAvailability(
     @CurrentUser() user: any,
     @Param('id') id: string,
@@ -91,7 +102,8 @@ export class PitchAdminController {
   }
 
   @Patch('pitches/:id/opening-hours')
-  @ApiOperation({ summary: 'Set operating hours + slot/court config for a venue' })
+  @OrgRoles('OWNER', 'MANAGER')
+  @ApiOperation({ summary: 'Set operating hours + slot/court config for a venue (no STAFF)' })
   updateOpeningHours(
     @CurrentUser() user: any,
     @Param('id') id: string,
@@ -146,7 +158,8 @@ export class PitchAdminController {
   }
 
   @Get('users')
-  @ApiOperation({ summary: 'Get players who have booked at owned pitches' })
+  @OrgRoles('OWNER', 'MANAGER')
+  @ApiOperation({ summary: 'Get players who have booked at owned pitches (no STAFF)' })
   @ApiQuery({ name: 'pitchId', required: false })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
@@ -167,13 +180,15 @@ export class PitchAdminController {
   }
 
   @Get('players')
-  @ApiOperation({ summary: 'Get unique players on owner pitches (legacy endpoint)' })
+  @OrgRoles('OWNER', 'MANAGER')
+  @ApiOperation({ summary: 'Get unique players on owner pitches (legacy endpoint, no STAFF)' })
   getPlayers(@CurrentUser() user: any) {
     return this.pitchAdminService.getPlayers(user.id);
   }
 
   @Get('revenue')
-  @ApiOperation({ summary: 'Get revenue breakdown' })
+  @OrgRoles('OWNER', 'MANAGER')
+  @ApiOperation({ summary: 'Get revenue breakdown (no STAFF)' })
   getRevenue(@CurrentUser() user: any) {
     return this.pitchAdminService.getRevenue(user.id);
   }

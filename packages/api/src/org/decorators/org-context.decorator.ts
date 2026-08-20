@@ -1,14 +1,15 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { OrgContext } from '../org-context.service';
+import { PortalContext } from '../org-context.service';
 
 /**
- * Injects the server-resolved `{ orgId, role }` attached by OrgGuard. Use this
- * for the org id — NEVER read it from a route param or request body.
+ * Injects the server-resolved portal context attached by OrgGuard
+ * (`{ legacy, orgId, role, org, pitchWhere }`). `@OrgCtx('orgId')` gives the
+ * tenant id (null for a legacy owner) — NEVER read it from a route param or body.
  */
 export const OrgCtx = createParamDecorator(
-  (data: keyof OrgContext | undefined, ctx: ExecutionContext): OrgContext | string => {
+  (data: keyof PortalContext | undefined, ctx: ExecutionContext) => {
     const req = ctx.switchToHttp().getRequest();
-    const orgContext: OrgContext = req.orgContext;
+    const orgContext: PortalContext = req.orgContext;
     return data ? orgContext?.[data] : orgContext;
   },
 );

@@ -12,15 +12,19 @@ import { Throttle } from '@nestjs/throttler';
 import { CrmService } from './crm.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { OrgGuard } from '../org/org.guard';
+import { OrgRoles } from '../org/decorators/org-roles.decorator';
 
 /**
- * Venue CRM endpoints. Scoped to the caller's ORGANISATION (or legacy owned
- * venues) inside the service — a client-supplied id can never widen access, and
- * STAFF are rejected there. Access is by membership, so JWT-only here.
+ * Venue CRM endpoints. OrgGuard resolves the caller's tenant from membership
+ * (or legacy ownership) and @OrgRoles gates out STAFF — the CRM is OWNER/MANAGER
+ * only. The service re-scopes every query (defence in depth); a client-supplied
+ * id can never widen access.
  */
 @ApiTags('pitch-admin-crm')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgGuard)
+@OrgRoles('OWNER', 'MANAGER')
 @Controller('pitch-admin')
 export class CrmController {
   constructor(private readonly crm: CrmService) {}
