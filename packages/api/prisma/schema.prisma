@@ -102,6 +102,7 @@ model User {
   walletTransactions         WalletTransaction[]
   phoneVerifications         PhoneVerification[]
   orgMemberships             OrgMember[]
+  venueAdminAssignments      VenueAdminAssignment[]
 }
 
 // ============ PHONE VERIFICATION ============
@@ -263,9 +264,10 @@ model Pitch {
   noMetalStuds    Boolean         @default(false)
   commission      Float           @default(0.10)
   rejectionReason String?
-  // A venue belongs to one sport. Defaults to PADEL to keep existing courts
-  // correctly labelled after the padel pivot; football pitches set FOOTBALL.
-  sport           Sport           @default(PADEL)
+  // A venue belongs to one sport. REQUIRED — no default: an omitted sport must
+  // fail loudly at write time rather than silently mislabelling a football pitch
+  // as padel (the old @default(PADEL) was the root cause of that bug).
+  sport           Sport
   // Padel court attributes
   courtType       PadelCourtType  @default(PANORAMIC)
   isCovered       Boolean         @default(false)
@@ -274,6 +276,10 @@ model Pitch {
   openingHours    Json?
   slotDuration    Int             @default(60)
   courtCount      Int             @default(1)
+  // Default per-slot price used when generating slots (PART 6). Admins can then
+  // bulk-edit individual slot prices (e.g. evenings cost more).
+  defaultPrice    Decimal?        @db.Decimal(12, 2)
+  slots           Slot[]
   locationId      String?
   location        Location?       @relation(fields: [locationId], references: [id])
   // Multi-tenant owner. `organizationId` is the authoritative tenant boundary for
@@ -285,9 +291,30 @@ model Pitch {
   matches         Match[]
   followers       PitchFollower[]
   pitchBookings   PitchBooking[]
+  venueAdmins     VenueAdminAssignment[]
 
   @@index([sport, city, isActive])
   @@index([organizationId])
+}
+
+// ============ VENUE ADMIN ASSIGNMENT (PART 3) ============
+// Superadmin narrows an org member to specific venues WITHIN their organization.
+// It layers ON TOP of the Organization tenant boundary — it never grants access
+// to a venue outside the caller's org. An intersection overlay: when a caller has
+// any assignment rows, their portal scope is intersected with those pitch ids;
+// with no rows, they keep their full org scope. Resolved server-side only.
+model VenueAdminAssignment {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pitchId    String
+  pitch      Pitch    @relation(fields: [pitchId], references: [id], onDelete: Cascade)
+  assignedBy String // superadmin user id who created the assignment
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, pitchId])
+  @@index([userId])
+  @@index([pitchId])
 }
 
 enum SurfaceType {
@@ -326,6 +353,37 @@ enum AmenityType {
   CAFE
   SECURITY
   LIGHTS
+}
+
+// ============ SLOT (PART 6 — the core booking primitive) ============
+// A bookable time block at a venue, priced by an admin. Users book INTO slots;
+// they never set the price. Generated from the venue's opening hours.
+model Slot {
+  id          String     @id @default(cuid())
+  pitchId     String
+  pitch       Pitch      @relation(fields: [pitchId], references: [id], onDelete: Cascade)
+  startTime   DateTime
+  endTime     DateTime
+  price       Decimal    @db.Decimal(12, 2) // set by admin — users never set price
+  status      SlotStatus @default(AVAILABLE)
+  courtNumber Int? // for multi-court venues
+  blockReason String? // why an admin made it unavailable
+  matchId     String?    @unique // the match occupying it, if booked
+  match       Match?     @relation(fields: [matchId], references: [id])
+  createdById String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([pitchId, courtNumber, startTime])
+  @@index([pitchId, startTime])
+  @@index([status, startTime])
+}
+
+enum SlotStatus {
+  AVAILABLE // bookable
+  BOOKED    // taken via the app
+  BLOCKED   // admin made unavailable (offline booking, maintenance)
+  PAST      // start time has passed
 }
 
 // ============ MATCH ============
@@ -383,6 +441,9 @@ model Match {
   ratings       PlayerRating[]
   notifications Notification[]
   result        MatchResult?
+  // The bookable slot this match occupies (PART 6). Null for legacy matches
+  // created before slot-based booking.
+  slot          Slot?
 
   // Availability filtering hits these hot paths.
   @@index([pitchId, startTime])

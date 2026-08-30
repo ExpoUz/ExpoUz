@@ -21,6 +21,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { MessagesModule } from './messages/messages.module';
 import { AdminModule } from './admin/admin.module';
 import { PitchAdminModule } from './pitch-admin/pitch-admin.module';
+import { SlotsModule } from './slots/slots.module';
 import { FormationModule } from './formation/formation.module';
 import { GatewayModule } from './gateway/gateway.module';
 import { TelegramModule } from './telegram/telegram.module';
@@ -88,6 +89,7 @@ import { HealthController } from './health.controller';
     MessagesModule,
     AdminModule,
     PitchAdminModule,
+    SlotsModule,
     FormationModule,
     GatewayModule,
   ],

@@ -220,7 +220,12 @@
     "pitchRateHours": "Pitch rate × {hours}h",
     "platformCommission10": "Platform commission (10%)",
     "youPay": "You pay",
-    "errCreate": "Could not create the match."
+    "errCreate": "Could not create the match.",
+    "chooseSlot": "Choose a slot",
+    "noSlots": "No slots available at this venue yet. Try another venue.",
+    "perPlayerShort": "/player",
+    "slotPriceNote": "Price is set by the venue and split across all players — you don't set it.",
+    "slotTaken": "That slot was just booked. Please pick another."
   },
   "wallet": {
     "title": "Wallet",

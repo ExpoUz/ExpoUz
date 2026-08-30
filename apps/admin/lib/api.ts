@@ -145,6 +145,27 @@ export async function updatePitch(id: string, dto: any) {
   return data;
 }
 
+// ─── Venue Admin Assignments (PART 3) ─────────────────────────
+export async function getVenueAdmins(pitchId: string): Promise<any[]> {
+  const { data } = await adminApi.get(`/admin/pitches/${pitchId}/admins`);
+  return data ?? [];
+}
+
+export async function assignVenueAdmin(pitchId: string, userId: string) {
+  const { data } = await adminApi.post(`/admin/pitches/${pitchId}/admins`, { userId });
+  return data;
+}
+
+export async function revokeVenueAdmin(assignmentId: string) {
+  const { data } = await adminApi.delete(`/admin/venue-admins/${assignmentId}`);
+  return data;
+}
+
+export async function getAssignedVenues(userId: string): Promise<any[]> {
+  const { data } = await adminApi.get(`/admin/pitch-admins/${userId}/venues`);
+  return data ?? [];
+}
+
 // ─── Pitch Admins ─────────────────────────────────────────────
 export async function getPitchAdmins(): Promise<any[]> {
   const { data } = await adminApi.get("/admin/pitch-admins");

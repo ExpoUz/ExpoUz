@@ -181,6 +181,8 @@ export class PitchesService {
           ...pitchData,
           ownerId,
           hourlyRate: pitchData.hourlyRate,
+          // Written explicitly (required in the DTO) — never fall back to a default.
+          sport: pitchData.sport,
         },
       });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getPendingPitches, verifyPitch, getAllPitches, createPitch, getPitchAdmins } from "@/lib/api";
+import { getPendingPitches, verifyPitch, getAllPitches, createPitch, getPitchAdmins, getVenueAdmins, assignVenueAdmin, revokeVenueAdmin } from "@/lib/api";
 import { useState } from "react";
 import dayjs from "dayjs";
 import { useSportFilter, sportParam } from "@/lib/sport-store";
@@ -126,6 +126,7 @@ function PitchCard({
   isPending: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [showAdmins, setShowAdmins] = useState(false);
   const isPadel = pitch.sport === "PADEL";
 
   return (
@@ -203,6 +204,12 @@ function PitchCard({
               </>
             )}
             <button
+              onClick={() => setShowAdmins(true)}
+              className="px-4 py-1.5 border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-lg transition-colors"
+            >
+              👤 Admins
+            </button>
+            <button
               onClick={() => setExpanded(!expanded)}
               className="text-xs text-gray-400 hover:text-gray-600"
             >
@@ -210,6 +217,10 @@ function PitchCard({
             </button>
           </div>
         </div>
+
+        {showAdmins && (
+          <ManageVenueAdminsModal pitch={pitch} onClose={() => setShowAdmins(false)} />
+        )}
 
         {/* Expanded */}
         {expanded && (
@@ -232,6 +243,7 @@ function CreatePitchModal({
   onCreated: () => void;
 }) {
   const { data: owners } = useQuery({ queryKey: ["pitch-admins"], queryFn: getPitchAdmins });
+  const sportFilter = useSportFilter();
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     name: "",
@@ -239,6 +251,9 @@ function CreatePitchModal({
     addressLine: "",
     district: "Mirzo-Ulugbek",
     city: "Tashkent",
+    // Required on the API — default to the current sport filter when one is active,
+    // otherwise PADEL. The admin must still see and confirm it below.
+    sport: sportFilter === "FOOTBALL" ? "FOOTBALL" : "PADEL",
     lat: 41.311,
     lng: 69.28,
     hourlyRate: 180000,
@@ -282,6 +297,22 @@ function CreatePitchModal({
                 </option>
               ))}
             </select>
+          </FormField>
+          <FormField label="Sport *">
+            <div className="flex gap-2">
+              {(["PADEL", "FOOTBALL", "TENNIS"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => set("sport", s)}
+                  className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
+                    form.sport === s ? "bg-primary text-white" : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {s.charAt(0) + s.slice(1).toLowerCase()}
+                </button>
+              ))}
+            </div>
           </FormField>
           <FormField label="Address *">
             <input className="inp" value={form.addressLine} onChange={(e) => set("addressLine", e.target.value)} placeholder="Street, building" />
@@ -351,6 +382,109 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
     <div>
       <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
       {children}
+    </div>
+  );
+}
+
+// PART 3 — assign/revoke venue admins for a single venue. Users must already be
+// members of the venue's organization (the API enforces this).
+function ManageVenueAdminsModal({ pitch, onClose }: { pitch: any; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+
+  const { data: admins } = useQuery({
+    queryKey: ["venue-admins", pitch.id],
+    queryFn: () => getVenueAdmins(pitch.id),
+  });
+  const { data: candidates } = useQuery({ queryKey: ["pitch-admins"], queryFn: getPitchAdmins });
+
+  const refresh = () => qc.invalidateQueries({ queryKey: ["venue-admins", pitch.id] });
+
+  const assign = useMutation({
+    mutationFn: (userId: string) => assignVenueAdmin(pitch.id, userId),
+    onSuccess: () => { setError(""); refresh(); },
+    onError: (e: any) => setError(e?.response?.data?.message ?? "Could not assign."),
+  });
+  const revoke = useMutation({
+    mutationFn: (assignmentId: string) => revokeVenueAdmin(assignmentId),
+    onSuccess: refresh,
+  });
+
+  const assignedUserIds = new Set((admins ?? []).map((a: any) => a.user?.id));
+  const filtered = (candidates ?? []).filter((u: any) => {
+    if (assignedUserIds.has(u.id)) return false;
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return `${u.firstName} ${u.lastName} ${u.phone}`.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Venue Admins</h2>
+        <p className="text-xs text-gray-500 mb-4">{pitch.name}</p>
+
+        <div className="mb-5">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Assigned</h3>
+          {(admins ?? []).length === 0 ? (
+            <p className="text-sm text-gray-400">No admins assigned — this venue is org-wide.</p>
+          ) : (
+            <div className="space-y-2">
+              {(admins ?? []).map((a: any) => (
+                <div key={a.id} className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2">
+                  <span className="text-sm text-gray-800">
+                    {a.user?.firstName} {a.user?.lastName}
+                    <span className="text-xs text-gray-400 ml-2">{a.user?.phone}</span>
+                  </span>
+                  <button
+                    onClick={() => revoke.mutate(a.id)}
+                    disabled={revoke.isPending}
+                    className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Assign a user</h3>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search pitch admins…"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-primary mb-2"
+          />
+          {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-sm text-gray-400">No matching users.</p>
+            ) : (
+              filtered.map((u: any) => (
+                <button
+                  key={u.id}
+                  onClick={() => assign.mutate(u.id)}
+                  disabled={assign.isPending}
+                  className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <span className="text-sm text-gray-800">
+                    {u.firstName} {u.lastName}
+                    <span className="text-xs text-gray-400 ml-2">{u.phone}</span>
+                  </span>
+                  <span className="text-xs font-semibold text-primary">+ Assign</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+
+        <button onClick={onClose} className="mt-5 w-full py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+          Done
+        </button>
+      </div>
     </div>
   );
 }

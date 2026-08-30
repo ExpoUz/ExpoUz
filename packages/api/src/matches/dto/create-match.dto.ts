@@ -29,6 +29,13 @@ export class CreateMatchDto {
   @IsString()
   pitchId: string;
 
+  // PART 6: the AVAILABLE slot the user is booking into. When provided, the
+  // match's startTime and price come from the slot — the user never sets price.
+  @ApiPropertyOptional({ description: 'AVAILABLE slot to book into; price and start time come from it' })
+  @IsOptional()
+  @IsString()
+  slotId?: string;
+
   @ApiPropertyOptional({ enum: Sport, default: Sport.FOOTBALL })
   @IsOptional()
   @IsEnum(Sport)

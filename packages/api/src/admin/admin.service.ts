@@ -930,6 +930,7 @@ export class AdminService {
     addressLine: string;
     district: string;
     city: string;
+    sport: 'FOOTBALL' | 'PADEL' | 'TENNIS';
     lat: number;
     lng: number;
     hourlyRate: number;
@@ -941,16 +942,97 @@ export class AdminService {
     description?: string;
     photos?: string[];
   }) {
+    if (!dto.sport) {
+      throw new BadRequestException('sport is required (FOOTBALL | PADEL | TENNIS)');
+    }
     return this.prisma.pitch.create({
       data: {
         ...dto,
         isVerified: true, // Super admin creates pitches pre-verified
         hourlyRate: dto.hourlyRate as any,
+        // Written explicitly — never rely on a schema default.
+        sport: dto.sport as any,
         surfaceType: (dto.surfaceType ?? 'ARTIFICIAL') as any,
         pitchSize: (dto.pitchSize ?? 'SEVEN_A_SIDE') as any,
       },
       include: { owner: { select: { id: true, firstName: true, lastName: true } } },
     });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PART 3 — Venue admin assignments (superadmin-managed)
+  // Layers on top of the org tenant boundary: an assignment narrows a member to
+  // specific venues WITHIN their org. Enforced server-side in OrgContextService.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /** Admins currently assigned to a venue. */
+  async getVenueAdmins(pitchId: string) {
+    return this.prisma.venueAdminAssignment.findMany({
+      where: { pitchId },
+      include: {
+        user: {
+          select: { id: true, firstName: true, lastName: true, phone: true, avatarUrl: true, role: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /** Venues a given user is assigned to. */
+  async getAssignedVenues(userId: string) {
+    return this.prisma.venueAdminAssignment.findMany({
+      where: { userId },
+      include: {
+        pitch: {
+          select: { id: true, name: true, city: true, district: true, sport: true, isActive: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async assignVenueAdmin(dto: { userId: string; pitchId: string }, assignedBy: string) {
+    const [user, pitch] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: dto.userId }, select: { id: true } }),
+      this.prisma.pitch.findUnique({ where: { id: dto.pitchId }, select: { id: true, organizationId: true } }),
+    ]);
+    if (!user) throw new NotFoundException('User not found');
+    if (!pitch) throw new NotFoundException('Venue not found');
+
+    // Assignment overlays the org boundary — it cannot grant cross-org access.
+    // Require the user to already belong to the venue's org, else the overlay
+    // would silently resolve to zero venues.
+    if (pitch.organizationId) {
+      const member = await this.prisma.orgMember.findUnique({
+        where: { orgId_userId: { orgId: pitch.organizationId, userId: dto.userId } },
+      });
+      if (!member) {
+        throw new BadRequestException(
+          "User must be a member of the venue's organization before being assigned to it",
+        );
+      }
+    }
+
+    const assignment = await this.prisma.venueAdminAssignment.upsert({
+      where: { userId_pitchId: { userId: dto.userId, pitchId: dto.pitchId } },
+      update: {},
+      create: { userId: dto.userId, pitchId: dto.pitchId, assignedBy },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, phone: true } },
+      },
+    });
+    await this.recordActivity(assignedBy, 'ASSIGN_VENUE_ADMIN', 'Pitch', dto.pitchId, { userId: dto.userId });
+    return assignment;
+  }
+
+  async revokeVenueAdmin(assignmentId: string, revokedBy: string) {
+    const assignment = await this.prisma.venueAdminAssignment.findUnique({ where: { id: assignmentId } });
+    if (!assignment) throw new NotFoundException('Assignment not found');
+    await this.prisma.venueAdminAssignment.delete({ where: { id: assignmentId } });
+    await this.recordActivity(revokedBy, 'REVOKE_VENUE_ADMIN', 'Pitch', assignment.pitchId, {
+      userId: assignment.userId,
+    });
+    return { success: true };
   }
 
   async updatePitch(id: string, dto: {

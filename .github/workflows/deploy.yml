@@ -1,0 +1,131 @@
+name: Deploy ExpoUz
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'pnpm' }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo lint
+        continue-on-error: true
+
+  deploy-api:
+    name: Deploy API → Railway
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install -g @railway/cli
+      - run: railway up --service api
+        working-directory: packages/api
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  deploy-player-tma:
+    name: Deploy Player TMA → Vercel
+    needs: deploy-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install -g vercel
+      - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/tma
+      - run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/tma
+      - run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/tma
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_TMA_PROJECT_ID }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
+
+  deploy-host-tma:
+    name: Deploy Host TMA → Vercel
+    needs: deploy-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install -g vercel
+      - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/host-tma
+      - run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/host-tma
+      - run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/host-tma
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_HOST_TMA_PROJECT_ID }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
+
+  deploy-admin:
+    name: Deploy Admin → Vercel
+    needs: deploy-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install -g vercel
+      - run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/admin
+      - run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/admin
+      - run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: apps/admin
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
+
+  notify:
+    name: Telegram Notify
+    needs: [deploy-player-tma, deploy-host-tma, deploy-admin]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify success
+        if: ${{ needs.deploy-player-tma.result == 'success' }}
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_NOTIFY_BOT_TOKEN }}
+          message: |
+            ✅ ExpoUz deployed successfully!
+            
+            🌐 Player TMA: https://tma.expouz.com
+            🏟️ Host TMA: https://host.expouz.com
+            🔐 Admin: https://admin.expouz.com
+            📦 API: https://api.expouz.com
+            
+            Commit: ${{ github.sha }}
+            By: ${{ github.actor }}
+
+      - name: Notify failure
+        if: ${{ needs.deploy-player-tma.result == 'failure' || needs.deploy-host-tma.result == 'failure' || needs.deploy-admin.result == 'failure' }}
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_NOTIFY_BOT_TOKEN }}
+          message: |
+            ❌ ExpoUz deployment failed!
+            
+            Commit: ${{ github.sha }}
+            By: ${{ github.actor }}
+            
+            Check: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

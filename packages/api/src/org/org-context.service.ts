@@ -68,6 +68,27 @@ export class OrgContextService {
     return pitches.map((p) => p.id);
   }
 
+  /**
+   * PART 3 overlay — venue-admin assignment.
+   *
+   * When a caller has any VenueAdminAssignment rows, their portal scope is
+   * INTERSECTED with those pitch ids (still bounded by the base org/owner
+   * boundary — assignments never expand access). With no rows, `base` is
+   * returned unchanged (full org scope). Callers pass their already-resolved
+   * base `pitchWhere`.
+   */
+  async applyAssignmentOverlay(
+    userId: string,
+    base: Prisma.PitchWhereInput,
+  ): Promise<Prisma.PitchWhereInput> {
+    const assignments = await this.prisma.venueAdminAssignment.findMany({
+      where: { userId },
+      select: { pitchId: true },
+    });
+    if (assignments.length === 0) return base;
+    return { ...base, id: { in: assignments.map((a) => a.pitchId) } };
+  }
+
   /** Convenience: venues for the caller, scoped to their resolved org. */
   async pitchesForCaller(userId: string) {
     const { orgId } = await this.resolveOrgContext(userId);
@@ -102,7 +123,7 @@ export class OrgContextService {
         orgId: null,
         role: 'OWNER',
         org: null,
-        pitchWhere: { ownerId: userId },
+        pitchWhere: await this.applyAssignmentOverlay(userId, { ownerId: userId }),
       };
     }
 
@@ -116,8 +137,23 @@ export class OrgContextService {
       orgId: active.orgId,
       role: active.role,
       org: { id: active.org.id, name: active.org.name, logoUrl: active.org.logoUrl },
-      pitchWhere: { organizationId: active.orgId },
+      pitchWhere: await this.applyAssignmentOverlay(userId, { organizationId: active.orgId }),
     };
+  }
+
+  /**
+   * Guard a single-venue action. Throws unless the pitch is inside the caller's
+   * resolved portal scope — i.e. within their org AND (if they are assignment-
+   * scoped) among their assigned venues. This is the ONLY authority for
+   * "can this user manage this venue"; never trust a client-supplied id.
+   */
+  async assertCanManagePitch(userId: string, pitchId: string): Promise<void> {
+    const { pitchWhere } = await this.resolvePortalContext(userId);
+    const pitch = await this.prisma.pitch.findFirst({
+      where: { id: pitchId, ...pitchWhere },
+      select: { id: true },
+    });
+    if (!pitch) throw new ForbiddenException('Not assigned to this venue');
   }
 
   /** STAFF may only see the schedule + check-in — never revenue or CRM. */

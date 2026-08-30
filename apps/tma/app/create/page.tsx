@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
-import { getPitches, createMatch, getPricingPreview, formatUZS, isPhoneRequiredError } from "@/lib/api";
+import { getPitches, createMatch, getPricingPreview, getAvailableSlots, formatUZS, isPhoneRequiredError } from "@/lib/api";
 import { usePhoneGate } from "@/lib/phone-gate";
 import { useSportStore, setSport, sportMeta, SPORTS } from "@/lib/sport-store";
 import {
@@ -19,7 +19,6 @@ import {
   showAlert,
 } from "@/lib/telegram";
 
-const DURATIONS = [60, 90, 120];
 const capForFormat = (f: string) => {
   const m = f.match(/^(\d+)v(\d+)$/);
   return m ? parseInt(m[1], 10) + parseInt(m[2], 10) : 4;
@@ -44,9 +43,11 @@ interface Form {
   date: string;
   time: string;
   durationMinutes: number;
-  // OPEN_EVENT
+  // OPEN_EVENT — booked into an admin-published slot (PART 6)
   maxPlayers: number;
-  pricePerPlayer: number;
+  pricePerPlayer: number; // derived from the slot; users never set it
+  slotId: string;
+  slotPrice: number; // the whole-slot price from the venue admin
   // GROUP_BOOKING
   organizerPlayerCount: number;
   extraSpotsAvailable: number;
@@ -70,6 +71,7 @@ export default function CreateMatchPage() {
   const [step, setStep] = useState(0); // 0..3
   const [submitting, setSubmitting] = useState(false);
 
+  const qc = useQueryClient();
   const { data: pitches } = useQuery({
     queryKey: ["tma-pitches", sport],
     queryFn: () => getPitches({ sport }),
@@ -84,7 +86,9 @@ export default function CreateMatchPage() {
     time: "19:00",
     durationMinutes: 60,
     maxPlayers: meta.formats[meta.formats.length - 1].maxPlayers,
-    pricePerPlayer: 50000,
+    pricePerPlayer: 0,
+    slotId: "",
+    slotPrice: 0,
     organizerPlayerCount: 3,
     extraSpotsAvailable: 4,
     fullBookingHours: 1,
@@ -93,31 +97,53 @@ export default function CreateMatchPage() {
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
 
+  // PART 6: available slots for the chosen venue (OPEN_EVENT books into a slot).
+  const { data: slotGroups, isLoading: slotsLoading } = useQuery({
+    queryKey: ["tma-slots", form.pitchId, sport],
+    queryFn: () => getAvailableSlots({ pitchId: form.pitchId, sport }),
+    enabled: step === 2 && form.bookingType === "OPEN_EVENT" && !!form.pitchId,
+  });
+  const slots = useMemo(() => slotGroups?.[0]?.slots ?? [], [slotGroups]);
+
   // Prefill from the "Free courts" conversion path: /create?pitchId=&date=&time=
   // Jump straight to the details step so the user just confirms.
   const searchParams = useSearchParams();
   const prefilledRef = useRef(false);
+  const pendingSlotRef = useRef<string | null>(null);
   useEffect(() => {
     if (prefilledRef.current) return;
     const pitchId = searchParams.get("pitchId");
     const date = searchParams.get("date");
     const time = searchParams.get("time");
-    if (!pitchId && !date && !time) return;
+    const slotId = searchParams.get("slotId");
+    if (!pitchId && !date && !time && !slotId) return;
     prefilledRef.current = true;
+    if (slotId) pendingSlotRef.current = slotId; // preselected once slots load
     setForm((f) => ({
       ...f,
       ...(pitchId ? { pitchId } : {}),
       ...(date ? { date } : {}),
       ...(time ? { time } : {}),
     }));
-    if (pitchId) setStep(2); // pitch chosen → go to date/time/details
+    if (pitchId) setStep(2); // pitch chosen → go to slot/details
   }, [searchParams]);
+
+  // Auto-select a slot passed via ?slotId= once the venue's slots have loaded.
+  useEffect(() => {
+    const pending = pendingSlotRef.current;
+    if (!pending || slots.length === 0) return;
+    const found = slots.find((s: any) => s.id === pending);
+    if (found) {
+      selectSlot(found);
+      pendingSlotRef.current = null;
+    }
+  }, [slots]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // When the sport switches, reset format + cap and clear the chosen pitch
   // (pitches are sport-specific).
   useEffect(() => {
     const def = meta.formats[meta.formats.length - 1];
-    setForm((f) => ({ ...f, format: def.id, maxPlayers: def.maxPlayers, pitchId: "" }));
+    setForm((f) => ({ ...f, format: def.id, maxPlayers: def.maxPlayers, pitchId: "", slotId: "", slotPrice: 0 }));
   }, [sport]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectedPitch = useMemo(
@@ -131,6 +157,31 @@ export default function CreateMatchPage() {
     set("format", fmt);
     set("maxPlayers", f?.maxPlayers ?? capForFormat(fmt));
   }
+
+  // PART 6: selecting a slot fixes the venue's time, duration and price. The
+  // per-player price is derived (slot price ÷ player cap) — never user-entered.
+  function selectSlot(s: any) {
+    hapticImpact("light");
+    const start = dayjs(s.startTime);
+    const dur = Math.round(
+      (new Date(s.endTime).getTime() - new Date(s.startTime).getTime()) / 60000,
+    );
+    setForm((f) => ({
+      ...f,
+      slotId: s.id,
+      slotPrice: Number(s.price),
+      date: start.format("YYYY-MM-DD"),
+      time: start.format("HH:mm"),
+      durationMinutes: dur,
+    }));
+  }
+
+  // Keep the per-player price in sync with the slot price and the format cap.
+  useEffect(() => {
+    if (form.bookingType !== "OPEN_EVENT" || form.slotPrice <= 0) return;
+    const perPlayer = Math.ceil(form.slotPrice / Math.max(1, form.maxPlayers));
+    setForm((f) => (f.pricePerPlayer === perPlayer ? f : { ...f, pricePerPlayer: perPlayer }));
+  }, [form.slotPrice, form.maxPlayers, form.bookingType]);
 
   // Pricing preview (review step)
   const { data: pricing } = useQuery({
@@ -159,8 +210,10 @@ export default function CreateMatchPage() {
     if (step === 0) return !!form.bookingType;
     if (step === 1) return !!form.pitchId;
     if (step === 2) {
+      // OPEN_EVENT books into a slot (which carries its own time); the other
+      // types still choose a date/time manually.
+      if (form.bookingType === "OPEN_EVENT") return !!form.format && !!form.slotId;
       if (!form.date || !form.time) return false;
-      if (form.bookingType === "OPEN_EVENT") return !!form.format && form.maxPlayers > 0 && form.pricePerPlayer >= 0;
       if (form.bookingType === "GROUP_BOOKING") return !!form.format && form.organizerPlayerCount >= 1;
       if (form.bookingType === "FULL_BOOKING") return form.fullBookingHours >= 1;
     }
@@ -189,7 +242,8 @@ export default function CreateMatchPage() {
       }
       if (form.bookingType === "OPEN_EVENT") {
         base.maxPlayers = form.maxPlayers;
-        base.pricePerPlayer = form.pricePerPlayer;
+        // PART 6: price comes from the slot — never sent by the client.
+        base.slotId = form.slotId;
       } else if (form.bookingType === "GROUP_BOOKING") {
         base.organizerPlayerCount = form.organizerPlayerCount;
         base.extraSpotsAvailable = form.extraSpotsAvailable;
@@ -208,6 +262,18 @@ export default function CreateMatchPage() {
         setSubmitting(false);
         setMainButtonLoading(false);
         if (await requirePhone()) submit();
+        return;
+      }
+      // PART 6: the slot was taken between selection and submit — clear it,
+      // refresh the list and send the user back to pick another.
+      if (e?.response?.data?.code === "SLOT_TAKEN") {
+        hapticError();
+        setForm((f) => ({ ...f, slotId: "", slotPrice: 0 }));
+        await qc.invalidateQueries({ queryKey: ["tma-slots", form.pitchId, sport] });
+        setStep(2);
+        showAlert(t("slotTaken"));
+        setSubmitting(false);
+        setMainButtonLoading(false);
         return;
       }
       hapticError();
@@ -331,7 +397,8 @@ export default function CreateMatchPage() {
               key={p.id}
               onClick={() => {
                 hapticImpact("light");
-                set("pitchId", p.id);
+                // Switching venue invalidates the previously chosen slot.
+                setForm((f) => ({ ...f, pitchId: p.id, slotId: "", slotPrice: 0 }));
               }}
               className="w-full flex items-center gap-3 rounded-2xl p-3 text-left border-2 transition-colors"
               style={{ background: "var(--tg-card)", borderColor: form.pitchId === p.id ? "#00C853" : "transparent" }}
@@ -358,18 +425,24 @@ export default function CreateMatchPage() {
       {/* STEP 2 — Details (per booking type) */}
       {step === 2 && (
         <div className="space-y-5">
-          <Field label={t("date")}>
-            <input
-              type="date"
-              value={form.date}
-              min={dayjs().format("YYYY-MM-DD")}
-              onChange={(e) => set("date", e.target.value)}
-              className="input"
-            />
-          </Field>
-          <Field label={t("kickoff")}>
-            <input type="time" value={form.time} onChange={(e) => set("time", e.target.value)} className="input" />
-          </Field>
+          {/* OPEN_EVENT picks a published slot (which sets the time); the other
+              booking types still choose a date/time manually. */}
+          {form.bookingType !== "OPEN_EVENT" && (
+            <>
+              <Field label={t("date")}>
+                <input
+                  type="date"
+                  value={form.date}
+                  min={dayjs().format("YYYY-MM-DD")}
+                  onChange={(e) => set("date", e.target.value)}
+                  className="input"
+                />
+              </Field>
+              <Field label={t("kickoff")}>
+                <input type="time" value={form.time} onChange={(e) => set("time", e.target.value)} className="input" />
+              </Field>
+            </>
+          )}
 
           {form.bookingType !== "FULL_BOOKING" && (
             <Field label={t("format")}>
@@ -417,31 +490,46 @@ export default function CreateMatchPage() {
 
           {form.bookingType === "OPEN_EVENT" && (
             <>
-              <Field label={t("duration")}>
-                <div className="flex gap-2">
-                  {DURATIONS.map((d) => (
-                    <Chip key={d} active={form.durationMinutes === d} onClick={() => set("durationMinutes", d)}>
-                      {t("minSuffix", { n: d })}
-                    </Chip>
-                  ))}
-                </div>
-              </Field>
               <Field label={t("players")}>
                 <div className="rounded-2xl p-3 text-sm" style={{ background: "var(--tg-card)" }}>
                   {t("fixedByFormat")}{" "}
                   <span className="font-bold text-[#00C853]">{t("playersCount", { count: form.maxPlayers })}</span>
                 </div>
               </Field>
-              <Field label={t("pricePerPlayer")}>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={form.pricePerPlayer}
-                  min={0}
-                  step={5000}
-                  onChange={(e) => set("pricePerPlayer", Number(e.target.value))}
-                  className="input"
-                />
+              <Field label={t("chooseSlot")}>
+                {slotsLoading ? (
+                  <div className="rounded-2xl p-4 text-sm text-center" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
+                    {t("calculating")}
+                  </div>
+                ) : slots.length === 0 ? (
+                  <div className="rounded-2xl p-4 text-sm text-center" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
+                    {t("noSlots")}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {slots.map((s: any) => {
+                      const active = form.slotId === s.id;
+                      const perPlayer = Math.ceil(Number(s.price) / Math.max(1, form.maxPlayers));
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => selectSlot(s)}
+                          className="rounded-2xl p-3 text-left border-2 transition-colors"
+                          style={{ background: "var(--tg-card)", borderColor: active ? "#00C853" : "rgba(0,0,0,0.1)" }}
+                        >
+                          <div className="font-semibold text-sm">{dayjs(s.startTime).format("ddd, MMM D")}</div>
+                          <div className="text-sm">{dayjs(s.startTime).format("HH:mm")}–{dayjs(s.endTime).format("HH:mm")}</div>
+                          <div className="text-xs mt-1" style={{ color: active ? "#00C853" : "var(--tg-hint)" }}>
+                            {formatUZS(perPlayer)}{t("perPlayerShort")}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="text-xs mt-2" style={{ color: "var(--tg-hint)" }}>
+                  {t("slotPriceNote")}
+                </p>
               </Field>
             </>
           )}

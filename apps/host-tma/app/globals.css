@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-canvas: #090E0C;
+  --bg-surface: #111a14;
+  --bg-border: #1e2e21;
+  --text-primary: #F0FFF4;
+  --text-muted: #7a9a80;
+  --green: #00C853;
+  --gold: #FFD700;
+  --coral: #FF5252;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.font-display { font-family: 'Barlow Condensed', sans-serif; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg-border); border-radius: 2px; }

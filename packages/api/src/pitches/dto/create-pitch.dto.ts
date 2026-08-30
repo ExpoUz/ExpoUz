@@ -23,6 +23,14 @@ export enum PitchSize {
   ELEVEN_A_SIDE = 'ELEVEN_A_SIDE',
 }
 
+// Mirrors the Prisma Sport enum. `sport` is REQUIRED on create — the schema no
+// longer defaults to PADEL, so omitting it must fail validation loudly.
+export enum Sport {
+  FOOTBALL = 'FOOTBALL',
+  PADEL = 'PADEL',
+  TENNIS = 'TENNIS',
+}
+
 export enum AmenityType {
   BATHROOM = 'BATHROOM',
   PARKING = 'PARKING',
@@ -54,6 +62,10 @@ export class CreatePitchDto {
   @ApiProperty({ default: 'Tashkent' })
   @IsString()
   city: string;
+
+  @ApiProperty({ enum: Sport, description: 'Required — no schema default' })
+  @IsEnum(Sport)
+  sport: Sport;
 
   @ApiProperty()
   @IsNumber()

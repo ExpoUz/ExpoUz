@@ -373,7 +373,25 @@ export class MatchesService {
       throw new NotFoundException('Pitch not found or not active');
     }
 
-    const startTime = new Date(dto.startTime);
+    // PART 6: slot-based booking. When a slotId is supplied the venue, start time
+    // and price all come from the slot — never from user input. Re-checked again
+    // inside the transaction to prevent double-booking.
+    let slot = dto.slotId
+      ? await this.prisma.slot.findUnique({ where: { id: dto.slotId } })
+      : null;
+    if (dto.slotId) {
+      if (!slot || slot.pitchId !== dto.pitchId) {
+        throw new NotFoundException('Slot not found for this venue');
+      }
+      if (slot.status !== 'AVAILABLE') {
+        throw new ConflictException({ code: 'SLOT_TAKEN', message: 'That slot is no longer available' });
+      }
+      if (new Date(slot.startTime) <= new Date()) {
+        throw new BadRequestException('That slot is in the past');
+      }
+    }
+
+    const startTime = slot ? new Date(slot.startTime) : new Date(dto.startTime);
     const dayName = startTime.toLocaleDateString('en-US', { weekday: 'short' });
     const timeStr = startTime.toLocaleTimeString('en-US', {
       hour: '2-digit',
@@ -416,6 +434,19 @@ export class MatchesService {
       maxPlayers = cap; // lock to the format cap
     }
 
+    // PART 6: price comes from the slot, split across the player cap (ceil).
+    // The user never sets it. FULL_BOOKING keeps its whole-venue rental pricing.
+    if (slot && bookingType !== BookingType.FULL_BOOKING) {
+      pricePerPlayer = Math.ceil(Number(slot.price) / Math.max(1, maxPlayers));
+      if (bookingType === BookingType.GROUP_BOOKING) {
+        organizerTotalPaid = pricePerPlayer * (organizerPlayerCount ?? 1);
+      }
+    }
+    // A slot's duration is fixed by the slot itself.
+    const durationMinutes = slot
+      ? Math.round((new Date(slot.endTime).getTime() - new Date(slot.startTime).getTime()) / 60000)
+      : dto.durationMinutes || 60;
+
     const titleSport = sport.charAt(0) + sport.slice(1).toLowerCase();
     const autoTitle = this.generateTitle(bookingType, titleSport, dto.format, pitch.name);
     const shareCode = this.generateShareCode();
@@ -431,6 +462,19 @@ export class MatchesService {
     // currentPlayers — happens in ONE transaction. If the organizer can't cover
     // a group booking, nothing is created.
     const match = await this.prisma.$transaction(async (tx) => {
+      // PART 6: reserve the slot first. Lock the row and re-check availability so
+      // two users racing the same slot can't both book it.
+      if (slot) {
+        await tx.$queryRaw`SELECT id FROM "Slot" WHERE id = ${slot.id} FOR UPDATE`;
+        const fresh = await tx.slot.findUnique({
+          where: { id: slot.id },
+          select: { status: true },
+        });
+        if (!fresh || fresh.status !== 'AVAILABLE') {
+          throw new ConflictException({ code: 'SLOT_TAKEN', message: 'That slot was just booked' });
+        }
+      }
+
       const created = await tx.match.create({
         data: {
           pitchId: dto.pitchId,
@@ -440,7 +484,7 @@ export class MatchesService {
           sport,
           format: dto.format,
           startTime,
-          durationMinutes: dto.durationMinutes || 60,
+          durationMinutes,
           maxPlayers,
           minPlayers: dto.minPlayers || Math.max(1, Math.floor(maxPlayers * 0.7)),
           currentPlayers: 0, // set by syncPlayerCount below — never guessed
@@ -480,6 +524,46 @@ export class MatchesService {
             qrCode: `${created.id}_host_${randomBytes(4).toString('hex')}`,
           },
         });
+      }
+
+      // PART 6: on a slot-based OPEN_EVENT the host pays their share up front
+      // (an immediate self-join) through the ledger, held in escrow until the
+      // match ends. GROUP_BOOKING settles its whole group in its own block below.
+      if (slot && hostPlays && bookingType === BookingType.OPEN_EVENT && pricePerPlayer > 0) {
+        const u = await tx.user.findUniqueOrThrow({
+          where: { id: hostId },
+          select: { credit: true },
+        });
+        if (Number(u.credit) < pricePerPlayer) {
+          throw new BadRequestException({
+            code: 'INSUFFICIENT_BALANCE',
+            needed: pricePerPlayer,
+            balance: Number(u.credit),
+          });
+        }
+        const hostBooking = await tx.booking.findFirst({
+          where: { matchId: created.id, userId: hostId, isHostBooking: true },
+        });
+        await this.wallet.adjust(
+          hostId,
+          -pricePerPlayer,
+          'MATCH_PAYMENT',
+          { reference: created.id, description: `Booked slot — ${created.title}` },
+          tx,
+        );
+        if (hostBooking) {
+          await tx.transaction.create({
+            data: {
+              userId: hostId,
+              bookingId: hostBooking.id,
+              amount: pricePerPlayer,
+              platformFee: pricePerPlayer * PLATFORM_FEE_RATE,
+              gateway: 'WALLET',
+              status: 'HELD',
+              heldAt: new Date(),
+            },
+          });
+        }
       }
 
       // GROUP_BOOKING: the organizer pre-pays for organizerPlayerCount seats
@@ -535,13 +619,26 @@ export class MatchesService {
         }
       }
 
+      // PART 6: mark the slot BOOKED and link it to the match so it disappears
+      // from availability. Done last, inside the same tx, after the re-check.
+      if (slot) {
+        await tx.slot.update({
+          where: { id: slot.id },
+          data: { matchId: created.id, status: 'BOOKED' },
+        });
+      }
+
       await syncPlayerCount(tx, created.id);
       return created;
     });
 
-    // A group booking pre-pays into escrow — schedule its release to the owner
-    // after the match ends (idempotent per match).
-    if (bookingType === BookingType.GROUP_BOOKING && pricePerPlayer > 0) {
+    // A group booking (or a slot-based open event where the host pre-paid) puts
+    // money into escrow — schedule its release to the owner after the match ends
+    // (idempotent per match).
+    const hostPrepaid =
+      (bookingType === BookingType.GROUP_BOOKING || (slot && bookingType === BookingType.OPEN_EVENT)) &&
+      pricePerPlayer > 0;
+    if (hostPrepaid) {
       await this.escrow
         .scheduleMatchRelease({
           id: match.id,
@@ -790,6 +887,20 @@ export class MatchesService {
 
     await this.prisma.$transaction(async (tx) => {
       await tx.match.update({ where: { id }, data: { status: 'CANCELLED' } });
+
+      // PART 6: release the slot back to AVAILABLE if it's still in the future,
+      // so it can be booked again. Past slots are left as-is (marked PAST later).
+      const slot = await tx.slot.findUnique({ where: { matchId: id }, select: { id: true } });
+      if (slot) {
+        const stillFuture = new Date(match.startTime) > new Date();
+        await tx.slot.update({
+          where: { id: slot.id },
+          data: {
+            matchId: null,
+            status: stillFuture ? 'AVAILABLE' : 'PAST',
+          },
+        });
+      }
 
       for (const booking of match.bookings) {
         await tx.booking.update({

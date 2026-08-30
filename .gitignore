@@ -22,6 +22,10 @@ credentials.local
 *.local
 .vercel/
 
+# Database backups (never commit — may contain production data)
+backup-*.sql
+backup-*.err
+
 # Logs
 *.log
 npm-debug.log*

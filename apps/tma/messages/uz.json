@@ -220,7 +220,12 @@
     "pitchRateHours": "Maydon tarifi × {hours}soat",
     "platformCommission10": "Platforma komissiyasi (10%)",
     "youPay": "Siz to'laysiz",
-    "errCreate": "O'yin yaratib bo'lmadi."
+    "errCreate": "O'yin yaratib bo'lmadi.",
+    "chooseSlot": "Slot tanlang",
+    "noSlots": "Bu maydonda hozircha slotlar yo'q. Boshqa maydonni tanlang.",
+    "perPlayerShort": "/o'yinchi",
+    "slotPriceNote": "Narxni maydon belgilaydi va barcha o'yinchilarga bo'linadi — uni siz kiritmaysiz.",
+    "slotTaken": "Bu slot hozirgina band qilindi. Boshqasini tanlang."
   },
   "wallet": {
     "title": "Hamyon",

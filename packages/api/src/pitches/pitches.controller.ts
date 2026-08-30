@@ -108,9 +108,11 @@ export class PitchesController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('PITCH_OWNER', 'ADMIN')
+  // PART 3: only superadmin creates venues. Venue admins edit/delete assigned
+  // venues but never create — the canonical create path is POST /admin/pitches.
+  @Roles('SUPER_ADMIN')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new pitch' })
+  @ApiOperation({ summary: 'Create a new pitch (SUPER_ADMIN only)' })
   create(@CurrentUser() user: any, @Body() dto: CreatePitchDto) {
     return this.pitchesService.create(user.id, dto);
   }

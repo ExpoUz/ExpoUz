@@ -147,6 +147,21 @@ export async function createMatch(body: any) {
   return data;
 }
 
+// ─── Slots (PART 6) ───────────────────────────────────────────
+// Available, future slots to book into, grouped by venue. Price is set by the
+// venue admin — users never set it.
+export async function getAvailableSlots(params: {
+  pitchId?: string;
+  sport?: string;
+  city?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}): Promise<{ pitch: any; slots: any[] }[]> {
+  const { data } = await api.get("/slots/available", { params });
+  return data ?? [];
+}
+
 // ─── Match results & scoring ──────────────────────────────────
 export async function getMatchResult(id: string) {
   const { data } = await api.get(`/matches/${id}/result`);

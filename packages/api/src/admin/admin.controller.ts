@@ -411,6 +411,7 @@ export class AdminController {
       addressLine: string;
       district: string;
       city: string;
+      sport: 'FOOTBALL' | 'PADEL' | 'TENNIS';
       lat: number;
       lng: number;
       hourlyRate: number;
@@ -424,6 +425,39 @@ export class AdminController {
     },
   ) {
     return this.adminService.createPitch(dto);
+  }
+
+  // ─── PART 3: Venue admin assignments ───────────────────────────────────────
+  @Get('pitches/:id/admins')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'List venue admins assigned to a pitch' })
+  getVenueAdmins(@Param('id') id: string) {
+    return this.adminService.getVenueAdmins(id);
+  }
+
+  @Post('pitches/:id/admins')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Assign a user as venue admin for a pitch' })
+  assignVenueAdmin(
+    @Param('id') id: string,
+    @Body('userId') userId: string,
+    @Req() req: any,
+  ) {
+    return this.adminService.assignVenueAdmin({ userId, pitchId: id }, req.user.id);
+  }
+
+  @Delete('venue-admins/:assignmentId')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'Revoke a venue admin assignment' })
+  revokeVenueAdmin(@Param('assignmentId') assignmentId: string, @Req() req: any) {
+    return this.adminService.revokeVenueAdmin(assignmentId, req.user.id);
+  }
+
+  @Get('pitch-admins/:id/venues')
+  @Roles('SUPER_ADMIN')
+  @ApiOperation({ summary: 'List venues a given user is assigned to' })
+  getAssignedVenues(@Param('id') id: string) {
+    return this.adminService.getAssignedVenues(id);
   }
 
   @Patch('pitches/:id')
