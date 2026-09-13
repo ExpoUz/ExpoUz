@@ -69,7 +69,7 @@ export default function OrganizationsInsightsPage() {
         </Panel>
 
         <Panel title={`Dormant (${data.dormant.length})`}>
-          {data.dormant.length === 0 && <Empty>Everyone's been active recently.</Empty>}
+          {data.dormant.length === 0 && <Empty>Everyone&apos;s been active recently.</Empty>}
           {data.dormant.map((o: any) => (
             <OrgRow key={o.id} o={o}>
               <span className="text-xs text-gray-400">
