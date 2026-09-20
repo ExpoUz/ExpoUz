@@ -8,7 +8,6 @@ import {
   matchPhoto,
   venueName,
   spotsLeft,
-  sportBadge,
 } from "./matchHelpers";
 
 /** Section B — landscape venue cards with venue name, format + spots, badge. */
@@ -42,18 +41,6 @@ export function OpenMatchesCarousel({ matches }: { matches: any[] }) {
                     "linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0) 58%)",
                 }}
               />
-
-              {/* Sport badge, top-left */}
-              <span
-                className="absolute top-2 left-2 px-1.5 py-0.5 rounded-full text-xs"
-                style={{
-                  background: "rgba(255,255,255,0.9)",
-                  backdropFilter: "blur(4px)",
-                  WebkitBackdropFilter: "blur(4px)",
-                }}
-              >
-                {sportBadge(m.sport)}
-              </span>
 
               {/* Copy, bottom-left */}
               <div className="absolute left-2.5 right-2.5 bottom-2">

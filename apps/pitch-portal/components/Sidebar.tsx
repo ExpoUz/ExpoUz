@@ -3,20 +3,32 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import {
+  LayoutDashboard,
+  CalendarDays,
+  Building2,
+  Users,
+  BarChart3,
+  Megaphone,
+  Wallet,
+  UserCog,
+  LogOut,
+  type LucideIcon,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n, LANGS } from "@/lib/i18n";
 import { getPortalContext, type OrgRole } from "@/lib/api";
 
 // Which org roles may see each nav item. STAFF is limited to schedule + check-in.
-const NAV_ITEMS: { href: string; key: string; icon: string; roles: OrgRole[] }[] = [
-  { href: "/", key: "nav.dashboard", icon: "📊", roles: ["OWNER", "MANAGER", "STAFF"] },
-  { href: "/schedule", key: "nav.schedule", icon: "🗓", roles: ["OWNER", "MANAGER", "STAFF"] },
-  { href: "/pitches", key: "nav.pitches", icon: "🏟", roles: ["OWNER", "MANAGER"] },
-  { href: "/players", key: "nav.players", icon: "👥", roles: ["OWNER", "MANAGER"] },
-  { href: "/insights", key: "nav.insights", icon: "📈", roles: ["OWNER", "MANAGER"] },
-  { href: "/broadcast", key: "nav.broadcast", icon: "📣", roles: ["OWNER", "MANAGER"] },
-  { href: "/revenue", key: "nav.revenue", icon: "💰", roles: ["OWNER", "MANAGER"] },
-  { href: "/staff", key: "nav.staff", icon: "🧑‍💼", roles: ["OWNER"] },
+const NAV_ITEMS: { href: string; key: string; Icon: LucideIcon; roles: OrgRole[] }[] = [
+  { href: "/", key: "nav.dashboard", Icon: LayoutDashboard, roles: ["OWNER", "MANAGER", "STAFF"] },
+  { href: "/schedule", key: "nav.schedule", Icon: CalendarDays, roles: ["OWNER", "MANAGER", "STAFF"] },
+  { href: "/pitches", key: "nav.pitches", Icon: Building2, roles: ["OWNER", "MANAGER"] },
+  { href: "/players", key: "nav.players", Icon: Users, roles: ["OWNER", "MANAGER"] },
+  { href: "/insights", key: "nav.insights", Icon: BarChart3, roles: ["OWNER", "MANAGER"] },
+  { href: "/broadcast", key: "nav.broadcast", Icon: Megaphone, roles: ["OWNER", "MANAGER"] },
+  { href: "/revenue", key: "nav.revenue", Icon: Wallet, roles: ["OWNER", "MANAGER"] },
+  { href: "/staff", key: "nav.staff", Icon: UserCog, roles: ["OWNER"] },
 ];
 
 export function Sidebar() {
@@ -64,7 +76,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {items.map(({ href, key, icon }) => (
+        {items.map(({ href, key, Icon }) => (
           <Link
             key={href}
             href={href}
@@ -74,7 +86,7 @@ export function Sidebar() {
                 : "text-gray-400 hover:bg-white/5 hover:text-white"
             }`}
           >
-            <span className="text-base">{icon}</span>
+            <Icon size={18} />
             {t(key)}
           </Link>
         ))}
@@ -114,9 +126,9 @@ export function Sidebar() {
         )}
         <button
           onClick={logout}
-          className="w-full text-left text-xs text-gray-600 hover:text-red-400 transition-colors py-1"
+          className="w-full flex items-center gap-2 text-xs text-gray-600 hover:text-red-400 transition-colors py-1"
         >
-          {t("nav.signout")} →
+          <LogOut size={14} /> {t("nav.signout")}
         </button>
       </div>
     </aside>

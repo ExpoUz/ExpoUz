@@ -6,14 +6,33 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import {
+  UserPlus,
+  LogIn,
+  Pencil,
+  PlusCircle,
+  CheckCircle2,
+  DoorOpen,
+  XCircle,
+  CreditCard,
+  Undo2,
+  Ticket,
+  Handshake,
+  Star,
+  Shield,
+  ArrowLeft,
+  AlertTriangle,
+  Circle,
+  type LucideIcon,
+} from "lucide-react";
 
 dayjs.extend(relativeTime);
 
-const CATEGORY_ICON: Record<string, string> = {
-  REGISTERED: "👤", LOGIN: "🔑", PROFILE_UPDATED: "✏️", MATCH_CREATED: "⚽",
-  MATCH_JOINED: "✅", MATCH_LEFT: "🚪", MATCH_CANCELLED: "❌", PAYMENT_COMPLETED: "💳",
-  PAYMENT_REFUNDED: "💰", BOOKING_CONFIRMED: "🎟️", BOOKING_CANCELLED: "❌",
-  INVITE_ACCEPTED: "🤝", RATING_GIVEN: "⭐", RATING_RECEIVED: "⭐", ADMIN_ACTION: "🛡️",
+const CATEGORY_ICON: Record<string, LucideIcon> = {
+  REGISTERED: UserPlus, LOGIN: LogIn, PROFILE_UPDATED: Pencil, MATCH_CREATED: PlusCircle,
+  MATCH_JOINED: CheckCircle2, MATCH_LEFT: DoorOpen, MATCH_CANCELLED: XCircle, PAYMENT_COMPLETED: CreditCard,
+  PAYMENT_REFUNDED: Undo2, BOOKING_CONFIRMED: Ticket, BOOKING_CANCELLED: XCircle,
+  INVITE_ACCEPTED: Handshake, RATING_GIVEN: Star, RATING_RECEIVED: Star, ADMIN_ACTION: Shield,
 };
 
 const TABS = ["Activity", "Bookings", "Transactions"] as const;
@@ -38,8 +57,8 @@ export default function UserDetailPage() {
 
   return (
     <div className="p-6 max-w-4xl">
-      <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-800 mb-4">
-        ← Back
+      <button onClick={() => router.back()} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-4">
+        <ArrowLeft size={16} /> Back
       </button>
 
       {/* User card */}
@@ -61,8 +80,8 @@ export default function UserDetailPage() {
               {u.role}
             </span>
             {u.isOnline && (
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-100 text-green-700">
-                ● Online
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-100 text-green-700">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-600" /> Online
               </span>
             )}
           </div>
@@ -108,7 +127,10 @@ export default function UserDetailPage() {
           )}
           {(u.activityLogs ?? []).map((a: any) => (
             <div key={a.id} className="flex items-center gap-3 px-5 py-3">
-              <span className="text-lg">{CATEGORY_ICON[a.category] ?? "•"}</span>
+              {(() => {
+                const Icon = CATEGORY_ICON[a.category] ?? Circle;
+                return <Icon size={18} className="text-gray-500 shrink-0" />;
+              })()}
               <div className="min-w-0 flex-1">
                 <div className="text-sm text-gray-800">{a.description ?? a.action}</div>
                 <div className="text-[11px] text-gray-400">{a.category ?? a.action}</div>
@@ -181,7 +203,7 @@ function PhoneVerification({ user }: { user: any }) {
   if (user.phoneVerified && !editing) {
     return (
       <div className="mt-1.5 flex items-center gap-2 text-xs">
-        <span className="inline-flex items-center gap-1 font-semibold text-green-700">✓ Phone verified</span>
+        <span className="inline-flex items-center gap-1 font-semibold text-green-700"><CheckCircle2 size={14} /> Phone verified</span>
         <span className="text-gray-400">
           {(user.phoneVerifyMethod ?? "").replace("_", " ")}
           {user.phoneVerifiedAt ? ` · ${dayjs(user.phoneVerifiedAt).format("MMM D, YYYY")}` : ""}
@@ -197,7 +219,7 @@ function PhoneVerification({ user }: { user: any }) {
           onClick={() => setEditing(true)}
           className="inline-flex items-center gap-1 font-semibold text-amber-600 hover:text-amber-700"
         >
-          ⚠ Phone unverified — mark verified
+          <AlertTriangle size={14} /> Phone unverified — mark verified
         </button>
       ) : (
         <div className="flex items-center gap-2">

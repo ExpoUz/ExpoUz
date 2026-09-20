@@ -67,7 +67,7 @@ export function PadelMatchCard({ match }: { match: any }) {
           </span>
           {hasRange && (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: "var(--tg-hint)" }}>
-              🎾 {formatLevel(match.minLevel ?? 0)} – {formatLevel(match.maxLevel ?? 7)}
+              {formatLevel(match.minLevel ?? 0)} – {formatLevel(match.maxLevel ?? 7)}
             </span>
           )}
           <span className="ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full bg-black/5">

@@ -2,26 +2,44 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  Users,
+  Building2,
+  Activity,
+  CreditCard,
+  Radio,
+  BarChart3,
+  Building,
+  ShieldCheck,
+  HardHat,
+  Search,
+  MessagesSquare,
+  MapPin,
+  Settings,
+  LogOut,
+  type LucideIcon,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
-const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: "📊" },
-  { href: "/users", label: "Users", icon: "👥" },
-  { href: "/pitches", label: "Pitches", icon: "🏟" },
-  { href: "/matches", label: "Matches", icon: "⚽" },
-  { href: "/transactions", label: "Transactions", icon: "💳" },
-  { href: "/activity", label: "Activity", icon: "📡" },
-  { href: "/analytics", label: "Analytics", icon: "📈" },
+const NAV_ITEMS: { href: string; label: string; Icon: LucideIcon }[] = [
+  { href: "/", label: "Dashboard", Icon: LayoutDashboard },
+  { href: "/users", label: "Users", Icon: Users },
+  { href: "/pitches", label: "Pitches", Icon: Building2 },
+  { href: "/matches", label: "Matches", Icon: Activity },
+  { href: "/transactions", label: "Transactions", Icon: CreditCard },
+  { href: "/activity", label: "Activity", Icon: Radio },
+  { href: "/analytics", label: "Analytics", Icon: BarChart3 },
 ];
 
-const SUPER_ITEMS = [
-  { href: "/organizations", label: "Organizations", icon: "🏢" },
-  { href: "/super/admins", label: "Admins", icon: "🛡" },
-  { href: "/super/pitch-admins", label: "Pitch Owners", icon: "🏗" },
-  { href: "/super/crm-oversight", label: "CRM Oversight", icon: "🔍" },
-  { href: "/super/groups", label: "Chat Groups", icon: "💬" },
-  { href: "/super/locations", label: "Locations", icon: "📍" },
-  { href: "/super/settings", label: "Settings", icon: "⚙️" },
+const SUPER_ITEMS: { href: string; label: string; Icon: LucideIcon }[] = [
+  { href: "/organizations", label: "Organizations", Icon: Building },
+  { href: "/super/admins", label: "Admins", Icon: ShieldCheck },
+  { href: "/super/pitch-admins", label: "Pitch Owners", Icon: HardHat },
+  { href: "/super/crm-oversight", label: "CRM Oversight", Icon: Search },
+  { href: "/super/groups", label: "Chat Groups", Icon: MessagesSquare },
+  { href: "/super/locations", label: "Locations", Icon: MapPin },
+  { href: "/super/settings", label: "Settings", Icon: Settings },
 ];
 
 export function Sidebar() {
@@ -49,7 +67,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map(({ href, label, icon }) => (
+        {NAV_ITEMS.map(({ href, label, Icon }) => (
           <Link
             key={href}
             href={href}
@@ -59,7 +77,7 @@ export function Sidebar() {
                 : "text-gray-400 hover:bg-white/5 hover:text-white"
             }`}
           >
-            <span className="text-base">{icon}</span>
+            <Icon size={18} />
             {label}
           </Link>
         ))}
@@ -71,7 +89,7 @@ export function Sidebar() {
                 Super Admin
               </span>
             </div>
-            {SUPER_ITEMS.map(({ href, label, icon }) => (
+            {SUPER_ITEMS.map(({ href, label, Icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -81,7 +99,7 @@ export function Sidebar() {
                     : "text-gray-400 hover:bg-white/5 hover:text-white"
                 }`}
               >
-                <span className="text-base">{icon}</span>
+                <Icon size={18} />
                 {label}
               </Link>
             ))}
@@ -108,9 +126,9 @@ export function Sidebar() {
         )}
         <button
           onClick={logout}
-          className="w-full text-left text-xs text-gray-600 hover:text-red-400 transition-colors py-1"
+          className="w-full flex items-center gap-2 text-xs text-gray-600 hover:text-red-400 transition-colors py-1"
         >
-          Sign out →
+          <LogOut size={14} /> Sign out
         </button>
       </div>
     </aside>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import Link from "next/link";
+import { Wallet, Smartphone, Lock, Flame, Snowflake, ChevronRight } from "lucide-react";
 import {
   getMe,
   getStatistics,
@@ -90,7 +91,7 @@ export default function ProfilePage() {
             className="w-full flex items-center gap-3 rounded-2xl p-4 text-left active:opacity-80"
             style={{ background: "rgba(0,176,255,0.1)", border: "1px solid rgba(0,176,255,0.25)" }}
           >
-            <div className="text-xl">📱</div>
+            <Smartphone size={22} className="shrink-0" style={{ color: "#00B0FF" }} />
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold">{tPhone("nudgeTitle")}</div>
               <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
@@ -110,22 +111,22 @@ export default function ProfilePage() {
           className="flex items-center gap-3 rounded-2xl p-4 active:opacity-80"
           style={{ background: "var(--tg-card)" }}
         >
-          <div className="text-xl">👛</div>
+          <Wallet size={22} className="shrink-0" style={{ color: "var(--tg-hint)" }} />
           <div className="flex-1">
             <div className="text-sm font-semibold">{tw("title")}</div>
             <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
               {tw("balance")} &amp; {tw("history")}
             </div>
           </div>
-          <span style={{ color: "var(--tg-hint)" }}>›</span>
+          <ChevronRight size={18} style={{ color: "var(--tg-hint)" }} />
         </Link>
       </div>
 
       {/* Sport tabs */}
       <div className="px-4 mt-4">
         <div className="flex gap-2 rounded-2xl p-1" style={{ background: "var(--tg-card)" }}>
-          <SportTab active={tab === "FOOTBALL"} icon="⚽" label={tSports("football")} onClick={() => { hapticImpact("light"); setTab("FOOTBALL"); }} />
-          <SportTab active={tab === "PADEL"} icon="🎾" label={tSports("padel")} onClick={() => { hapticImpact("light"); setTab("PADEL"); }} />
+          <SportTab active={tab === "FOOTBALL"} label={tSports("football")} onClick={() => { hapticImpact("light"); setTab("FOOTBALL"); }} />
+          <SportTab active={tab === "PADEL"} label={tSports("padel")} onClick={() => { hapticImpact("light"); setTab("PADEL"); }} />
         </div>
       </div>
 
@@ -139,8 +140,9 @@ export default function ProfilePage() {
         <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--tg-hint)" }}>
           {t("venuePrivacyTitle")}
         </div>
-        <div className="rounded-2xl p-4 text-xs leading-relaxed" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
-          🔒 {t("venuePrivacyBody")}
+        <div className="rounded-2xl p-4 text-xs leading-relaxed flex gap-2" style={{ background: "var(--tg-card)", color: "var(--tg-hint)" }}>
+          <Lock size={14} className="shrink-0 mt-0.5" />
+          <span>{t("venuePrivacyBody")}</span>
         </div>
       </div>
 
@@ -160,6 +162,7 @@ export default function ProfilePage() {
 // ─── PADEL TAB ────────────────────────────────────────────────────────────────
 function PadelProfile({ me, stats }: { me: any; stats: any }) {
   const t = useTranslations("profile");
+  const tStatus = useTranslations("status");
   const level = stats?.level ?? me?.padelLevel ?? 0;
   const band = getSkillBand(Number(level));
   const reliability = stats?.reliability ?? me?.padelReliability ?? 0;
@@ -206,8 +209,18 @@ function PadelProfile({ me, stats }: { me: any; stats: any }) {
           </div>
         </div>
         <div className="rounded-2xl p-4 flex flex-col justify-center" style={{ background: "var(--tg-card)" }}>
-          <div className="text-2xl font-bold">
-            {streak > 0 ? `🔥 ${streak}` : streak < 0 ? `❄️ ${Math.abs(streak)}` : "—"}
+          <div className="text-2xl font-bold flex items-center gap-1.5">
+            {streak > 0 ? (
+              <>
+                <Flame size={22} style={{ color: "#F59E0B" }} /> {streak}
+              </>
+            ) : streak < 0 ? (
+              <>
+                <Snowflake size={22} style={{ color: "#00B0FF" }} /> {Math.abs(streak)}
+              </>
+            ) : (
+              "—"
+            )}
           </div>
           <div className="text-xs mt-1" style={{ color: "var(--tg-hint)" }}>
             {streak > 0 ? t("winStreak") : streak < 0 ? t("losingStreak") : t("noStreak")}
@@ -227,7 +240,7 @@ function PadelProfile({ me, stats }: { me: any; stats: any }) {
             <PrefRow label={t("courtPosition")} value={stats.preferences.courtPosition ? t(`pos_${stats.preferences.courtPosition}`) : "—"} />
             <PrefRow
               label={t("preferred")}
-              value={stats.preferences.preferredMatchType === "CASUAL" ? "😎 Casual" : "⚔️ Competitive"}
+              value={stats.preferences.preferredMatchType === "CASUAL" ? tStatus("CASUAL") : tStatus("COMPETITIVE")}
             />
           </div>
         </div>
@@ -282,8 +295,9 @@ function FootballProfile({ me }: { me: any }) {
               >
                 {skillLabel}
               </span>
-              <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold" style={{ color: "var(--tg-hint)" }}>
-                {playerMeta.icon} {tRanks(me?.playerLevel ?? "NEW")}
+              <span className="ml-2 inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color: "var(--tg-hint)" }}>
+                <span className="w-2 h-2 rounded-full" style={{ background: playerMeta.color }} />
+                {tRanks(me?.playerLevel ?? "NEW")}
               </span>
             </div>
             <div className="text-right">
@@ -365,17 +379,16 @@ function MyGames({ bookings, sport }: { bookings: any[] | undefined; sport: Spor
   );
 }
 
-function SportTab({ active, icon, label, onClick }: { active: boolean; icon: string; label: string; onClick: () => void }) {
+function SportTab({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-sm font-semibold transition-colors"
+      className="flex-1 flex items-center justify-center rounded-xl py-2 text-sm font-semibold transition-colors"
       style={{
         background: active ? "#00C853" : "transparent",
         color: active ? "#fff" : "var(--tg-hint)",
       }}
     >
-      <span>{icon}</span>
       {label}
     </button>
   );

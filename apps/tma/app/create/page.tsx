@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import { Megaphone, Users, Building2, Check, Swords, Smile, Lock, Globe, type LucideIcon } from "lucide-react";
 import dayjs from "dayjs";
 import { getPitches, createMatch, getPricingPreview, getAvailableSlots, formatUZS, isPhoneRequiredError } from "@/lib/api";
 import { usePhoneGate } from "@/lib/phone-gate";
@@ -27,10 +28,10 @@ const capForFormat = (f: string) => {
 type BookingType = "OPEN_EVENT" | "GROUP_BOOKING" | "FULL_BOOKING";
 
 // Titles/descriptions are translated at render via the `bookingType` namespace.
-const BOOKING_TYPES: { type: BookingType; icon: string; color: string }[] = [
-  { type: "OPEN_EVENT", icon: "📢", color: "#00C853" },
-  { type: "GROUP_BOOKING", icon: "👥", color: "#00B0FF" },
-  { type: "FULL_BOOKING", icon: "🏟️", color: "#FF5252" },
+const BOOKING_TYPES: { type: BookingType; Icon: LucideIcon; color: string }[] = [
+  { type: "OPEN_EVENT", Icon: Megaphone, color: "#00C853" },
+  { type: "GROUP_BOOKING", Icon: Users, color: "#00B0FF" },
+  { type: "FULL_BOOKING", Icon: Building2, color: "#FF5252" },
 ];
 
 type MatchType = "COMPETITIVE" | "CASUAL";
@@ -72,7 +73,8 @@ export default function CreateMatchPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const qc = useQueryClient();
-  const { data: pitches } = useQuery({
+  const tCommon = useTranslations("common");
+  const { data: pitches, isError: pitchesError } = useQuery({
     queryKey: ["tma-pitches", sport],
     queryFn: () => getPitches({ sport }),
   });
@@ -347,7 +349,6 @@ export default function CreateMatchPage() {
                     className="flex items-center justify-center gap-2 rounded-2xl p-3 border-2 transition-colors"
                     style={{ background: "var(--tg-card)", borderColor: active ? "#00C853" : "transparent" }}
                   >
-                    <span className="text-xl">{s.icon}</span>
                     <span className="font-semibold text-sm" style={{ color: active ? "#00C853" : "var(--tg-text)" }}>
                       {tSports(s.id === "PADEL" ? "padel" : "football")}
                     </span>
@@ -358,6 +359,7 @@ export default function CreateMatchPage() {
           </div>
           {BOOKING_TYPES.map((bt) => {
             const active = form.bookingType === bt.type;
+            const Icon = bt.Icon;
             return (
               <button
                 key={bt.type}
@@ -368,11 +370,16 @@ export default function CreateMatchPage() {
                 className="w-full flex items-start gap-3 rounded-2xl p-4 text-left border-2 transition-colors"
                 style={{ background: "var(--tg-card)", borderColor: active ? bt.color : "transparent" }}
               >
-                <div className="text-3xl shrink-0">{bt.icon}</div>
+                <div
+                  className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background: `${bt.color}1A`, color: bt.color }}
+                >
+                  <Icon size={22} />
+                </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold flex items-center gap-2">
                     {tBooking(bt.type)}
-                    {active && <span style={{ color: bt.color }}>✓</span>}
+                    {active && <Check size={16} style={{ color: bt.color }} />}
                   </div>
                   <div className="text-xs mt-0.5" style={{ color: "var(--tg-hint)" }}>
                     {tBooking(`${bt.type}_desc`)}
@@ -387,7 +394,12 @@ export default function CreateMatchPage() {
       {/* STEP 1 — Pitch */}
       {step === 1 && (
         <div className="space-y-2">
-          {(pitches ?? []).length === 0 && (
+          {pitchesError && (
+            <p className="text-sm" style={{ color: "var(--tg-hint)" }}>
+              {tCommon("error")}
+            </p>
+          )}
+          {!pitchesError && (pitches ?? []).length === 0 && (
             <p className="text-sm" style={{ color: "var(--tg-hint)" }}>
               {t("noPitches")}
             </p>
@@ -403,12 +415,12 @@ export default function CreateMatchPage() {
               className="w-full flex items-center gap-3 rounded-2xl p-3 text-left border-2 transition-colors"
               style={{ background: "var(--tg-card)", borderColor: form.pitchId === p.id ? "#00C853" : "transparent" }}
             >
-              <div className="w-12 h-12 rounded-xl bg-[#0D1117] overflow-hidden flex items-center justify-center text-xl shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-[#0D1117] overflow-hidden flex items-center justify-center shrink-0">
                 {p.photos?.[0] ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={p.photos[0]} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  "🏟"
+                  <Building2 size={22} style={{ color: "rgba(255,255,255,0.4)" }} />
                 )}
               </div>
               <div className="min-w-0">
@@ -469,14 +481,14 @@ export default function CreateMatchPage() {
               <div className="grid grid-cols-2 gap-2">
                 <MatchTypeButton
                   active={form.matchType === "COMPETITIVE"}
-                  icon="⚔️"
+                  icon={<Swords size={22} />}
                   title={t("competitive")}
                   color="#EF4444"
                   onClick={() => { hapticImpact("light"); set("matchType", "COMPETITIVE"); }}
                 />
                 <MatchTypeButton
                   active={form.matchType === "CASUAL"}
-                  icon="😎"
+                  icon={<Smile size={22} />}
                   title={t("casual")}
                   color="#00B0FF"
                   onClick={() => { hapticImpact("light"); set("matchType", "CASUAL"); }}
@@ -563,7 +575,7 @@ export default function CreateMatchPage() {
                   style={{ background: "var(--tg-card)", borderColor: form.isPrivate ? "#FF5252" : "transparent" }}
                 >
                   <span className="text-sm">{form.isPrivate ? t("privateHidden") : t("openVisible")}</span>
-                  <span>{form.isPrivate ? "🔒" : "🌍"}</span>
+                  {form.isPrivate ? <Lock size={18} /> : <Globe size={18} />}
                 </button>
               </Field>
               {selectedPitch && (
@@ -586,10 +598,10 @@ export default function CreateMatchPage() {
             <ReviewRow label={t("r_type")} value={tBooking(form.bookingType)} />
             <ReviewRow label={t("r_pitch")} value={selectedPitch?.name ?? "—"} />
             <ReviewRow label={t("r_when")} value={dayjs(`${form.date}T${form.time}`).format("ddd, MMM D · HH:mm")} />
-            <ReviewRow label={t("r_sport")} value={`${meta.icon} ${sportLabel}`} />
+            <ReviewRow label={t("r_sport")} value={sportLabel} />
             {form.bookingType !== "FULL_BOOKING" && <ReviewRow label={t("r_format")} value={form.format} />}
             {form.bookingType !== "FULL_BOOKING" && isPadel && (
-              <ReviewRow label={t("r_matchType")} value={form.matchType === "CASUAL" ? `😎 ${t("casual")}` : `⚔️ ${t("competitive")}`} />
+              <ReviewRow label={t("r_matchType")} value={form.matchType === "CASUAL" ? t("casual") : t("competitive")} />
             )}
             {form.bookingType === "OPEN_EVENT" && <ReviewRow label={t("r_maxPlayers")} value={String(form.maxPlayers)} />}
             {form.bookingType === "GROUP_BOOKING" && (
@@ -687,7 +699,7 @@ function MatchTypeButton({
   onClick,
 }: {
   active: boolean;
-  icon: string;
+  icon: ReactNode;
   title: string;
   color: string;
   onClick: () => void;
@@ -698,7 +710,7 @@ function MatchTypeButton({
       className="flex flex-col items-center gap-1 rounded-2xl p-3 border-2 transition-colors"
       style={{ background: "var(--tg-card)", borderColor: active ? color : "transparent" }}
     >
-      <span className="text-2xl">{icon}</span>
+      <span style={{ color: active ? color : "var(--tg-text)" }}>{icon}</span>
       <span className="text-sm font-semibold" style={{ color: active ? color : "var(--tg-text)" }}>
         {title}
       </span>

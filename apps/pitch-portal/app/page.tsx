@@ -19,7 +19,7 @@ import { useAuth } from "@/lib/auth";
 export default function DashboardPage() {
   const { user } = useAuth();
 
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading, isError } = useQuery({
     queryKey: ["portal-dashboard"],
     queryFn: getDashboard,
     refetchInterval: 60_000,
@@ -51,7 +51,12 @@ export default function DashboardPage() {
         } registered`}
       />
 
-      {isLoading ? (
+      {isError ? (
+        <EmptyState
+          title="Couldn't load your dashboard"
+          hint="Check your connection and try again."
+        />
+      ) : isLoading ? (
         <Spinner />
       ) : (
         <>

@@ -1,12 +1,25 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { StatCard } from "@expouz/ui";
+import Link from "next/link";
+import {
+  Users,
+  Building2,
+  Activity,
+  Clock,
+  Phone,
+  CalendarClock,
+  Wallet,
+  TrendingUp,
+  AlertTriangle,
+  ChevronRight,
+} from "lucide-react";
+import { StatCard, PageHeader, EmptyState, StatusPill } from "@expouz/ui";
 import { getDashboard, getMatches, getUsers } from "@/lib/api";
 import dayjs from "dayjs";
 
 export default function DashboardPage() {
-  const { data: dashboard, isLoading: dbLoading } = useQuery({
+  const { data: dashboard, isLoading: dbLoading, isError } = useQuery({
     queryKey: ["admin-dashboard"],
     queryFn: getDashboard,
   });
@@ -26,44 +39,45 @@ export default function DashboardPage() {
 
   return (
     <div className="p-8">
-      {/* Page Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          {dayjs().format("dddd, MMMM D, YYYY")} · Platform overview
-        </p>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        subtitle={`${dayjs().format("dddd, MMMM D, YYYY")} · Platform overview`}
+      />
 
-      {/* Stat Cards */}
-      {dbLoading ? (
-        <div className="grid grid-cols-4 gap-5 mb-8">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl p-5 h-32 animate-pulse" />
+      {isError ? (
+        <EmptyState
+          title="Couldn't load the dashboard"
+          hint="Check your connection and try again."
+        />
+      ) : dbLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl border border-[#E5E7EB] p-5 h-32 animate-pulse" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-5 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           <StatCard
-            icon="👥"
-            label="Total Users"
+            icon={<Users size={18} />}
+            label="Total users"
             value={(dashboard?.totalUsers ?? 0).toLocaleString()}
             accent="#2563EB"
           />
           <StatCard
-            icon="🏟"
-            label="Verified Pitches"
+            icon={<Building2 size={18} />}
+            label="Verified pitches"
             value={dashboard?.activePitches ?? dashboard?.totalPitches ?? 0}
             accent="#00C853"
           />
           <StatCard
-            icon="⚽"
-            label="Active Matches"
+            icon={<Activity size={18} />}
+            label="Active matches"
             value={dashboard?.activeMatches ?? dashboard?.totalMatches ?? 0}
             accent="#7C3AED"
           />
           <StatCard
-            icon="⏳"
-            label="Pending Pitches"
+            icon={<Clock size={18} />}
+            label="Pending pitches"
             value={dashboard?.pendingPitches ?? 0}
             accent="#F59E0B"
             delta={
@@ -73,14 +87,14 @@ export default function DashboardPage() {
             }
           />
           <StatCard
-            icon="📱"
-            label="Unverified Phones"
+            icon={<Phone size={18} />}
+            label="Unverified phones"
             value={(dashboard?.unverifiedPhoneUsers ?? 0).toLocaleString()}
             accent="#00B0FF"
           />
           <StatCard
-            icon="⏰"
-            label="Venues Missing Hours"
+            icon={<CalendarClock size={18} />}
+            label="Venues missing hours"
             value={`${dashboard?.venuesMissingHours ?? 0}${dashboard?.activeVenues != null ? ` / ${dashboard.activeVenues}` : ""}`}
             accent="#EF4444"
             hint={
@@ -92,24 +106,24 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Revenue Row */}
+      {/* Revenue row */}
       {(dashboard?.revenueToday || dashboard?.revenueMonth) && (
-        <div className="grid grid-cols-3 gap-5 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <StatCard
-            icon="💰"
-            label="Revenue Today"
+            icon={<Wallet size={18} />}
+            label="Revenue today"
             value={`${Number(dashboard?.revenueToday ?? 0).toLocaleString()} UZS`}
             accent="#00C853"
           />
           <StatCard
-            icon="📋"
-            label="Revenue This Month"
+            icon={<TrendingUp size={18} />}
+            label="Revenue this month"
             value={`${Number(dashboard?.revenueMonth ?? 0).toLocaleString()} UZS`}
             accent="#7C3AED"
           />
           <StatCard
-            icon="⚠️"
-            label="Failed Transactions"
+            icon={<AlertTriangle size={18} />}
+            label="Failed transactions"
             value={dashboard?.failedTransactions ?? 0}
             accent="#EF4444"
           />
@@ -118,9 +132,8 @@ export default function DashboardPage() {
 
       {/* Sport breakdown */}
       {dashboard?.sportBreakdown && (
-        <div className="grid grid-cols-2 gap-5 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           <SportBreakdownCard
-            icon="⚽"
             title="Football"
             color="#00C853"
             rows={[
@@ -129,7 +142,6 @@ export default function DashboardPage() {
             ]}
           />
           <SportBreakdownCard
-            icon="🎾"
             title="Padel"
             color="#00B0FF"
             rows={[
@@ -141,56 +153,55 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-6">
-        {/* Recent Matches */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">Recent Matches</h2>
-            <a href="/matches" className="text-xs text-primary font-medium hover:underline">
-              View all →
-            </a>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent matches */}
+        <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between">
+            <h2 className="font-semibold text-[#0D1117]">Recent matches</h2>
+            <Link href="/matches" className="inline-flex items-center gap-0.5 text-xs text-[#00875A] font-medium hover:underline">
+              View all <ChevronRight size={14} />
+            </Link>
           </div>
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-[#F3F4F6]">
             {topMatches.length === 0 && (
-              <div className="px-6 py-8 text-center text-gray-400 text-sm">No matches yet</div>
+              <div className="px-6 py-8 text-center text-[#6B7280] text-sm">No matches yet</div>
             )}
             {topMatches.map((m: any) => (
               <div key={m.id} className="px-6 py-3 flex items-center gap-3">
-                <div className="text-xl">⚽</div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{m.title}</div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-sm font-medium text-[#0D1117] truncate">{m.title}</div>
+                  <div className="text-xs text-[#6B7280]">
                     {m.pitch?.name ?? ""} · {dayjs(m.startTime).format("MMM D, HH:mm")}
                   </div>
                 </div>
-                <StatusBadge status={m.status} />
+                <StatusPill status={m.status} />
               </div>
             ))}
           </div>
         </div>
 
-        {/* Recent Users */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">Recent Users</h2>
-            <a href="/users" className="text-xs text-primary font-medium hover:underline">
-              View all →
-            </a>
+        {/* Recent users */}
+        <div className="bg-white rounded-2xl border border-[#E5E7EB] shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between">
+            <h2 className="font-semibold text-[#0D1117]">Recent users</h2>
+            <Link href="/users" className="inline-flex items-center gap-0.5 text-xs text-[#00875A] font-medium hover:underline">
+              View all <ChevronRight size={14} />
+            </Link>
           </div>
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-[#F3F4F6]">
             {recentUsers.length === 0 && (
-              <div className="px-6 py-8 text-center text-gray-400 text-sm">No users yet</div>
+              <div className="px-6 py-8 text-center text-[#6B7280] text-sm">No users yet</div>
             )}
             {recentUsers.map((u: any) => (
               <div key={u.id} className="px-6 py-3 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-sm font-bold text-green-700">
+                <div className="w-8 h-8 rounded-full bg-[#00C853]/15 flex items-center justify-center text-sm font-bold text-[#00875A]">
                   {u.firstName?.[0] ?? "?"}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900">
+                  <div className="text-sm font-medium text-[#0D1117]">
                     {u.firstName} {u.lastName}
                   </div>
-                  <div className="text-xs text-gray-500">{u.phone}</div>
+                  <div className="text-xs text-[#6B7280]">{u.phone}</div>
                 </div>
                 <RoleBadge role={u.role} />
               </div>
@@ -203,21 +214,19 @@ export default function DashboardPage() {
 }
 
 function SportBreakdownCard({
-  icon,
   title,
   color,
   rows,
 }: {
-  icon: string;
   title: string;
   color: string;
   rows: { label: string; value: number }[];
 }) {
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#E5E7EB]">
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-2xl">{icon}</span>
-        <span className="font-semibold text-gray-900">{title}</span>
+        <span className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
+        <span className="font-semibold text-[#0D1117]">{title}</span>
       </div>
       <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${rows.length}, minmax(0, 1fr))` }}>
         {rows.map((r) => (
@@ -225,7 +234,7 @@ function SportBreakdownCard({
             <div className="text-2xl font-extrabold" style={{ color }}>
               {r.value.toLocaleString()}
             </div>
-            <div className="text-xs text-gray-500">{r.label}</div>
+            <div className="text-xs text-[#6B7280]">{r.label}</div>
           </div>
         ))}
       </div>
@@ -233,31 +242,15 @@ function SportBreakdownCard({
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    OPEN: "bg-green-100 text-green-700",
-    FULL: "bg-red-100 text-red-600",
-    CONFIRMED: "bg-blue-100 text-blue-700",
-    IN_PROGRESS: "bg-purple-100 text-purple-700",
-    COMPLETED: "bg-gray-100 text-gray-600",
-    CANCELLED: "bg-gray-100 text-gray-400 line-through",
-  };
-  return (
-    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${map[status] ?? "bg-gray-100 text-gray-500"}`}>
-      {status}
-    </span>
-  );
-}
-
 function RoleBadge({ role }: { role: string }) {
   const map: Record<string, string> = {
-    SUPER_ADMIN: "bg-red-100 text-red-700",
-    ADMIN: "bg-orange-100 text-orange-700",
-    PITCH_OWNER: "bg-purple-100 text-purple-700",
-    PLAYER: "bg-green-100 text-green-700",
+    SUPER_ADMIN: "bg-[#EF4444]/15 text-[#B91C1C]",
+    ADMIN: "bg-[#F59E0B]/15 text-[#B45309]",
+    PITCH_OWNER: "bg-[#8B5CF6]/15 text-[#6D28D9]",
+    PLAYER: "bg-[#00C853]/15 text-[#00875A]",
   };
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${map[role] ?? "bg-gray-100 text-gray-500"}`}>
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${map[role] ?? "bg-[#6B7280]/15 text-[#374151]"}`}>
       {role.replace("_", " ")}
     </span>
   );

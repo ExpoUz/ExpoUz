@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getRevenue, getPadelAnalytics, getFootballAnalytics, getDisputes, resolveDispute } from "@/lib/api";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import dayjs from "dayjs";
+import { ReactNode } from "react";
+import { Wallet, CheckCircle2, BarChart3 } from "lucide-react";
 import { useSportFilter } from "@/lib/sport-store";
 
 export default function AnalyticsPage() {
@@ -62,21 +64,21 @@ export default function AnalyticsPage() {
         <MetricCard
           title="Total Revenue (this month)"
           value={`${totalRevenue.toLocaleString()} UZS`}
-          icon="💰"
+          icon={<Wallet size={20} />}
           color="#00C853"
           loading={isLoading}
         />
         <MetricCard
           title="Transactions (this month)"
           value={totalBookings}
-          icon="✅"
+          icon={<CheckCircle2 size={20} />}
           color="#2563EB"
           loading={isLoading}
         />
         <MetricCard
           title="Avg per Transaction"
           value={totalBookings > 0 ? `${Math.round(totalRevenue / totalBookings).toLocaleString()} UZS` : "—"}
-          icon="📊"
+          icon={<BarChart3 size={20} />}
           color="#7C3AED"
           loading={isLoading}
         />
@@ -141,7 +143,7 @@ export default function AnalyticsPage() {
       {/* Football — match count + fill rate per format */}
       {showFootball && (
         <div className="mt-8">
-          <h2 className="text-lg font-bold text-gray-900 mb-1">⚽ Football Insights</h2>
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Football Insights</h2>
           <p className="text-gray-500 text-sm mb-4">{football?.totalMatches ?? 0} football matches</p>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h3 className="font-semibold text-gray-900 mb-4">Capacity Fill Rate by Format</h3>
@@ -161,7 +163,7 @@ export default function AnalyticsPage() {
       {/* Padel — level distribution + match-type split */}
       {showPadel && (
       <div className="mt-8">
-        <h2 className="text-lg font-bold text-gray-900 mb-1">🎾 Padel Insights</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Padel Insights</h2>
         <p className="text-gray-500 text-sm mb-4">
           {padel?.totalAssessed ?? 0} rated players · {(padel?.matchTypeSplit?.casual ?? 0) + (padel?.matchTypeSplit?.competitive ?? 0)} padel matches
         </p>
@@ -189,13 +191,13 @@ export default function AnalyticsPage() {
             <h3 className="font-semibold text-gray-900 mb-4">Casual vs Competitive</h3>
             <div className="space-y-4">
               <SplitRow
-                label="⚔️ Competitive"
+                label="Competitive"
                 value={padel?.matchTypeSplit?.competitive ?? 0}
                 total={(padel?.matchTypeSplit?.casual ?? 0) + (padel?.matchTypeSplit?.competitive ?? 0)}
                 color="#EF4444"
               />
               <SplitRow
-                label="😎 Casual"
+                label="Casual"
                 value={padel?.matchTypeSplit?.casual ?? 0}
                 total={(padel?.matchTypeSplit?.casual ?? 0) + (padel?.matchTypeSplit?.competitive ?? 0)}
                 color="#00B0FF"
@@ -209,7 +211,7 @@ export default function AnalyticsPage() {
       {/* Disputed padel results — moderation */}
       {showPadel && (disputes ?? []).length > 0 && (
         <div className="mt-8">
-          <h2 className="text-lg font-bold text-gray-900 mb-1">⚖️ Disputed Results</h2>
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Disputed Results</h2>
           <p className="text-gray-500 text-sm mb-4">{(disputes ?? []).length} awaiting moderation</p>
           <div className="space-y-3">
             {(disputes ?? []).map((d: any) => (
@@ -246,7 +248,9 @@ export default function AnalyticsPage() {
 
       {!isLoading && daily.length === 0 && monthly.length === 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center mt-6">
-          <div className="text-4xl mb-3">📊</div>
+          <div className="flex justify-center mb-3 text-gray-300">
+            <BarChart3 size={40} />
+          </div>
           <div className="text-gray-500">No revenue data yet</div>
         </div>
       )}
@@ -280,7 +284,7 @@ function MetricCard({
 }: {
   title: string;
   value: string | number;
-  icon: string;
+  icon: ReactNode;
   color: string;
   loading?: boolean;
 }) {
@@ -290,7 +294,7 @@ function MetricCard({
         <div className="h-16 bg-gray-100 rounded animate-pulse" />
       ) : (
         <>
-          <div className="text-2xl mb-3">{icon}</div>
+          <div className="mb-3" style={{ color }}>{icon}</div>
           <div className="text-2xl font-bold mb-1" style={{ color }}>
             {value}
           </div>

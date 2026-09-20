@@ -69,8 +69,9 @@ export default function PlayersPage() {
                 <div className="font-semibold text-sm truncate">
                   {p.firstName} {p.lastName}
                 </div>
-                <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-                  {lvl.icon} {tRanks(p.playerLevel ?? "NEW")} · {p.gamesAttended}
+                <div className="text-xs flex items-center gap-1.5" style={{ color: "var(--tg-hint)" }}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: lvl.color }} />
+                  {tRanks(p.playerLevel ?? "NEW")} · {p.gamesAttended}
                 </div>
               </div>
               {p.district || p.city ? (

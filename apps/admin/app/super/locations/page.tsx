@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { MapPin } from "lucide-react";
 import {
   getLocations,
   createLocation,
@@ -117,7 +118,7 @@ export default function LocationsPage() {
           <div className="divide-y divide-gray-50">
             {(locations ?? []).map((loc: any) => (
               <div key={loc.id} className="px-6 py-3 flex items-center gap-4">
-                <span className="text-xl">📍</span>
+                <MapPin size={20} className="text-gray-400 shrink-0" />
                 <div className="flex-1">
                   <div className="font-medium text-gray-900 text-sm">{loc.name}</div>
                   <div className="text-xs text-gray-500">

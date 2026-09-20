@@ -5,6 +5,7 @@ import { getUsers } from "@/lib/api";
 import { useState } from "react";
 import Link from "next/link";
 import dayjs from "dayjs";
+import { Check } from "lucide-react";
 
 export default function UsersPage() {
   const { data: users, isLoading } = useQuery({
@@ -86,8 +87,8 @@ export default function UsersPage() {
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Verified</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">⚽ Football</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">🎾 Padel</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Football</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Padel</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Reliability</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">City</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
@@ -200,7 +201,7 @@ function PhoneVerifiedCell({ user }: { user: any }) {
   return (
     <div className="flex flex-col">
       <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700">
-        ✓ Verified
+        <Check size={13} /> Verified
       </span>
       <span className="text-[10px] text-gray-400">
         {method || "—"}

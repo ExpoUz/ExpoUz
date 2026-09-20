@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { getOrganizationsInsights } from "@/lib/api";
 
 const STAGES = ["LEAD", "CONTACTED", "DEMO", "NEGOTIATING", "ACTIVE", "CHURNED"];
@@ -17,8 +18,8 @@ function money(n: number) {
 }
 
 function trend(t: string) {
-  if (t === "up") return <span className="text-green-600">▲</span>;
-  if (t === "down") return <span className="text-red-500">▼</span>;
+  if (t === "up") return <TrendingUp size={14} className="text-green-600" />;
+  if (t === "down") return <TrendingDown size={14} className="text-red-500" />;
   return <span className="text-gray-300">—</span>;
 }
 

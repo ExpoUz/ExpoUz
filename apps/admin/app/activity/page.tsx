@@ -7,28 +7,49 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import {
+  UserPlus,
+  LogIn,
+  Pencil,
+  PlusCircle,
+  CheckCircle2,
+  DoorOpen,
+  XCircle,
+  Receipt,
+  CreditCard,
+  AlertTriangle,
+  Undo2,
+  Ticket,
+  Send,
+  Handshake,
+  Star,
+  Shield,
+  Lock,
+  Circle,
+  type LucideIcon,
+} from "lucide-react";
 
 dayjs.extend(relativeTime);
 
-const CATEGORY_META: Record<string, { icon: string; color: string }> = {
-  REGISTERED: { icon: "👤", color: "bg-gray-100 text-gray-600" },
-  LOGIN: { icon: "🔑", color: "bg-gray-100 text-gray-600" },
-  PROFILE_UPDATED: { icon: "✏️", color: "bg-gray-100 text-gray-600" },
-  MATCH_CREATED: { icon: "⚽", color: "bg-green-100 text-green-700" },
-  MATCH_JOINED: { icon: "✅", color: "bg-green-100 text-green-700" },
-  MATCH_LEFT: { icon: "🚪", color: "bg-orange-100 text-orange-700" },
-  MATCH_CANCELLED: { icon: "❌", color: "bg-red-100 text-red-600" },
-  PAYMENT_INITIATED: { icon: "🧾", color: "bg-blue-100 text-blue-700" },
-  PAYMENT_COMPLETED: { icon: "💳", color: "bg-green-100 text-green-700" },
-  PAYMENT_FAILED: { icon: "⚠️", color: "bg-red-100 text-red-600" },
-  PAYMENT_REFUNDED: { icon: "💰", color: "bg-blue-100 text-blue-700" },
-  BOOKING_CONFIRMED: { icon: "🎟️", color: "bg-green-100 text-green-700" },
-  BOOKING_CANCELLED: { icon: "❌", color: "bg-red-100 text-red-600" },
-  INVITE_SENT: { icon: "📤", color: "bg-blue-100 text-blue-700" },
-  INVITE_ACCEPTED: { icon: "🤝", color: "bg-green-100 text-green-700" },
-  RATING_GIVEN: { icon: "⭐", color: "bg-yellow-100 text-yellow-700" },
-  RATING_RECEIVED: { icon: "⭐", color: "bg-yellow-100 text-yellow-700" },
-  ADMIN_ACTION: { icon: "🛡️", color: "bg-purple-100 text-purple-700" },
+const CATEGORY_META: Record<string, { Icon: LucideIcon; color: string }> = {
+  REGISTERED: { Icon: UserPlus, color: "bg-gray-100 text-gray-600" },
+  LOGIN: { Icon: LogIn, color: "bg-gray-100 text-gray-600" },
+  PROFILE_UPDATED: { Icon: Pencil, color: "bg-gray-100 text-gray-600" },
+  MATCH_CREATED: { Icon: PlusCircle, color: "bg-green-100 text-green-700" },
+  MATCH_JOINED: { Icon: CheckCircle2, color: "bg-green-100 text-green-700" },
+  MATCH_LEFT: { Icon: DoorOpen, color: "bg-orange-100 text-orange-700" },
+  MATCH_CANCELLED: { Icon: XCircle, color: "bg-red-100 text-red-600" },
+  PAYMENT_INITIATED: { Icon: Receipt, color: "bg-blue-100 text-blue-700" },
+  PAYMENT_COMPLETED: { Icon: CreditCard, color: "bg-green-100 text-green-700" },
+  PAYMENT_FAILED: { Icon: AlertTriangle, color: "bg-red-100 text-red-600" },
+  PAYMENT_REFUNDED: { Icon: Undo2, color: "bg-blue-100 text-blue-700" },
+  BOOKING_CONFIRMED: { Icon: Ticket, color: "bg-green-100 text-green-700" },
+  BOOKING_CANCELLED: { Icon: XCircle, color: "bg-red-100 text-red-600" },
+  INVITE_SENT: { Icon: Send, color: "bg-blue-100 text-blue-700" },
+  INVITE_ACCEPTED: { Icon: Handshake, color: "bg-green-100 text-green-700" },
+  RATING_GIVEN: { Icon: Star, color: "bg-yellow-100 text-yellow-700" },
+  RATING_RECEIVED: { Icon: Star, color: "bg-yellow-100 text-yellow-700" },
+  ADMIN_ACTION: { Icon: Shield, color: "bg-purple-100 text-purple-700" },
 };
 
 const CATEGORIES = ["ALL", ...Object.keys(CATEGORY_META)];
@@ -145,7 +166,7 @@ function ActivityFeed() {
               category === c ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
-            {c === "ALL" ? "All" : `${CATEGORY_META[c]?.icon ?? ""} ${c.replace(/_/g, " ").toLowerCase()}`}
+            {c === "ALL" ? "All" : c.replace(/_/g, " ").toLowerCase()}
           </button>
         ))}
       </div>
@@ -156,16 +177,17 @@ function ActivityFeed() {
           <div className="px-5 py-12 text-center text-gray-400 text-sm">No activity found.</div>
         )}
         {rows.map((a: any) => {
-          const meta = CATEGORY_META[a.category] ?? { icon: "•", color: "bg-gray-100 text-gray-600" };
+          const meta = CATEGORY_META[a.category] ?? { Icon: Circle, color: "bg-gray-100 text-gray-600" };
+          const Icon = meta.Icon;
           const sensitive = isSensitive(a);
           return (
             <div key={a.id} className={`flex items-center gap-3 px-5 py-3 ${sensitive ? "bg-amber-50/60" : ""}`}>
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0 ${meta.color}`}>
-                {meta.icon}
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${meta.color}`}>
+                <Icon size={16} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm text-gray-800 flex items-center gap-2">
-                  {sensitive && <span title="Sensitive action">🔒</span>}
+                  {sensitive && <Lock size={12} aria-label="Sensitive action" />}
                   <span>{a.description ?? a.action}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">

@@ -15,15 +15,6 @@ const STATUS_COLORS: Record<string, string> = {
   CANCELLED: "bg-gray-100 text-gray-400",
 };
 
-const SPORT_ICONS: Record<string, string> = {
-  FOOTBALL: "⚽",
-  PADEL: "🎾",
-  FUTSAL: "🎯",
-  BASKETBALL: "🏀",
-  VOLLEYBALL: "🏐",
-  TENNIS: "🎾",
-};
-
 export default function MatchesPage() {
   const sport = useSportFilter();
   const { data: matches, isLoading } = useQuery({
@@ -118,15 +109,10 @@ export default function MatchesPage() {
               filtered.map((m: any) => (
                 <tr key={m.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{SPORT_ICONS[m.sport] ?? "⚽"}</span>
-                      <div>
-                        <div className="font-medium text-gray-900 max-w-[160px] truncate">
-                          {m.title ?? "Untitled"}
-                        </div>
-                        <div className="text-xs text-gray-400 font-mono">{m.id.slice(0, 8)}…</div>
-                      </div>
+                    <div className="font-medium text-gray-900 max-w-[160px] truncate">
+                      {m.title ?? "Untitled"}
                     </div>
+                    <div className="text-xs text-gray-400 font-mono">{m.id.slice(0, 8)}…</div>
                   </td>
                   <td className="px-5 py-3 text-gray-700 max-w-[120px] truncate">
                     {m.pitch?.name ?? "—"}
@@ -147,7 +133,7 @@ export default function MatchesPage() {
                   <td className="px-5 py-3">
                     {m.sport === "PADEL" ? (
                       <span className="text-xs font-medium text-gray-600">
-                        {m.matchType === "CASUAL" ? "😎 Casual" : "⚔️ Competitive"}
+                        {m.matchType === "CASUAL" ? "Casual" : "Competitive"}
                       </span>
                     ) : (
                       <span className="text-gray-300">—</span>

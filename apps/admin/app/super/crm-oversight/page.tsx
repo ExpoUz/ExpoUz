@@ -236,7 +236,7 @@ function ReportsTab() {
           </div>
         ))}
         {(data ?? []).length === 0 && (
-          <div className="px-5 py-10 text-center text-gray-400 text-sm">No player reports. 🎉</div>
+          <div className="px-5 py-10 text-center text-gray-400 text-sm">No player reports.</div>
         )}
       </div>
     </Card>

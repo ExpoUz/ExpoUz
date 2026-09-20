@@ -6,7 +6,25 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
-import { MapPin, Users, Clock, Shield, ChevronRight, Calendar, Share2, Copy } from "lucide-react";
+import {
+  MapPin,
+  Users,
+  Clock,
+  Shield,
+  ChevronRight,
+  Calendar,
+  Share2,
+  Copy,
+  Megaphone,
+  Building2,
+  ClipboardList,
+  Trophy,
+  Crown,
+  AlertTriangle,
+  CheckCircle2,
+  Plus,
+  type LucideIcon,
+} from "lucide-react";
 import {
   joinMatchAndPay,
   leaveMatch,
@@ -34,10 +52,10 @@ import { HostCard } from "./HostCard";
 import { MatchChatRow } from "./MatchChatRow";
 import { VenueMap } from "./VenueMap";
 
-const BOOKING_TYPE_LABELS: Record<string, { label: string; icon: string; color: string }> = {
-  OPEN_EVENT: { label: "Open Event", icon: "📢", color: "#00C853" },
-  GROUP_BOOKING: { label: "Group Booking", icon: "👥", color: "#00B0FF" },
-  FULL_BOOKING: { label: "Full Pitch", icon: "🏟️", color: "#FF5252" },
+const BOOKING_TYPE_META: Record<string, { Icon: LucideIcon; color: string }> = {
+  OPEN_EVENT: { Icon: Megaphone, color: "#00C853" },
+  GROUP_BOOKING: { Icon: Users, color: "#00B0FF" },
+  FULL_BOOKING: { Icon: Building2, color: "#FF5252" },
 };
 
 export function FootballMatchDetail({ match }: { match: any }) {
@@ -47,6 +65,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
   const { user } = useAuth();
   const { requirePhone } = usePhoneGate();
   const t = useTranslations("matches");
+  const tc = useTranslations("common");
   const tBooking = useTranslations("bookingType");
   const searchParams = useSearchParams();
   const justCreated = searchParams.get("created") === "1";
@@ -132,7 +151,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
     } else if (isFull) {
       hideMainButton();
     } else {
-      cleanup = showMainButton(`⚽ ${t("reserve", { price: formatUZS(match.pricePerPlayer) })}`, () => reserve(), "#FF5252");
+      cleanup = showMainButton(t("reserve", { price: formatUZS(match.pricePerPlayer) }), () => reserve(), "#FF5252");
     }
     return () => {
       cleanup();
@@ -151,7 +170,9 @@ export function FootballMatchDetail({ match }: { match: any }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={photo} alt={match.pitch?.name} className="w-full h-full object-cover" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-6xl">🏟</div>
+          <div className="w-full h-full flex items-center justify-center">
+            <Building2 size={48} style={{ color: "rgba(255,255,255,0.4)" }} />
+          </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
         <div className="absolute bottom-3 left-4 right-4 text-white">
@@ -161,12 +182,16 @@ export function FootballMatchDetail({ match }: { match: any }) {
                 {match.format}
               </span>
             )}
-            {match.bookingType && BOOKING_TYPE_LABELS[match.bookingType] && (
+            {match.bookingType && BOOKING_TYPE_META[match.bookingType] && (
               <span
-                className="px-2 py-0.5 rounded-full text-[11px] font-bold text-white"
-                style={{ background: BOOKING_TYPE_LABELS[match.bookingType].color }}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold text-white"
+                style={{ background: BOOKING_TYPE_META[match.bookingType].color }}
               >
-                {BOOKING_TYPE_LABELS[match.bookingType].icon} {tBooking(match.bookingType)}
+                {(() => {
+                  const Icon = BOOKING_TYPE_META[match.bookingType].Icon;
+                  return <Icon size={11} />;
+                })()}
+                {tBooking(match.bookingType)}
               </span>
             )}
             <span
@@ -188,7 +213,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
           <Row
             icon={<Clock size={16} />}
             label={`${dayjs(match.startTime).format("HH:mm")}${
-              match.durationMinutes ? ` · ${match.durationMinutes} min` : ""
+              match.durationMinutes ? ` · ${t("minSuffix", { n: match.durationMinutes })}` : ""
             }`}
           />
           <Row
@@ -199,26 +224,26 @@ export function FootballMatchDetail({ match }: { match: any }) {
           />
           <Row
             icon={<Users size={16} />}
-            label={`${filled}/${match.maxPlayers} players · min ${
-              match.minPlayers ?? "—"
-            }`}
+            label={t("playersMeta", { filled, max: match.maxPlayers, min: match.minPlayers ?? "—" })}
           />
           {match.skillFilter && (
-            <Row icon={<Shield size={16} />} label={`Skill: ${match.skillFilter}`} />
+            <Row icon={<Shield size={16} />} label={t("skillLevel", { level: match.skillFilter })} />
           )}
         </div>
 
         {/* Booking-type specifics */}
         {match.bookingType === "GROUP_BOOKING" && (
-          <div className="rounded-2xl p-4 text-sm" style={{ background: "var(--tg-card)" }}>
-            👥 Organised by{" "}
-            <span className="font-semibold">{match.host?.firstName ?? "host"}</span>
-            {match.organizerPlayerCount != null && <> — paid for {match.organizerPlayerCount} players</>}
-            {match.extraSpotsAvailable != null && (
-              <div className="text-xs mt-1" style={{ color: "var(--tg-hint)" }}>
-                {Math.max(0, spotsLeft)} spots remaining for others
-              </div>
-            )}
+          <div className="rounded-2xl p-4 text-sm flex gap-2" style={{ background: "var(--tg-card)" }}>
+            <Users size={16} className="shrink-0 mt-0.5" style={{ color: "#00B0FF" }} />
+            <div>
+              {t("organisedBy", { name: match.host?.firstName ?? "" })}
+              {match.organizerPlayerCount != null && <> — {t("paidForPlayers", { count: match.organizerPlayerCount })}</>}
+              {match.extraSpotsAvailable != null && (
+                <div className="text-xs mt-1" style={{ color: "var(--tg-hint)" }}>
+                  {t("spotsRemaining", { count: Math.max(0, spotsLeft) })}
+                </div>
+              )}
+            </div>
           </div>
         )}
         {match.bookingType === "FULL_BOOKING" && (
@@ -240,23 +265,23 @@ export function FootballMatchDetail({ match }: { match: any }) {
               <button
                 onClick={() => {
                   hapticImpact("light");
-                  shareToTelegram(share.telegramShareLink, `Join my game: ${match.title}`);
+                  shareToTelegram(share.telegramShareLink, t("joinMyGame", { title: match.title }));
                 }}
                 className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold text-white"
                 style={{ background: "#00B0FF" }}
               >
-                <Share2 size={16} /> Share
+                <Share2 size={16} /> {tc("share")}
               </button>
               <button
                 onClick={async () => {
                   hapticImpact("light");
                   const ok = await copyToClipboard(share.telegramShareLink);
-                  showAlert(ok ? "Invite link copied!" : "Copy not supported — share instead.");
+                  showAlert(ok ? t("inviteCopied") : t("copyNotSupported"));
                 }}
                 className="flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold"
                 style={{ background: "var(--tg-bg)", border: "1px solid rgba(0,0,0,0.1)" }}
               >
-                <Copy size={16} /> Copy
+                <Copy size={16} /> {tc("copy")}
               </button>
             </div>
           </div>
@@ -277,11 +302,16 @@ export function FootballMatchDetail({ match }: { match: any }) {
           className="rounded-2xl p-4 flex items-center gap-3"
           style={{ background: "var(--tg-card)" }}
         >
-          <div className="text-2xl">📋</div>
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+            style={{ background: "rgba(0,200,83,0.12)", color: "#00875A" }}
+          >
+            <ClipboardList size={20} />
+          </div>
           <div className="flex-1">
-            <div className="font-semibold text-sm">Lineup &amp; Formation</div>
+            <div className="font-semibold text-sm">{t("lineupTitle")}</div>
             <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-              Pick your position on the pitch
+              {t("lineupSub")}
             </div>
           </div>
           <ChevronRight size={18} style={{ color: "var(--tg-hint)" }} />
@@ -290,7 +320,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
         {/* Players */}
         <div>
           <div className="text-sm font-semibold mb-2 px-1">
-            Players ({filled}/{match.maxPlayers})
+            {t("playersWithCount", { filled, max: match.maxPlayers })}
           </div>
           <div className="grid grid-cols-4 gap-3">
             {slots.map((b) => (
@@ -303,24 +333,29 @@ export function FootballMatchDetail({ match }: { match: any }) {
                 <div className="relative">
                   <Avatar user={b.isGuestSlot ? { firstName: "?" } : b.user} />
                   {b.isHostBooking && (
-                    <span className="absolute -top-1 -right-1 text-[11px]" title="Host">👑</span>
+                    <span
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center"
+                      title={t("host")}
+                    >
+                      <Crown size={10} style={{ color: "#F59E0B" }} />
+                    </span>
                   )}
                 </div>
                 <span className="text-[11px] text-center truncate w-full" style={{ color: "var(--tg-hint)" }}>
-                  {b.isGuestSlot ? b.guestLabel ?? "Guest" : b.user?.firstName}
+                  {b.isGuestSlot ? b.guestLabel ?? t("guest") : b.user?.firstName}
                 </span>
               </button>
             ))}
             {Array.from({ length: Math.min(spotsLeft, match.maxPlayers) }).map((_, i) => (
               <div key={`empty-${i}`} className="flex flex-col items-center gap-1">
                 <div
-                  className="w-11 h-11 rounded-full border-2 border-dashed flex items-center justify-center text-lg"
+                  className="w-11 h-11 rounded-full border-2 border-dashed flex items-center justify-center"
                   style={{ borderColor: "rgba(0,0,0,0.15)", color: "var(--tg-hint)" }}
                 >
-                  +
+                  <Plus size={18} />
                 </div>
                 <span className="text-[11px]" style={{ color: "var(--tg-hint)" }}>
-                  Open
+                  {t("openSlot")}
                 </span>
               </div>
             ))}
@@ -341,7 +376,12 @@ export function FootballMatchDetail({ match }: { match: any }) {
             className="rounded-2xl p-4 flex items-center gap-3"
             style={{ background: "var(--tg-card)" }}
           >
-            <div className="text-2xl">🏆</div>
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: "rgba(245,158,11,0.15)", color: "#B45309" }}
+            >
+              <Trophy size={20} />
+            </div>
             <div className="flex-1">
               <div className="font-semibold text-sm">
                 {match.resultSubmitted ? t("viewResult") : t("submitResult")}
@@ -355,8 +395,8 @@ export function FootballMatchDetail({ match }: { match: any }) {
         )}
 
         {joined && (
-          <div className="rounded-2xl p-3 text-center text-sm font-medium text-[#00875A] bg-[#00C853]/10">
-            ✓ You&apos;re in this game
+          <div className="rounded-2xl p-3 flex items-center justify-center gap-1.5 text-sm font-medium text-[#00875A] bg-[#00C853]/10">
+            <CheckCircle2 size={16} /> {t("youreInGame")}
           </div>
         )}
       </div>
@@ -371,24 +411,29 @@ export function FootballMatchDetail({ match }: { match: any }) {
           >
             {hoursUntilMatch < (match.cancellationDeadlineHours ?? 5) ? (
               <div className="rounded-2xl p-4 space-y-1" style={{ background: "rgba(255,82,82,0.1)" }}>
-                <div className="font-bold text-[#FF5252]">⚠️ Cancellation Fee Applies</div>
+                <div className="font-bold text-[#FF5252] flex items-center gap-1.5">
+                  <AlertTriangle size={16} /> {t("cancelFeeTitle")}
+                </div>
                 <p className="text-sm">
-                  You&apos;re cancelling within {match.cancellationDeadlineHours ?? 5} hours of kick-off.
+                  {t("cancelWithin", { hours: match.cancellationDeadlineHours ?? 5 })}
                 </p>
                 <p className="text-sm">
-                  {match.cancellationFeePercent ?? 50}% of your payment is charged as a fee.
+                  {t("cancelFeePct", { percent: match.cancellationFeePercent ?? 50 })}
                 </p>
                 <p className="text-sm font-semibold pt-1">
-                  You&apos;ll receive:{" "}
-                  {formatUZS(
-                    Number(match.pricePerPlayer) * (1 - (match.cancellationFeePercent ?? 50) / 100),
-                  )}
+                  {t("youllReceive", {
+                    amount: formatUZS(
+                      Number(match.pricePerPlayer) * (1 - (match.cancellationFeePercent ?? 50) / 100),
+                    ),
+                  })}
                 </p>
               </div>
             ) : (
               <div className="rounded-2xl p-4 space-y-1" style={{ background: "rgba(0,200,83,0.1)" }}>
-                <div className="font-bold text-[#00875A]">✅ Free cancellation</div>
-                <p className="text-sm">Full refund of {formatUZS(match.pricePerPlayer)} added to your wallet.</p>
+                <div className="font-bold text-[#00875A] flex items-center gap-1.5">
+                  <CheckCircle2 size={16} /> {t("freeCancel")}
+                </div>
+                <p className="text-sm">{t("fullRefund", { amount: formatUZS(match.pricePerPlayer) })}</p>
               </div>
             )}
             <div className="flex gap-2">
@@ -398,7 +443,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
                 className="flex-1 rounded-xl py-3 text-sm font-semibold"
                 style={{ background: "var(--tg-card)" }}
               >
-                Keep my spot
+                {t("keepSpot")}
               </button>
               <button
                 type="button"
@@ -409,7 +454,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
                 className="flex-1 rounded-xl py-3 text-sm font-semibold text-white"
                 style={{ background: "#FF5252" }}
               >
-                Cancel booking
+                {t("cancelBooking")}
               </button>
             </div>
           </div>

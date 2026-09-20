@@ -22,10 +22,6 @@ export function venueArea(m: any): string {
   return m?.pitch?.district ?? m?.pitch?.city ?? "";
 }
 
-export function sportBadge(sport?: string): string {
-  return sport === "FOOTBALL" ? "⚽" : "🎾";
-}
-
 const byStartAsc = (a: any, b: any) =>
   dayjs(a.startTime).valueOf() - dayjs(b.startTime).valueOf();
 

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
-import { Send, Check } from "lucide-react";
+import { Send, Check, Lock, MessageSquare, Crown } from "lucide-react";
 import {
   getMatchChat,
   getConversationMessages,
@@ -122,12 +122,16 @@ export default function MatchChatPage() {
           </div>
         ) : isError ? (
           <div className="text-center py-20">
-            <div className="text-3xl mb-2">🔒</div>
+            <div className="flex justify-center mb-2">
+              <Lock size={28} style={{ color: "var(--tg-hint)" }} />
+            </div>
             <p className="text-sm" style={{ color: "var(--tg-hint)" }}>{t("joinToChat")}</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="text-center py-20">
-            <div className="text-3xl mb-2">💬</div>
+            <div className="flex justify-center mb-2">
+              <MessageSquare size={28} style={{ color: "var(--tg-hint)" }} />
+            </div>
             <p className="text-sm" style={{ color: "var(--tg-hint)" }}>{t("empty")}</p>
           </div>
         ) : (
@@ -273,7 +277,7 @@ function MessageRow({ m, mineId, hostId, onAction }: { m: ChatMessage; mineId?: 
         {!mine && !deleted && (
           <div className="flex items-center gap-1 mb-0.5">
             <span className="text-[11px] font-semibold" style={{ color: "#00875A" }}>{name}</span>
-            {isHost && <span className="text-[10px]">👑</span>}
+            {isHost && <Crown size={11} style={{ color: "#F59E0B" }} />}
           </div>
         )}
         {deleted ? (

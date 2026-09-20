@@ -377,13 +377,13 @@ export function formatLevel(level: number | null | undefined): string {
 }
 
 // Shared level metadata (mirrors API RankingService)
-export const LEVEL_META: Record<string, { label: string; color: string; icon: string }> = {
-  NEW: { label: "New Player", color: "#9CA3AF", icon: "🌱" },
-  ROOKIE: { label: "Rookie", color: "#10B981", icon: "🎾" },
-  REGULAR: { label: "Regular", color: "#00B0FF", icon: "🔵" },
-  EXPERIENCED: { label: "Experienced", color: "#8B5CF6", icon: "🔥" },
-  VETERAN: { label: "Veteran", color: "#F59E0B", icon: "⭐" },
-  ELITE: { label: "Elite", color: "#FFD700", icon: "👑" },
+export const LEVEL_META: Record<string, { label: string; color: string }> = {
+  NEW: { label: "New Player", color: "#9CA3AF" },
+  ROOKIE: { label: "Rookie", color: "#10B981" },
+  REGULAR: { label: "Regular", color: "#00B0FF" },
+  EXPERIENCED: { label: "Experienced", color: "#8B5CF6" },
+  VETERAN: { label: "Veteran", color: "#F59E0B" },
+  ELITE: { label: "Elite", color: "#FFD700" },
 };
 
 // ─── Profile ──────────────────────────────────────────────────
@@ -483,18 +483,15 @@ export async function getWalletHistory(): Promise<WalletTransaction[]> {
   return Array.isArray(data) ? data : [];
 }
 
-export const WALLET_TX_META: Record<
-  WalletTransaction["type"],
-  { label: string; icon: string }
-> = {
-  TOPUP: { label: "Top-up", icon: "💳" },
-  MATCH_PAYMENT: { label: "Match payment", icon: "⚽" },
-  REFUND: { label: "Refund", icon: "↩️" },
-  CANCELLATION_FEE: { label: "Cancellation fee", icon: "⚠️" },
-  PAYOUT: { label: "Payout", icon: "💰" },
-  ADMIN_ADJUSTMENT: { label: "Adjustment", icon: "🛠️" },
-  REFERRAL_BONUS: { label: "Referral bonus", icon: "🎁" },
-  WELCOME_BONUS: { label: "Welcome bonus", icon: "✨" },
+export const WALLET_TX_META: Record<WalletTransaction["type"], { label: string }> = {
+  TOPUP: { label: "Top-up" },
+  MATCH_PAYMENT: { label: "Match payment" },
+  REFUND: { label: "Refund" },
+  CANCELLATION_FEE: { label: "Cancellation fee" },
+  PAYOUT: { label: "Payout" },
+  ADMIN_ADJUSTMENT: { label: "Adjustment" },
+  REFERRAL_BONUS: { label: "Referral bonus" },
+  WELCOME_BONUS: { label: "Welcome bonus" },
 };
 
 // ─── Messaging / chat ─────────────────────────────────────────

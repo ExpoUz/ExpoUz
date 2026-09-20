@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Award, Check } from "lucide-react";
 import { submitOnboarding, formatLevel, getSkillBand } from "@/lib/api";
 import {
   showMainButton,
@@ -98,7 +99,7 @@ export default function OnboardingPage() {
   if (result) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
-        <div className="text-5xl mb-4">🎾</div>
+        <Award size={44} className="mb-4" style={{ color: result.band.color }} />
         <p className="text-sm" style={{ color: "var(--tg-hint)" }}>
           {t("startingLevel")}
         </p>
@@ -217,7 +218,7 @@ function OptionCard({ active, title, sub, onClick }: { active: boolean; title: s
         <div className="font-semibold">{title}</div>
         {sub && <div className="text-xs mt-0.5" style={{ color: "var(--tg-hint)" }}>{sub}</div>}
       </div>
-      {active && <span className="text-[#00C853] text-lg">✓</span>}
+      {active && <Check size={18} className="text-[#00C853]" />}
     </button>
   );
 }

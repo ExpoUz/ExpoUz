@@ -4,11 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import { Medal } from "lucide-react";
 import { getLeaderboard, getCities, getMe, LEVEL_META } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { hapticImpact } from "@/lib/telegram";
 
-const MEDALS = ["🥇", "🥈", "🥉"];
+// Medal tint for the top three ranks.
+const MEDAL_COLORS = ["#FFD700", "#C0C0C0", "#CD7F32"];
 
 export default function LeaderboardPage() {
   const router = useRouter();
@@ -77,16 +79,21 @@ export default function LeaderboardPage() {
                   border: isMe ? "1px solid #00C853" : "1px solid transparent",
                 }}
               >
-                <div className="w-7 text-center font-bold text-sm shrink-0">
-                  {p.rank <= 3 ? MEDALS[p.rank - 1] : p.rank}
+                <div className="w-7 flex items-center justify-center font-bold text-sm shrink-0">
+                  {p.rank <= 3 ? (
+                    <Medal size={20} style={{ color: MEDAL_COLORS[p.rank - 1] }} />
+                  ) : (
+                    p.rank
+                  )}
                 </div>
                 <Avatar user={p} />
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-sm truncate">
                     {p.firstName} {p.lastName} {isMe && <span className="text-[#00C853]">{t("you")}</span>}
                   </div>
-                  <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
-                    {lvl.icon} {tRanks(p.playerLevel ?? "NEW")}
+                  <div className="text-xs flex items-center gap-1.5" style={{ color: "var(--tg-hint)" }}>
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: lvl.color }} />
+                    {tRanks(p.playerLevel ?? "NEW")}
                   </div>
                 </div>
                 <div className="text-right shrink-0">

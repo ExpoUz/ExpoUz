@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { Calendar, Clock, Check, Menu } from "lucide-react";
+import { Calendar, Clock, Check, Menu, ChevronDown, SearchX, CalendarX2 } from "lucide-react";
 import dayjs from "dayjs";
 import { getMatches, getCities, getNearbyPitches, getFreeCourts, getJoinableGames } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { useAuth } from "@/lib/auth";
-import { useSportStore, setSport, setCity as setStoreCity, sportMeta, type Sport } from "@/lib/sport-store";
+import { useSportStore, setSport, setCity as setStoreCity, type Sport } from "@/lib/sport-store";
 import { showMainButton, hideMainButton, hapticImpact } from "@/lib/telegram";
 import { useGeolocation } from "@/lib/use-geolocation";
 import { HeroBanner } from "@/components/home/HeroBanner";
@@ -25,11 +25,11 @@ import { initialsOf } from "@/components/home/PhotoOrInitials";
 export default function HomePage() {
   const router = useRouter();
   const t = useTranslations("home");
+  const tCommon = useTranslations("common");
   const tSports = useTranslations("sports");
   const tNav = useTranslations("nav");
   const { user } = useAuth();
   const { sport, city: storeCity } = useSportStore();
-  const meta = sportMeta(sport);
   const sportLabel = tSports(sport === "PADEL" ? "padel" : "football");
   const isPadel = sport === "PADEL";
 
@@ -69,7 +69,7 @@ export default function HomePage() {
   // When a time window is chosen, use the availability/games endpoint (it
   // filters by window and counts real open spots); otherwise the normal list.
   const useSlotGames = !!slotWindow || (freeMode === false && !!slotFilter && !!slotDate);
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["tma-matches", sport, city, district, effectiveDate, slotWindow, spotsOnly, matchType, useSlotGames],
     queryFn: async () => {
       if (useSlotGames) {
@@ -125,7 +125,7 @@ export default function HomePage() {
   });
 
   useEffect(() => {
-    const cleanup = showMainButton(`${meta.icon} ${t("hostGame")}`, () => {
+    const cleanup = showMainButton(t("hostGame"), () => {
       hapticImpact("medium");
       router.push("/create");
     });
@@ -133,7 +133,7 @@ export default function HomePage() {
       cleanup();
       hideMainButton();
     };
-  }, [router, meta.icon]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 4);
@@ -228,7 +228,7 @@ export default function HomePage() {
           >
             <Clock size={15} />
             <span>{slotFilter ? slotFilterLabel(slotFilter, tSlots) : t("time")}</span>
-            {slotFilter && <span className="ml-0.5">▾</span>}
+            {slotFilter && <ChevronDown size={14} className="ml-0.5" />}
           </button>
           {isPadel && (
             <>
@@ -277,7 +277,9 @@ export default function HomePage() {
             <SectionHeader title={tSlots("freeCourtsTitle")} />
             {courts.length === 0 ? (
               <div className="text-center py-14 px-8">
-                <div className="text-4xl mb-2">🎾</div>
+                <div className="flex justify-center mb-3">
+                  <CalendarX2 size={32} style={{ color: "var(--tg-hint)" }} />
+                </div>
                 <p className="font-medium">{tSlots("noFreeCourts")}</p>
                 <button onClick={() => setSlotOpen(true)} className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold bg-[#00C853] text-white">
                   {tSlots("changeTime")}
@@ -291,6 +293,19 @@ export default function HomePage() {
           </div>
         ) : isLoading ? (
           <HomeSkeleton />
+        ) : isError ? (
+          <div className="text-center py-14 px-8">
+            <div className="flex justify-center mb-3">
+              <SearchX size={32} style={{ color: "var(--tg-hint)" }} />
+            </div>
+            <p className="font-medium">{tCommon("error")}</p>
+            <button
+              onClick={() => refetch()}
+              className="mt-4 px-4 py-2 rounded-xl text-sm font-semibold bg-[#00C853] text-white"
+            >
+              {tCommon("retry")}
+            </button>
+          </div>
         ) : (
           <div className="space-y-7">
             {hero && (
@@ -301,7 +316,9 @@ export default function HomePage() {
 
             {noMatches && (
               <div className="text-center py-14 px-8 section-in" style={{ animationDelay: "40ms" }}>
-                <div className="text-4xl mb-2">{meta.icon}</div>
+                <div className="flex justify-center mb-3">
+                  <SearchX size={32} style={{ color: "var(--tg-hint)" }} />
+                </div>
                 <p className="font-medium">{t("noGames", { sport: sportLabel })}</p>
                 <p className="text-sm mt-1" style={{ color: "var(--tg-hint)" }}>
                   {t("tryClearing")}
@@ -362,7 +379,7 @@ export default function HomePage() {
                     border: "1px solid rgba(0,0,0,0.08)",
                   }}
                 >
-                  {sportMeta(s).icon} {tSports(s === "PADEL" ? "padel" : "football")}
+                  {tSports(s === "PADEL" ? "padel" : "football")}
                 </button>
               );
             })}

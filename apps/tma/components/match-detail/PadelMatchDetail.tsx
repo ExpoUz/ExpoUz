@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import { Lock, Unlock, CheckCircle2, Clock, ShieldAlert, Plus } from "lucide-react";
 import dayjs from "dayjs";
 import {
   joinMatchAndPay,
@@ -51,6 +52,7 @@ export function PadelMatchDetail({ match }: { match: any }) {
   const { requirePhone } = usePhoneGate();
   const t = useTranslations("matches");
   const tHome = useTranslations("home");
+  const tSports = useTranslations("sports");
   const tBands = useTranslations("levels.bands");
 
   // Render the in-page reserve button only outside Telegram (inside Telegram the
@@ -245,7 +247,7 @@ export function PadelMatchDetail({ match }: { match: any }) {
         <div className="rounded-2xl p-4" style={{ background: "var(--tg-card)" }}>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <div className="text-sm font-bold">🎾 PADEL</div>
+              <div className="text-sm font-bold uppercase tracking-wide">{tSports("padel")}</div>
               <div className="text-base font-semibold mt-1">
                 {dayjs(match.startTime).format("dddd, MMMM D")}
               </div>
@@ -276,11 +278,11 @@ export function PadelMatchDetail({ match }: { match: any }) {
         <div className="flex gap-2">
           <StatusPill
             text={match.isPrivate ? t("private") : t("openMatch")}
-            icon={match.isPrivate ? "🔒" : "🔓"}
+            icon={match.isPrivate ? <Lock size={14} /> : <Unlock size={14} />}
           />
           <StatusPill
             text={match.courtReserved ? t("courtReserved") : t("courtPending")}
-            icon={match.courtReserved ? "✅" : "⏳"}
+            icon={match.courtReserved ? <CheckCircle2 size={14} /> : <Clock size={14} />}
             good={!!match.courtReserved}
           />
         </div>
@@ -386,7 +388,9 @@ export function PadelMatchDetail({ match }: { match: any }) {
       {gate === "blocked" && (
         <GateSheet onClose={() => setGate(null)}>
           <div className="text-center">
-            <div className="text-4xl mb-2">🎾</div>
+            <div className="flex justify-center mb-2">
+              <ShieldAlert size={32} style={{ color: "#00B0FF" }} />
+            </div>
             <h2 className="text-lg font-bold">
               {t("forLevel", { min: formatLevel(match.minLevel ?? 0), max: formatLevel(match.maxLevel ?? 7) })}
             </h2>
@@ -442,7 +446,7 @@ function InfoCol({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatusPill({ text, icon, good }: { text: string; icon: string; good?: boolean }) {
+function StatusPill({ text, icon, good }: { text: string; icon: ReactNode; good?: boolean }) {
   return (
     <div
       className="flex-1 rounded-xl px-3 py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
@@ -496,6 +500,7 @@ function PadelTeam({
 }
 
 function FilledSlot({ player, onClick }: { player: PadelPlayer; onClick: () => void }) {
+  const t = useTranslations("matches");
   const band = getSkillBand(Number(player.padelLevel ?? 0));
   const initial = (player.firstName?.[0] ?? "?").toUpperCase();
   return (
@@ -516,12 +521,14 @@ function FilledSlot({ player, onClick }: { player: PadelPlayer; onClick: () => v
           {Number(player.padelLevel ?? 0).toFixed(1)}
         </span>
       </div>
-      <span className="text-[11px] truncate max-w-full">{player.firstName ?? "Player"}</span>
+      <span className="text-[11px] truncate max-w-full">{player.firstName ?? t("playerFallback")}</span>
     </button>
   );
 }
 
 function EmptySlot({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+  const t = useTranslations("matches");
+  const tCommon = useTranslations("common");
   return (
     <button
       type="button"
@@ -530,14 +537,14 @@ function EmptySlot({ disabled, onClick }: { disabled: boolean; onClick: () => vo
       className="flex flex-col items-center gap-1 w-14 disabled:opacity-40"
     >
       <div
-        className="w-12 h-12 rounded-full border-2 border-dashed flex items-center justify-center text-xl"
+        className="w-12 h-12 rounded-full border-2 border-dashed flex items-center justify-center"
         style={{ borderColor: "rgba(0,176,255,0.4)", color: "#00B0FF" }}
       >
-        +
+        <Plus size={20} />
       </div>
-      <span className="text-[11px] font-semibold text-[#00B0FF] leading-tight">Join</span>
+      <span className="text-[11px] font-semibold text-[#00B0FF] leading-tight">{tCommon("join")}</span>
       <span className="text-[9px]" style={{ color: "var(--tg-hint)" }}>
-        Available
+        {t("available")}
       </span>
     </button>
   );

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { MapPin, Users, CalendarDays, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { MapPin, Users, CalendarDays, CheckCircle2, Clock, XCircle, Building2 } from "lucide-react";
 import { getPitches, setPitchAvailability, formatUZS } from "@/lib/api";
 import { PageHeader, Spinner, EmptyState } from "@/components/ui";
 import { ConfirmModal, useToast } from "@expouz/ui";
@@ -80,7 +80,9 @@ export default function PitchesPage() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={photo} alt={p.name} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-4xl">🏟</div>
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Building2 size={40} style={{ color: "rgba(255,255,255,0.4)" }} />
+                    </div>
                   )}
                   <div className="absolute top-3 right-3">
                     <span

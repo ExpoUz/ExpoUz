@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dayjs from "dayjs";
 import { useTranslations } from "next-intl";
-import { MapPin, Users } from "lucide-react";
+import { MapPin, Users, Building2 } from "lucide-react";
 import { formatUZS } from "@/lib/api";
 import { hapticImpact } from "@/lib/telegram";
 
@@ -28,12 +28,12 @@ export function FootballMatchCard({ match }: { match: any }) {
     >
       <div className="flex gap-3 p-3">
         {/* Venue photo */}
-        <div className="w-16 h-16 rounded-xl bg-[#0D1117] overflow-hidden flex items-center justify-center text-2xl shrink-0">
+        <div className="w-16 h-16 rounded-xl bg-[#0D1117] overflow-hidden flex items-center justify-center shrink-0">
           {match.pitch?.photos?.[0] ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={match.pitch.photos[0]} alt="" className="w-full h-full object-cover" />
           ) : (
-            "⚽"
+            <Building2 size={24} style={{ color: "rgba(255,255,255,0.4)" }} />
           )}
         </div>
 
@@ -49,7 +49,7 @@ export function FootballMatchCard({ match }: { match: any }) {
             {isIndoor && (
               <span className="px-1.5 py-0.5 rounded bg-black/5 font-bold">{t("indoor")}</span>
             )}
-            <span>⚽ {match.format}</span>
+            <span>{match.format}</span>
             <span>{t("withHost", { name: hostName })}</span>
           </div>
 

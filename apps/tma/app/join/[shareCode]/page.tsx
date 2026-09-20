@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import { Unlink, Building2 } from "lucide-react";
 import dayjs from "dayjs";
 import {
   getMatchByShareCode,
@@ -96,7 +97,7 @@ export default function JoinViaInvitePage() {
   if (error || !match) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center gap-2">
-        <div className="text-4xl">🔗</div>
+        <Unlink size={36} style={{ color: "var(--tg-hint)" }} />
         <div className="font-semibold">{t("invalidInvite")}</div>
         <button onClick={() => router.replace("/")} className="mt-3 text-sm font-medium text-[#00C853]">
           {t("browseInstead")}
@@ -116,12 +117,12 @@ export default function JoinViaInvitePage() {
       </div>
 
       {/* Pitch image */}
-      <div className="h-44 bg-[#0D1117] overflow-hidden flex items-center justify-center text-4xl">
+      <div className="h-44 bg-[#0D1117] overflow-hidden flex items-center justify-center">
         {match.pitch?.photos?.[0] ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={match.pitch.photos[0]} alt="" className="w-full h-full object-cover" />
         ) : (
-          "🏟"
+          <Building2 size={44} style={{ color: "rgba(255,255,255,0.4)" }} />
         )}
       </div>
 

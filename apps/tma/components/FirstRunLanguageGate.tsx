@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { Languages } from "lucide-react";
 import { LOCALES, LOCALE_LABELS, setLocale, hasChosenLocale, type Locale } from "@/lib/locale-store";
 import { api } from "@/lib/api";
 import { hapticImpact } from "@/lib/telegram";
@@ -32,7 +33,9 @@ export function FirstRunLanguageGate() {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center px-6" style={{ background: "var(--tg-bg)" }}>
       <div className="w-full max-w-sm text-center">
-        <div className="text-4xl mb-3">🎾</div>
+        <div className="flex justify-center mb-3">
+          <Languages size={36} style={{ color: "#00C853" }} />
+        </div>
         <h1 className="text-xl font-bold mb-1">{t("choose")}</h1>
         <p className="text-sm mb-6" style={{ color: "var(--tg-hint)" }}>
           {t("chooseSub")}

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import dayjs from "dayjs";
-import { Plus, Search, X, LifeBuoy } from "lucide-react";
+import { Plus, Search, X, LifeBuoy, MessageSquare, Users } from "lucide-react";
 import {
   getConversations,
   chatUserName,
@@ -102,7 +102,7 @@ export default function MessagesPage() {
             <LifeBuoy size={22} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="font-semibold">📌 {t("support")}</div>
+            <div className="font-semibold">{t("support")}</div>
             <div className="text-sm truncate" style={{ color: "var(--tg-hint)" }}>{t("supportHint")}</div>
           </div>
           {support && support.unreadCount > 0 && (
@@ -134,8 +134,8 @@ export default function MessagesPage() {
       {/* [+] menu */}
       {menuOpen && (
         <Sheet title={t("new")} onClose={() => setMenuOpen(false)}>
-          <SheetAction icon="💬" label={t("messagePlayer")} onClick={() => { setMenuOpen(false); setDmOpen(true); }} />
-          <SheetAction icon="👥" label={t("browseGroups")} onClick={() => { setMenuOpen(false); setBrowseOpen(true); }} />
+          <SheetAction icon={<MessageSquare size={20} />} label={t("messagePlayer")} onClick={() => { setMenuOpen(false); setDmOpen(true); }} />
+          <SheetAction icon={<Users size={20} />} label={t("browseGroups")} onClick={() => { setMenuOpen(false); setBrowseOpen(true); }} />
         </Sheet>
       )}
 
@@ -154,7 +154,9 @@ function EmptyState({ tab, onBrowse, onFindPlayer }: { tab: Tab; onBrowse: () =>
   const t = useTranslations("chat");
   return (
     <div className="text-center py-16">
-      <div className="text-4xl mb-2">{tab === "direct" ? "💬" : "👥"}</div>
+      <div className="flex justify-center mb-3" style={{ color: "var(--tg-hint)" }}>
+        {tab === "direct" ? <MessageSquare size={32} /> : <Users size={32} />}
+      </div>
       <p className="font-medium">{tab === "direct" ? t("noDirect") : t("noGroups")}</p>
       <p className="text-sm mt-1" style={{ color: "var(--tg-hint)" }}>
         {tab === "direct" ? t("noDirectHint") : t("noGroupsHint")}
@@ -174,9 +176,8 @@ function ConversationRow({ conversation: c, onClick }: { conversation: Conversat
   const t = useTranslations("chat");
   const isGroup = c.type === "PUBLIC_GROUP";
   const name = isGroup ? c.title ?? t("group") : chatUserName(c.otherMember);
-  const initials = isGroup
-    ? "👥"
-    : `${c.otherMember?.firstName?.[0] ?? ""}${c.otherMember?.lastName?.[0] ?? ""}`.toUpperCase() || "?";
+  const initials =
+    `${c.otherMember?.firstName?.[0] ?? ""}${c.otherMember?.lastName?.[0] ?? ""}`.toUpperCase() || "?";
   const preview = c.lastMessage?.content ?? t("noMessagesShort");
   const time = c.lastMessage?.createdAt ? dayjs(c.lastMessage.createdAt).format("MMM D") : "";
   const unread = c.unreadCount > 0;
@@ -184,7 +185,9 @@ function ConversationRow({ conversation: c, onClick }: { conversation: Conversat
   return (
     <button onClick={onClick} className="w-full flex items-center gap-3 rounded-2xl p-3 text-left" style={{ background: "var(--tg-card)" }}>
       <div className="w-12 h-12 rounded-full bg-[#00C853]/15 text-[#00875A] flex items-center justify-center text-base font-bold overflow-hidden shrink-0">
-        {!isGroup && c.otherMember?.avatarUrl ? (
+        {isGroup ? (
+          <Users size={22} />
+        ) : c.otherMember?.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={c.otherMember.avatarUrl} alt="" className="w-full h-full object-cover" />
         ) : (
@@ -235,7 +238,7 @@ function BrowseGroups({ onClose, onOpen }: { onClose: () => void; onOpen: (id: s
         <div className="space-y-2">
           {groups!.map((g) => (
             <div key={g.id} className="flex items-center gap-3 rounded-2xl p-3" style={{ background: "var(--tg-card)" }}>
-              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(0,200,83,0.12)" }}>👥</div>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: "rgba(0,200,83,0.12)", color: "#00875A" }}><Users size={20} /></div>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-sm truncate">{g.title}</div>
                 <div className="text-xs" style={{ color: "var(--tg-hint)" }}>
@@ -322,10 +325,10 @@ function Sheet({ title, children, onClose }: { title: string; children: React.Re
   );
 }
 
-function SheetAction({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+function SheetAction({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
   return (
     <button onClick={onClick} className="w-full flex items-center gap-3 rounded-2xl p-3.5 text-left mb-2" style={{ background: "var(--tg-card)" }}>
-      <span className="text-xl">{icon}</span>
+      <span style={{ color: "var(--tg-hint)" }}>{icon}</span>
       <span className="font-semibold text-sm">{label}</span>
     </button>
   );

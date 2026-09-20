@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronDown, Check } from "lucide-react";
-import { SPORTS, sportMeta, type Sport } from "@/lib/sport-store";
+import { SPORTS, type Sport } from "@/lib/sport-store";
 import { hapticImpact } from "@/lib/telegram";
 
 export function SportCityHeader({
@@ -20,7 +20,6 @@ export function SportCityHeader({
   const [sportOpen, setSportOpen] = useState(false);
   const t = useTranslations("sports");
   const tHome = useTranslations("home");
-  const current = sportMeta(sport);
   const sportLabel = (s: Sport) => t(s === "PADEL" ? "padel" : "football");
 
   return (
@@ -33,7 +32,6 @@ export function SportCityHeader({
             setSportOpen(true);
           }}
         >
-          <span>{current.icon}</span>
           <span className="font-bold underline underline-offset-4">{sportLabel(sport)}</span>
           <ChevronDown size={16} />
         </button>
@@ -79,7 +77,6 @@ export function SportCityHeader({
                   className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-left"
                   style={{ color: selected ? "#00C853" : "var(--tg-text)" }}
                 >
-                  <span className="text-2xl">{s.icon}</span>
                   <span className="font-medium flex-1">{sportLabel(s.id)}</span>
                   {selected && <Check size={18} />}
                 </button>

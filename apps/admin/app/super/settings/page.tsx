@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Check } from "lucide-react";
 import { getSettings, updateCommission } from "@/lib/api";
 import { useState, useEffect } from "react";
 
@@ -77,7 +78,7 @@ export default function SettingsPage() {
                 disabled={updateMutation.isPending || !commission}
                 className="bg-green-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-green-700 disabled:opacity-50 transition-colors"
               >
-                {saved ? "✓ Saved" : updateMutation.isPending ? "Saving…" : "Save Changes"}
+                {saved ? <span className="inline-flex items-center gap-1"><Check size={14} /> Saved</span> : updateMutation.isPending ? "Saving…" : "Save Changes"}
               </button>
             </div>
           </div>

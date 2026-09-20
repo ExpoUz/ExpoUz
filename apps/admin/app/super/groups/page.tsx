@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { MessagesSquare } from "lucide-react";
 import { getPublicGroups, createPublicGroup } from "@/lib/api";
 
 const SPORTS = ["", "FOOTBALL", "PADEL"];
@@ -95,7 +96,7 @@ export default function GroupsPage() {
           <div className="divide-y divide-gray-50">
             {groups!.map((g: any) => (
               <div key={g.id} className="px-6 py-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">💬</div>
+                <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center"><MessagesSquare size={18} /></div>
                 <div className="flex-1">
                   <div className="font-medium text-gray-900">{g.title}</div>
                   <div className="text-xs text-gray-500">

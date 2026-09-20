@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+import { Plus } from "lucide-react";
 import { formatLevel, getSkillBand } from "@/lib/api";
 
 interface VsPlayer {
@@ -24,11 +26,18 @@ export function VersusPreview({
   teamA: (VsPlayer | null)[];
   teamB: (VsPlayer | null)[];
 }) {
+  const t = useTranslations("matches");
   const avgA = teamAvg(teamA);
   const avgB = teamAvg(teamB);
   const gap = avgA != null && avgB != null ? Math.abs(avgA - avgB) : null;
   const balance =
-    gap == null ? null : gap < 0.3 ? "⚖️ Even match" : gap < 0.8 ? "Slight edge" : "Mismatch";
+    gap == null
+      ? null
+      : gap < 0.3
+        ? t("balanceEven")
+        : gap < 0.8
+          ? t("balanceEdge")
+          : t("balanceMismatch");
 
   return (
     <div className="vs-preview">
@@ -38,8 +47,8 @@ export function VersusPreview({
             <VsAvatar key={p?.id ?? `a-${i}`} player={p} />
           ))}
         </div>
-        <div className="vs-team-label" style={{ color: "#00875A" }}>Team A</div>
-        <div className="vs-team-level">avg {avgA != null ? avgA.toFixed(1) : "—"}</div>
+        <div className="vs-team-label" style={{ color: "#00875A" }}>{t("teamA")}</div>
+        <div className="vs-team-level">{t("avg", { value: avgA != null ? avgA.toFixed(1) : "—" })}</div>
       </div>
 
       <div className="vs-center">
@@ -53,8 +62,8 @@ export function VersusPreview({
             <VsAvatar key={p?.id ?? `b-${i}`} player={p} />
           ))}
         </div>
-        <div className="vs-team-label" style={{ color: "#0066B0" }}>Team B</div>
-        <div className="vs-team-level">avg {avgB != null ? avgB.toFixed(1) : "—"}</div>
+        <div className="vs-team-label" style={{ color: "#0066B0" }}>{t("teamB")}</div>
+        <div className="vs-team-level">{t("avg", { value: avgB != null ? avgB.toFixed(1) : "—" })}</div>
       </div>
 
       <style jsx>{`
@@ -159,11 +168,12 @@ export function VersusPreview({
 }
 
 function VsAvatar({ player }: { player: VsPlayer | null }) {
+  const t = useTranslations("matches");
   if (!player) {
     return (
       <div className="vs-avatar-empty">
-        <span>+</span>
-        <span className="vs-empty-label">Open</span>
+        <Plus size={18} />
+        <span className="vs-empty-label">{t("openSlot")}</span>
         <style jsx>{`
           .vs-avatar-empty {
             width: 52px;
@@ -201,7 +211,7 @@ function VsAvatar({ player }: { player: VsPlayer | null }) {
           {formatLevel(player.padelLevel)}
         </span>
       </div>
-      <span className="vs-name">{player.firstName ?? "Player"}</span>
+      <span className="vs-name">{player.firstName ?? t("playerFallback")}</span>
       <style jsx>{`
         .vs-avatar {
           display: flex;

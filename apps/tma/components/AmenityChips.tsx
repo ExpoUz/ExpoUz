@@ -1,18 +1,30 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import {
+  Car,
+  ShowerHead,
+  Bath,
+  Droplets,
+  Coffee,
+  Shield,
+  Lightbulb,
+  Home,
+  Umbrella,
+  type LucideIcon,
+} from "lucide-react";
 
 // Icon per amenity type (matches the AmenityType enum on the API).
-const AMENITY_ICON: Record<string, string> = {
-  PARKING: "🚗",
-  CHANGING_ROOM: "🚿",
-  BATHROOM: "🚻",
-  WATER_FOUNTAIN: "🚰",
-  CAFE: "☕",
-  SECURITY: "🛡️",
-  LIGHTS: "💡",
-  INDOOR: "🏠",
-  COVERED: "⛱️",
+const AMENITY_ICON: Record<string, LucideIcon> = {
+  PARKING: Car,
+  CHANGING_ROOM: ShowerHead,
+  BATHROOM: Bath,
+  WATER_FOUNTAIN: Droplets,
+  CAFE: Coffee,
+  SECURITY: Shield,
+  LIGHTS: Lightbulb,
+  INDOOR: Home,
+  COVERED: Umbrella,
 };
 
 /**
@@ -39,16 +51,19 @@ export function AmenityChips({
 
   return (
     <div className="flex flex-wrap gap-2">
-      {list.map((tp) => (
-        <span
-          key={tp}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px]"
-          style={{ background: "var(--tg-card)", color: "var(--tg-text)" }}
-        >
-          <span>{AMENITY_ICON[tp]}</span>
-          {t(tp)}
-        </span>
-      ))}
+      {list.map((tp) => {
+        const Icon = AMENITY_ICON[tp];
+        return (
+          <span
+            key={tp}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[13px]"
+            style={{ background: "var(--tg-card)", color: "var(--tg-text)" }}
+          >
+            <Icon size={14} style={{ color: "var(--tg-hint)" }} />
+            {t(tp)}
+          </span>
+        );
+      })}
     </div>
   );
 }

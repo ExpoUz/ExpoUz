@@ -4,6 +4,20 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getPendingPitches, verifyPitch, getAllPitches, createPitch, getPitchAdmins, getVenueAdmins, assignVenueAdmin, revokeVenueAdmin } from "@/lib/api";
 import { useState } from "react";
 import dayjs from "dayjs";
+import {
+  Building2,
+  CheckCircle2,
+  Check,
+  X,
+  Home,
+  Sun,
+  Sprout,
+  Users,
+  Wallet,
+  ChevronDown,
+  ChevronUp,
+  UserCog,
+} from "lucide-react";
 import { useSportFilter, sportParam } from "@/lib/sport-store";
 
 export default function PitchesPage() {
@@ -79,7 +93,7 @@ export default function PitchesPage() {
                 : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
             }`}
           >
-            {t === "pending" ? "⏳ Pending Review" : "🏟 All Pitches"}
+            {t === "pending" ? "Pending Review" : "All Pitches"}
           </button>
         ))}
       </div>
@@ -92,7 +106,9 @@ export default function PitchesPage() {
 
         {!isLoading && items.length === 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
-            <div className="text-4xl mb-3">✅</div>
+            <div className="flex justify-center mb-3 text-green-500">
+              <CheckCircle2 size={40} />
+            </div>
             <div className="text-gray-500">
               {tab === "pending" ? "No pitches pending review" : "No pitches found"}
             </div>
@@ -135,17 +151,17 @@ function PitchCard({
         <div className="flex items-start justify-between gap-4">
           {/* Main Info */}
           <div className="flex items-start gap-4 flex-1 min-w-0">
-            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center text-2xl flex-shrink-0">
-              {isPadel ? "🎾" : "⚽"}
+            <div className="w-12 h-12 rounded-xl bg-green-100 text-green-700 flex items-center justify-center flex-shrink-0">
+              <Building2 size={22} />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-semibold text-gray-900 text-base">{pitch.name}</span>
                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                  {isPadel ? "🎾 Padel" : "⚽ Football"}
+                  {isPadel ? "Padel" : "Football"}
                 </span>
                 {pitch.isVerified ? (
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✓ Verified</span>
+                  <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full"><Check size={12} /> Verified</span>
                 ) : (
                   <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Pending</span>
                 )}
@@ -158,17 +174,21 @@ function PitchCard({
               <div className="flex gap-4 mt-3 text-xs text-gray-500 flex-wrap">
                 {isPadel ? (
                   <>
-                    <span>🎾 {pitch.courtType ?? "—"}</span>
-                    <span>{pitch.isCovered ? "🏠 Covered" : "☀️ Outdoor"}</span>
+                    <span className="inline-flex items-center gap-1"><Sprout size={13} /> {pitch.courtType ?? "—"}</span>
+                    <span className="inline-flex items-center gap-1">
+                      {pitch.isCovered ? <><Home size={13} /> Covered</> : <><Sun size={13} /> Outdoor</>}
+                    </span>
                   </>
                 ) : (
                   <>
-                    <span>🌱 {pitch.surfaceType ?? "—"}</span>
-                    <span>{pitch.isIndoor ? "🏠 Indoor" : "☀️ Outdoor"}</span>
-                    <span>👥 {pitch.pitchSize ?? "—"}</span>
+                    <span className="inline-flex items-center gap-1"><Sprout size={13} /> {pitch.surfaceType ?? "—"}</span>
+                    <span className="inline-flex items-center gap-1">
+                      {pitch.isIndoor ? <><Home size={13} /> Indoor</> : <><Sun size={13} /> Outdoor</>}
+                    </span>
+                    <span className="inline-flex items-center gap-1"><Users size={13} /> {pitch.pitchSize ?? "—"}</span>
                   </>
                 )}
-                <span>💰 {Number(pitch.hourlyRate ?? 0).toLocaleString()} UZS/hr</span>
+                <span className="inline-flex items-center gap-1"><Wallet size={13} /> {Number(pitch.hourlyRate ?? 0).toLocaleString()} UZS/hr</span>
               </div>
 
               {pitch.amenities && pitch.amenities.length > 0 && (
@@ -190,30 +210,30 @@ function PitchCard({
                 <button
                   onClick={() => onVerify(true)}
                   disabled={isPending}
-                  className="px-4 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1 px-4 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
                 >
-                  ✓ Approve
+                  <Check size={13} /> Approve
                 </button>
                 <button
                   onClick={() => onVerify(false)}
                   disabled={isPending}
-                  className="px-4 py-1.5 bg-red-100 hover:bg-red-200 text-red-600 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1 px-4 py-1.5 bg-red-100 hover:bg-red-200 text-red-600 text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
                 >
-                  ✕ Reject
+                  <X size={13} /> Reject
                 </button>
               </>
             )}
             <button
               onClick={() => setShowAdmins(true)}
-              className="px-4 py-1.5 border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-lg transition-colors"
+              className="inline-flex items-center gap-1 px-4 py-1.5 border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-lg transition-colors"
             >
-              👤 Admins
+              <UserCog size={13} /> Admins
             </button>
             <button
               onClick={() => setExpanded(!expanded)}
-              className="text-xs text-gray-400 hover:text-gray-600"
+              className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
             >
-              {expanded ? "Hide details ▲" : "View details ▼"}
+              {expanded ? <>Hide details <ChevronUp size={13} /></> : <>View details <ChevronDown size={13} /></>}
             </button>
           </div>
         </div>

@@ -21,14 +21,14 @@ export function SegmentBadge({ segment }: { segment: string }) {
   );
 }
 
-/** Padel level (🎾 2.4) or football skill/ELO badge, per sport. */
+/** Padel level (2.4) or football skill/ELO badge, per sport. */
 export function LevelBadge({ padelLevel, skillLevel }: { padelLevel: number | null; skillLevel?: string }) {
   if (padelLevel != null && padelLevel > 0) {
     return (
-      <span className="text-xs font-semibold text-[#6D28D9]">🎾 {padelLevel.toFixed(1)}</span>
+      <span className="text-xs font-semibold text-[#6D28D9]">{padelLevel.toFixed(1)}</span>
     );
   }
-  return <span className="text-xs font-medium text-[#6B7280]">⚽ {skillLevel ?? "—"}</span>;
+  return <span className="text-xs font-medium text-[#6B7280]">{skillLevel ?? "—"}</span>;
 }
 
 export function Avatar({ url, first, last, size = 40 }: { url?: string | null; first?: string; last?: string; size?: number }) {

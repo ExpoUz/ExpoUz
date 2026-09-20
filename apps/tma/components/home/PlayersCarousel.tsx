@@ -37,7 +37,8 @@ export function PlayersCarousel({ players }: { players: any[] }) {
                 className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold"
                 style={{ background: `${level.color}1F`, color: level.color }}
               >
-                {level.icon} {tRanks(p.playerLevel ?? "NEW")}
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: level.color }} />
+                {tRanks(p.playerLevel ?? "NEW")}
               </span>
             </div>
           </Link>

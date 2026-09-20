@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
+import { TrendingUp, TrendingDown, Check } from "lucide-react";
 import {
   getOrganization,
   updateOrganization,
@@ -460,8 +461,8 @@ function ActivityTab({ id }: { id: string }) {
 }
 
 function trendIcon(t: string) {
-  if (t === "up") return <span className="text-green-600">▲ up</span>;
-  if (t === "down") return <span className="text-red-500">▼ down</span>;
+  if (t === "up") return <span className="inline-flex items-center gap-1 text-green-600"><TrendingUp size={13} /> up</span>;
+  if (t === "down") return <span className="inline-flex items-center gap-1 text-red-500"><TrendingDown size={13} /> down</span>;
   return <span className="text-gray-400">— flat</span>;
 }
 
@@ -636,7 +637,7 @@ function SettingsTab({ org }: { org: any }) {
         </div>
         <div><label className={label}>Internal notes</label><textarea rows={3} className={input} value={form.notes} onChange={set("notes")} /></div>
         <button onClick={() => save.mutate()} disabled={save.isPending} className="rounded-xl bg-primary px-5 py-2 text-sm font-bold text-white hover:opacity-90 disabled:opacity-40">
-          {save.isPending ? "Saving…" : saved ? "✓ Saved" : "Save changes"}
+          {save.isPending ? "Saving…" : saved ? <span className="inline-flex items-center gap-1"><Check size={14} /> Saved</span> : "Save changes"}
         </button>
       </div>
 

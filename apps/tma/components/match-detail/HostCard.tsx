@@ -1,8 +1,10 @@
 "use client";
 
+import { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useMutation } from "@tanstack/react-query";
+import { Crown, Star, Building2, Check } from "lucide-react";
 import { startDirectConversation, getSkillBand, formatLevel } from "@/lib/api";
 import { hapticImpact } from "@/lib/telegram";
 
@@ -39,9 +41,9 @@ export function HostCard({
   const band = getSkillBand(padelLevel);
   const levelText = isPadel
     ? host.padelInitialSet && padelLevel > 0
-      ? `🎾 ${formatLevel(padelLevel)} · ${tBands(band.key)}`
+      ? `${formatLevel(padelLevel)} · ${tBands(band.key)}`
       : null
-    : `⚽ ${host.eloRating ?? 1000} · ${
+    : `${host.eloRating ?? 1000} · ${
         ["BEGINNER", "AMATEUR", "PRO"].includes(host.skillLevel) ? tFootball(host.skillLevel) : host.skillLevel ?? ""
       }`;
 
@@ -66,7 +68,7 @@ export function HostCard({
               <span className="font-semibold truncate">
                 {host.firstName} {host.lastName}
               </span>
-              <span title={t("host")}>👑</span>
+              <Crown size={14} className="shrink-0" style={{ color: "#F59E0B" }} aria-label={t("host")} />
             </div>
             {levelText && (
               <div className="text-xs mt-0.5" style={{ color: "var(--tg-hint)" }}>
@@ -79,10 +81,31 @@ export function HostCard({
         {/* Stats */}
         <div className="grid grid-cols-3 gap-2 mt-3 text-center">
           {host.ratingPercent != null && (
-            <Stat value={`⭐ ${host.ratingPercent}%`} label={t("rating")} />
+            <Stat
+              value={
+                <span className="inline-flex items-center gap-1">
+                  <Star size={13} style={{ color: "#F59E0B" }} /> {host.ratingPercent}%
+                </span>
+              }
+              label={t("rating")}
+            />
           )}
-          <Stat value={`🏟️ ${host.gamesHosted ?? 0}`} label={t("hosted")} />
-          <Stat value={`✓ ${reliability}%`} label={t("reliability")} />
+          <Stat
+            value={
+              <span className="inline-flex items-center gap-1">
+                <Building2 size={13} style={{ color: "var(--tg-hint)" }} /> {host.gamesHosted ?? 0}
+              </span>
+            }
+            label={t("hosted")}
+          />
+          <Stat
+            value={
+              <span className="inline-flex items-center gap-1">
+                <Check size={13} style={{ color: "#00875A" }} /> {reliability}%
+              </span>
+            }
+            label={t("reliability")}
+          />
         </div>
 
         {host.bio && (
@@ -134,7 +157,7 @@ export function HostCard({
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({ value, label }: { value: ReactNode; label: string }) {
   return (
     <div>
       <div className="text-sm font-bold">{value}</div>

@@ -74,10 +74,11 @@ export default function PlayerProfilePage() {
           {p.firstName} {p.lastName}
         </h1>
         <div
-          className="mt-1 px-3 py-1 rounded-full text-sm font-semibold"
+          className="mt-1 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold"
           style={{ background: `${lvl.color}22`, color: lvl.color }}
         >
-          {lvl.icon} {tRanks(p.playerLevel ?? "NEW")}
+          <span className="w-2 h-2 rounded-full" style={{ background: lvl.color }} />
+          {tRanks(p.playerLevel ?? "NEW")}
         </div>
         <p className="text-xs mt-1" style={{ color: "var(--tg-hint)" }}>
           {t("memberSince", { date: dayjs(p.createdAt).format("MMM YYYY") })}

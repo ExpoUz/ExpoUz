@@ -6,6 +6,19 @@ import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
+  CreditCard,
+  Ticket,
+  Undo2,
+  AlertTriangle,
+  Wallet as WalletIcon,
+  Wrench,
+  Gift,
+  Sparkles,
+  Receipt,
+  Circle,
+  type LucideIcon,
+} from "lucide-react";
+import {
   getWalletBalance,
   getWalletHistory,
   formatUZS,
@@ -13,6 +26,18 @@ import {
   type WalletTransaction,
 } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
+
+// Lucide icon per wallet transaction type (kept in the view, not the data layer).
+const TX_ICON: Record<WalletTransaction["type"], LucideIcon> = {
+  TOPUP: CreditCard,
+  MATCH_PAYMENT: Ticket,
+  REFUND: Undo2,
+  CANCELLATION_FEE: AlertTriangle,
+  PAYOUT: WalletIcon,
+  ADMIN_ADJUSTMENT: Wrench,
+  REFERRAL_BONUS: Gift,
+  WELCOME_BONUS: Sparkles,
+};
 import { usePhoneGate } from "@/lib/phone-gate";
 import { hideMainButton, showBackButton, hapticImpact, showAlert } from "@/lib/telegram";
 
@@ -92,7 +117,9 @@ export default function WalletPage() {
           </div>
         ) : !history?.length ? (
           <div className="text-center py-12" style={{ color: "var(--tg-hint)" }}>
-            <div className="text-3xl mb-2">🧾</div>
+            <div className="flex justify-center mb-2">
+              <Receipt size={28} />
+            </div>
             <div className="text-sm">{t("noTransactions")}</div>
           </div>
         ) : (
@@ -111,7 +138,8 @@ export default function WalletPage() {
 
 function LedgerRow({ tx }: { tx: WalletTransaction }) {
   const t = useTranslations("wallet.types");
-  const meta = WALLET_TX_META[tx.type] ?? { label: tx.type, icon: "•" };
+  const meta = WALLET_TX_META[tx.type] ?? { label: tx.type };
+  const Icon = TX_ICON[tx.type] ?? Circle;
   // Prefer the localized type label; the server `description` is English-only.
   const label = t(tx.type as any) || tx.description || meta.label;
   const amount = Number(tx.amount);
@@ -122,7 +150,7 @@ function LedgerRow({ tx }: { tx: WalletTransaction }) {
       className="rounded-2xl px-4 py-3 flex items-center gap-3"
       style={{ background: "var(--tg-card)" }}
     >
-      <div className="text-xl shrink-0">{meta.icon}</div>
+      <div className="shrink-0" style={{ color: "var(--tg-hint)" }}><Icon size={20} /></div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium truncate">{label}</div>
         <div className="text-xs mt-0.5" style={{ color: "var(--tg-hint)" }}>

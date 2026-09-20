@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import { Trophy } from "lucide-react";
 import {
   getMatch,
   getMatchResult,
@@ -224,7 +225,7 @@ function TeamRow({ team, label, highlight }: { team: any[]; label: string; highl
         <div>
           <div className="text-sm font-semibold flex items-center gap-1.5">
             {team.map((p) => p.firstName).join(" & ") || label}
-            {highlight && <span title="Winner">🏆</span>}
+            {highlight && <Trophy size={14} style={{ color: "#F59E0B" }} aria-label="Winner" />}
           </div>
           <div className="flex gap-1 mt-0.5">
             {team.map((p) => (
