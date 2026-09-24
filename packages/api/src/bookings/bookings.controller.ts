@@ -52,4 +52,38 @@ export class BookingsController {
   cancel(@Param('id') id: string, @CurrentUser() user: any) {
     return this.bookingsService.cancel(id, user.id);
   }
+
+  // ─── Venue-admin actions (org-scoped inside the service) ───
+
+  @Post('phone/reserve')
+  @ApiOperation({ summary: 'Reserve N places for a caller (phone booking)' })
+  reservePhone(
+    @CurrentUser() user: any,
+    @Body()
+    dto: { matchId: string; places: number; callerName: string; callerPhone?: string; paid?: boolean },
+  ) {
+    return this.bookingsService.reservePhone(user.id, dto);
+  }
+
+  @Post('phone/remove')
+  @ApiOperation({ summary: 'Release N phone-reserved places' })
+  removePhone(@CurrentUser() user: any, @Body() dto: { matchId: string; count: number }) {
+    return this.bookingsService.removePhonePlaces(user.id, dto.matchId, dto.count);
+  }
+
+  @Post(':id/confirm')
+  @ApiOperation({ summary: 'Confirm an awaiting booking (payment received)' })
+  confirm(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.bookingsService.confirmByAdmin(user.id, id);
+  }
+
+  @Post(':id/decline')
+  @ApiOperation({ summary: 'Decline an awaiting booking with a reason' })
+  decline(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body('reason') reason?: string,
+  ) {
+    return this.bookingsService.declineByAdmin(user.id, id, reason);
+  }
 }

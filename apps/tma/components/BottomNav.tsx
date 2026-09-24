@@ -7,14 +7,20 @@ import { useTranslations } from "next-intl";
 import { Home, Search, MessageCircle, Trophy, User } from "lucide-react";
 import { hapticImpact } from "@/lib/telegram";
 import { getConversations } from "@/lib/api";
+import { SIMPLE_MODE } from "@/lib/flags";
 
-const ITEMS = [
+// hideInSimple: dropped from the bottom nav when SIMPLE_MODE is on (default).
+// The core loop keeps Book (games), Chat and Profile. Player discovery and the
+// Ranks/leaderboard tab return when NEXT_PUBLIC_SIMPLE_MODE=false.
+const ALL_ITEMS = [
   { href: "/", key: "games", icon: Home },
-  { href: "/players", key: "players", icon: Search },
+  { href: "/players", key: "players", icon: Search, hideInSimple: true },
   { href: "/messages", key: "chat", icon: MessageCircle },
-  { href: "/leaderboard", key: "ranks", icon: Trophy },
+  { href: "/leaderboard", key: "ranks", icon: Trophy, hideInSimple: true },
   { href: "/profile", key: "profile", icon: User },
 ] as const;
+
+const ITEMS = ALL_ITEMS.filter((i) => !(SIMPLE_MODE && "hideInSimple" in i && i.hideInSimple));
 
 export function BottomNav() {
   const pathname = usePathname();

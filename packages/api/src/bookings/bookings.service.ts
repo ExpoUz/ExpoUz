@@ -5,12 +5,21 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { ActivityService } from '../activity/activity.service';
 import { WalletService } from '../payments/wallet/wallet.service';
+import { OrgContextService } from '../org/org-context.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { syncPlayerCount } from '../matches/player-count';
+
+// An unconfirmed booking holds its place for this long, then auto-expires and
+// releases the place (Step 5). Applies to the offline/awaiting path and also
+// cleans up abandoned online-payment attempts.
+const AWAITING_EXPIRY_MS = 2 * 60 * 60 * 1000;
 
 @Injectable()
 export class BookingsService {
@@ -19,6 +28,9 @@ export class BookingsService {
     private redis: RedisService,
     private activity: ActivityService,
     private wallet: WalletService,
+    private orgContext: OrgContextService,
+    private notifications: NotificationsService,
+    @InjectQueue('reminders') private remindersQueue: Queue,
   ) {}
 
   async create(userId: string, dto: CreateBookingDto) {
@@ -93,6 +105,9 @@ export class BookingsService {
     if (positionId) {
       await this.redis.releasePosition(positionId);
     }
+
+    // Hold the place for 2h, then auto-expire if still unconfirmed (Step 5).
+    await this.scheduleExpiry(result.booking.id);
 
     const paymentUrl = this.generatePaymentUrl(
       result.transaction.id,
@@ -246,6 +261,239 @@ export class BookingsService {
           ? `Cancelled after start time — no refund.`
           : `Full refund of ${refunded.toLocaleString()} UZS added to your wallet.`,
     };
+  }
+
+  // ─────────────────────────── STEP 5: admin confirm / decline / expire ───────
+
+  /** Enqueue the 2h auto-expiry job for an awaiting booking. Best-effort. */
+  private async scheduleExpiry(bookingId: string): Promise<void> {
+    try {
+      await this.remindersQueue.add(
+        'booking-expiry',
+        { bookingId },
+        { delay: AWAITING_EXPIRY_MS, removeOnComplete: true, removeOnFail: true },
+      );
+    } catch {
+      /* queue unavailable — the sweep is a safety net, not a correctness guarantee */
+    }
+  }
+
+  /** Load a booking and assert the caller may manage its venue (org boundary). */
+  private async loadManageableBooking(adminUserId: string, bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { match: { select: { id: true, title: true, pitchId: true } }, transaction: true },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    await this.orgContext.assertCanManagePitch(adminUserId, booking.match.pitchId);
+    return booking;
+  }
+
+  /**
+   * Admin confirms an awaiting booking once payment is received. Online-paid
+   * bookings are already CONFIRMED (auto-confirm is kept), so this is the manual
+   * override for the offline/phone path.
+   */
+  async confirmByAdmin(adminUserId: string, bookingId: string) {
+    const booking = await this.loadManageableBooking(adminUserId, bookingId);
+    if (booking.status !== 'PENDING_PAYMENT') {
+      throw new BadRequestException('Only an awaiting booking can be confirmed');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.booking.update({ where: { id: bookingId }, data: { status: 'CONFIRMED', paidOffline: true } });
+      // Offline payment received — settle any pending payment intent.
+      if (booking.transaction && booking.transaction.status === 'PENDING') {
+        await tx.transaction.update({
+          where: { id: booking.transaction.id },
+          data: { status: 'RELEASED' },
+        });
+      }
+      await syncPlayerCount(tx, booking.matchId);
+    });
+
+    // The occupant is the venue itself for phone bookings — only notify real users.
+    if (!booking.isPhoneBooking) {
+      await this.notifications
+        .send(booking.userId, 'BOOKING_CONFIRMED' as any, booking.matchId, { matchTitle: booking.match.title })
+        .catch(() => {});
+    }
+    await this.activity.log(adminUserId, 'BOOKING_CONFIRMED', `Confirmed booking ${bookingId}`, {
+      bookingId,
+      matchId: booking.matchId,
+    });
+    return { confirmed: true, bookingId, status: 'CONFIRMED' };
+  }
+
+  /**
+   * Admin declines an awaiting (or confirmed) booking with a reason. The place is
+   * released and the player is notified; a paid booking is fully refunded (no
+   * penalty — the venue declined, not the player).
+   */
+  async declineByAdmin(adminUserId: string, bookingId: string, reason?: string) {
+    const booking = await this.loadManageableBooking(adminUserId, bookingId);
+    if (!['PENDING_PAYMENT', 'CONFIRMED'].includes(booking.status)) {
+      throw new BadRequestException('This booking can no longer be declined');
+    }
+    const paid =
+      booking.transaction && ['HELD', 'RELEASED'].includes(booking.transaction.status);
+    const refundAmount = paid ? Number(booking.transaction!.amount) : 0;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: { status: 'DECLINED', declineReason: reason ?? null },
+      });
+      if (booking.transaction) {
+        await tx.transaction.update({
+          where: { id: booking.transaction.id },
+          data: { status: paid ? 'REFUNDED' : 'FAILED', refundedAt: paid ? new Date() : null },
+        });
+      }
+      if (refundAmount > 0) {
+        await this.wallet.adjust(
+          booking.userId,
+          refundAmount,
+          'REFUND',
+          { reference: booking.matchId, description: 'Booking declined by venue — full refund' },
+          tx,
+        );
+      }
+      await tx.matchPosition.updateMany({
+        where: { bookingId },
+        data: { bookingId: null, isLocked: false },
+      });
+      await syncPlayerCount(tx, booking.matchId);
+    });
+
+    if (!booking.isPhoneBooking) {
+      await this.notifications
+        .send(booking.userId, 'MATCH_CANCELLED' as any, booking.matchId, {
+          matchTitle: booking.match.title,
+          reason: reason ?? '',
+        })
+        .catch(() => {});
+    }
+    await this.activity.log(adminUserId, 'BOOKING_CANCELLED', `Declined booking ${bookingId}`, {
+      bookingId,
+      matchId: booking.matchId,
+      reason,
+      refundAmount,
+    });
+    return { declined: true, bookingId, status: 'DECLINED', refundAmount };
+  }
+
+  /**
+   * Auto-expire an unconfirmed booking after the hold window (called by the
+   * reminders queue). No-op if it was confirmed, cancelled or already handled.
+   */
+  async expireIfStale(bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { match: { select: { title: true } }, transaction: true },
+    });
+    if (!booking || booking.status !== 'PENDING_PAYMENT') return { expired: false };
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.booking.update({ where: { id: bookingId }, data: { status: 'EXPIRED' } });
+      if (booking.transaction && booking.transaction.status === 'PENDING') {
+        await tx.transaction.update({ where: { id: booking.transaction.id }, data: { status: 'FAILED' } });
+      }
+      await tx.matchPosition.updateMany({
+        where: { bookingId },
+        data: { bookingId: null, isLocked: false },
+      });
+      await syncPlayerCount(tx, booking.matchId);
+    });
+
+    await this.notifications
+      .send(booking.userId, 'MATCH_CANCELLED' as any, booking.matchId, { matchTitle: booking.match.title })
+      .catch(() => {});
+    return { expired: true, bookingId };
+  }
+
+  // ─────────────────────────── STEP 6: phone bookings ─────────────────────────
+
+  /**
+   * Reserve N places for a caller (phone booking). Holds the places immediately
+   * (CONFIRMED) so the app's "places left" — always `maxPlayers − occupied` via
+   * syncPlayerCount — drops by N. The app shows only the caller's name.
+   */
+  async reservePhone(
+    adminUserId: string,
+    dto: { matchId: string; places: number; callerName: string; callerPhone?: string; paid?: boolean },
+  ) {
+    const match = await this.prisma.match.findUnique({ where: { id: dto.matchId } });
+    if (!match) throw new NotFoundException('Match not found');
+    await this.orgContext.assertCanManagePitch(adminUserId, match.pitchId);
+
+    const places = Math.floor(dto.places);
+    if (!places || places < 1) throw new BadRequestException('Reserve at least one place');
+    if (!dto.callerName?.trim()) throw new BadRequestException("Enter the caller's name");
+    const open = match.maxPlayers - match.currentPlayers;
+    if (places > open) {
+      throw new ConflictException(`Only ${open} place(s) left — cannot reserve ${places}`);
+    }
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      for (let i = 0; i < places; i++) {
+        await tx.booking.create({
+          data: {
+            userId: adminUserId,
+            matchId: dto.matchId,
+            status: 'CONFIRMED',
+            isPhoneBooking: true,
+            callerName: dto.callerName.trim(),
+            callerPhone: dto.callerPhone?.trim() || null,
+            paidOffline: !!dto.paid,
+            guestLabel: dto.callerName.trim(),
+            qrCode: `${dto.matchId}_phone_${Date.now()}_${i}`,
+          },
+        });
+      }
+      const count = await syncPlayerCount(tx, dto.matchId);
+      return count;
+    });
+
+    await this.activity.log(adminUserId, 'ADMIN_ACTION', `Reserved ${places} place(s) by phone`, {
+      matchId: dto.matchId,
+      places,
+      callerName: dto.callerName,
+      paid: !!dto.paid,
+    });
+    return { reserved: places, occupied: created, placesLeft: match.maxPlayers - created };
+  }
+
+  /**
+   * Release N phone-reserved places (a caller dropped out). Removes the most
+   * recent phone bookings on the match and returns the places to the app.
+   */
+  async removePhonePlaces(adminUserId: string, matchId: string, count: number) {
+    const match = await this.prisma.match.findUnique({ where: { id: matchId } });
+    if (!match) throw new NotFoundException('Match not found');
+    await this.orgContext.assertCanManagePitch(adminUserId, match.pitchId);
+
+    const n = Math.floor(count);
+    if (!n || n < 1) throw new BadRequestException('Remove at least one place');
+
+    const removed = await this.prisma.$transaction(async (tx) => {
+      const rows = await tx.booking.findMany({
+        where: { matchId, isPhoneBooking: true, status: 'CONFIRMED' },
+        orderBy: { createdAt: 'desc' },
+        take: n,
+        select: { id: true },
+      });
+      if (rows.length === 0) return 0;
+      await tx.booking.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } });
+      await syncPlayerCount(tx, matchId);
+      return rows.length;
+    });
+
+    await this.activity.log(adminUserId, 'ADMIN_ACTION', `Removed ${removed} phone place(s)`, {
+      matchId,
+      removed,
+    });
+    return { removed };
   }
 
   private generatePaymentUrl(transactionId: string, amount: number, gateway: string): string {

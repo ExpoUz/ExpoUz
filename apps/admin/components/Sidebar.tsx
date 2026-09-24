@@ -21,26 +21,33 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { SIMPLE_MODE } from "@/lib/flags";
 
-const NAV_ITEMS: { href: string; label: string; Icon: LucideIcon }[] = [
+// hideInSimple: dropped from the nav when SIMPLE_MODE is on (default). The
+// routes still exist and return when NEXT_PUBLIC_SIMPLE_MODE=false.
+type NavItem = { href: string; label: string; Icon: LucideIcon; hideInSimple?: boolean };
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", Icon: LayoutDashboard },
   { href: "/users", label: "Users", Icon: Users },
   { href: "/pitches", label: "Pitches", Icon: Building2 },
   { href: "/matches", label: "Matches", Icon: Activity },
   { href: "/transactions", label: "Transactions", Icon: CreditCard },
-  { href: "/activity", label: "Activity", Icon: Radio },
-  { href: "/analytics", label: "Analytics", Icon: BarChart3 },
+  { href: "/activity", label: "Activity", Icon: Radio, hideInSimple: true },
+  { href: "/analytics", label: "Analytics", Icon: BarChart3, hideInSimple: true },
 ];
 
-const SUPER_ITEMS: { href: string; label: string; Icon: LucideIcon }[] = [
-  { href: "/organizations", label: "Organizations", Icon: Building },
+const SUPER_ITEMS: NavItem[] = [
+  { href: "/organizations", label: "Organizations", Icon: Building, hideInSimple: true },
   { href: "/super/admins", label: "Admins", Icon: ShieldCheck },
   { href: "/super/pitch-admins", label: "Pitch Owners", Icon: HardHat },
-  { href: "/super/crm-oversight", label: "CRM Oversight", Icon: Search },
-  { href: "/super/groups", label: "Chat Groups", Icon: MessagesSquare },
+  { href: "/super/crm-oversight", label: "CRM Oversight", Icon: Search, hideInSimple: true },
+  { href: "/super/groups", label: "Chat Groups", Icon: MessagesSquare, hideInSimple: true },
   { href: "/super/locations", label: "Locations", Icon: MapPin },
   { href: "/super/settings", label: "Settings", Icon: Settings },
 ];
+
+const visible = (items: NavItem[]) => items.filter((i) => !(SIMPLE_MODE && i.hideInSimple));
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -67,7 +74,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map(({ href, label, Icon }) => (
+        {visible(NAV_ITEMS).map(({ href, label, Icon }) => (
           <Link
             key={href}
             href={href}
@@ -89,7 +96,7 @@ export function Sidebar() {
                 Super Admin
               </span>
             </div>
-            {SUPER_ITEMS.map(({ href, label, Icon }) => (
+            {visible(SUPER_ITEMS).map(({ href, label, Icon }) => (
               <Link
                 key={href}
                 href={href}

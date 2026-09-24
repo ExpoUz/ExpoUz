@@ -559,6 +559,15 @@ model Booking {
   // the organizer (userId = organizerId) and does not count as their membership.
   isGuestSlot   Boolean        @default(false)
   guestLabel    String? // "Guest 1", or a name the organizer enters
+  // Admin decline reason (Step 5) — surfaced to the player when a venue declines.
+  declineReason String?
+  // Phone booking (Step 6): a place the venue admin reserved for a caller. Holds
+  // the place like any booking; the app shows only the caller's name. paidOffline
+  // records whether the venue has been paid (cash/transfer) yet.
+  isPhoneBooking Boolean       @default(false)
+  callerName     String?
+  callerPhone    String?
+  paidOffline    Boolean       @default(false)
   transaction   Transaction?
   createdAt     DateTime       @default(now())
 
@@ -572,6 +581,8 @@ enum BookingStatus {
   CANCELLED_PENALTY
   COMPLETED
   NO_SHOW
+  DECLINED // venue admin declined an awaiting booking (Step 5) — place released
+  EXPIRED // unconfirmed booking auto-expired after 2h (Step 5) — place released
 }
 
 // ============ TRANSACTION (Escrow) ============

@@ -23,6 +23,7 @@ import {
   hapticError,
   showAlert,
 } from "@/lib/telegram";
+import { SIMPLE_MODE } from "@/lib/flags";
 
 export default function JoinViaInvitePage() {
   const router = useRouter();
@@ -62,7 +63,7 @@ export default function JoinViaInvitePage() {
       }
       if (isInsufficientBalanceError(e)) {
         showAlert(t("insufficient"));
-        router.push("/wallet");
+        if (!SIMPLE_MODE) router.push("/wallet");
       } else {
         showAlert(e?.response?.data?.message ?? tm("couldNotJoinGame"));
       }

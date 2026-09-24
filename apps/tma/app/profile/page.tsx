@@ -21,6 +21,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useAuth } from "@/lib/auth";
 import { usePhoneGate } from "@/lib/phone-gate";
 import { useSportStore, type Sport } from "@/lib/sport-store";
+import { SIMPLE_MODE } from "@/lib/flags";
 import { hideMainButton, hapticImpact } from "@/lib/telegram";
 import { useEffect } from "react";
 
@@ -104,6 +105,7 @@ export default function ProfilePage() {
       )}
 
       {/* Wallet quick-link */}
+      {!SIMPLE_MODE && (
       <div className="px-4 mt-3">
         <Link
           href="/wallet"
@@ -121,6 +123,7 @@ export default function ProfilePage() {
           <ChevronRight size={18} style={{ color: "var(--tg-hint)" }} />
         </Link>
       </div>
+      )}
 
       {/* Sport tabs */}
       <div className="px-4 mt-4">
@@ -130,7 +133,8 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {isPadel ? <PadelProfile me={me} stats={stats} /> : <FootballProfile me={me} />}
+      {/* Skill level / ELO surfaces — hidden in SIMPLE_MODE. */}
+      {!SIMPLE_MODE && (isPadel ? <PadelProfile me={me} stats={stats} /> : <FootballProfile me={me} />)}
 
       {/* My games (filtered to the active sport) */}
       <MyGames bookings={bookings} sport={tab} />

@@ -48,6 +48,7 @@ import {
   copyToClipboard,
 } from "@/lib/telegram";
 import { useAuth } from "@/lib/auth";
+import { SIMPLE_MODE } from "@/lib/flags";
 import { HostCard } from "./HostCard";
 import { MatchChatRow } from "./MatchChatRow";
 import { VenueMap } from "./VenueMap";
@@ -111,7 +112,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
             ? `${t("insufficientJoin")}\n${formatUZS(info.needed)} · ${t("yourWallet", { balance: formatUZS(info.balance) })}`
             : t("insufficientJoin"),
         );
-        router.push("/wallet");
+        if (!SIMPLE_MODE) router.push("/wallet");
         return;
       }
       showAlert(e?.response?.data?.message ?? t("couldNotJoinGame"));
@@ -296,7 +297,8 @@ export function FootballMatchDetail({ match }: { match: any }) {
           </div>
         )}
 
-        {/* Formation link */}
+        {/* Formation link — hidden in SIMPLE_MODE */}
+        {!SIMPLE_MODE && (
         <Link
           href={`/match/${id}/formation`}
           className="rounded-2xl p-4 flex items-center gap-3"
@@ -316,6 +318,7 @@ export function FootballMatchDetail({ match }: { match: any }) {
           </div>
           <ChevronRight size={18} style={{ color: "var(--tg-hint)" }} />
         </Link>
+        )}
 
         {/* Players */}
         <div>
@@ -368,8 +371,8 @@ export function FootballMatchDetail({ match }: { match: any }) {
         {/* Where you'll play — static map + amenities */}
         <VenueMap pitch={match.pitch} />
 
-        {/* Result entry — available once the match has started */}
-        {hoursUntilMatch <= 0 && (joined || isHost) && (
+        {/* Result entry — available once the match has started; hidden in SIMPLE_MODE */}
+        {!SIMPLE_MODE && hoursUntilMatch <= 0 && (joined || isHost) && (
           <Link
             href={`/match/${id}/result`}
             onClick={() => hapticImpact("light")}

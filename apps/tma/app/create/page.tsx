@@ -9,6 +9,7 @@ import dayjs from "dayjs";
 import { getPitches, createMatch, getPricingPreview, getAvailableSlots, formatUZS, isPhoneRequiredError } from "@/lib/api";
 import { usePhoneGate } from "@/lib/phone-gate";
 import { useSportStore, setSport, sportMeta, SPORTS } from "@/lib/sport-store";
+import { SIMPLE_MODE } from "@/lib/flags";
 import {
   showMainButton,
   hideMainButton,
@@ -357,7 +358,7 @@ export default function CreateMatchPage() {
               })}
             </div>
           </div>
-          {BOOKING_TYPES.map((bt) => {
+          {BOOKING_TYPES.filter((bt) => !(SIMPLE_MODE && bt.type === "GROUP_BOOKING")).map((bt) => {
             const active = form.bookingType === bt.type;
             const Icon = bt.Icon;
             return (
@@ -475,8 +476,8 @@ export default function CreateMatchPage() {
             </Field>
           )}
 
-          {/* Match type (Casual / Competitive) is padel-only */}
-          {form.bookingType !== "FULL_BOOKING" && isPadel && (
+          {/* Match type (Casual / Competitive) is padel-only, and hidden in SIMPLE_MODE */}
+          {form.bookingType !== "FULL_BOOKING" && isPadel && !SIMPLE_MODE && (
             <Field label={t("matchType")}>
               <div className="grid grid-cols-2 gap-2">
                 <MatchTypeButton
@@ -600,7 +601,7 @@ export default function CreateMatchPage() {
             <ReviewRow label={t("r_when")} value={dayjs(`${form.date}T${form.time}`).format("ddd, MMM D · HH:mm")} />
             <ReviewRow label={t("r_sport")} value={sportLabel} />
             {form.bookingType !== "FULL_BOOKING" && <ReviewRow label={t("r_format")} value={form.format} />}
-            {form.bookingType !== "FULL_BOOKING" && isPadel && (
+            {form.bookingType !== "FULL_BOOKING" && isPadel && !SIMPLE_MODE && (
               <ReviewRow label={t("r_matchType")} value={form.matchType === "CASUAL" ? t("casual") : t("competitive")} />
             )}
             {form.bookingType === "OPEN_EVENT" && <ReviewRow label={t("r_maxPlayers")} value={String(form.maxPlayers)} />}

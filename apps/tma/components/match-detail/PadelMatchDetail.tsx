@@ -29,6 +29,7 @@ import {
   isInTelegram,
 } from "@/lib/telegram";
 import { useAuth } from "@/lib/auth";
+import { SIMPLE_MODE } from "@/lib/flags";
 import { VersusPreview } from "./VersusPreview";
 import { HostCard } from "./HostCard";
 import { MatchChatRow } from "./MatchChatRow";
@@ -135,7 +136,13 @@ export function PadelMatchDetail({ match }: { match: any }) {
         return;
       }
       if (code === "PADEL_LEVEL_REQUIRED") {
-        router.push(`/onboarding?next=/match/${id}`);
+        // Level gate is hidden in SIMPLE_MODE — surface a plain message rather
+        // than routing to the (disabled) onboarding questionnaire.
+        if (SIMPLE_MODE) {
+          showAlert(e?.response?.data?.message ?? t("couldNotJoin"));
+        } else {
+          router.push(`/onboarding?next=/match/${id}`);
+        }
         return;
       }
       if (isInsufficientBalanceError(e)) {
@@ -145,7 +152,7 @@ export function PadelMatchDetail({ match }: { match: any }) {
             ? `${t("insufficientPlace")}\n${formatUZS(info.needed)} · ${t("yourWallet", { balance: formatUZS(info.balance) })}`
             : t("insufficientPlace"),
         );
-        router.push("/wallet");
+        if (!SIMPLE_MODE) router.push("/wallet");
         return;
       }
       showAlert(e?.response?.data?.message ?? t("couldNotJoin"));
@@ -174,15 +181,19 @@ export function PadelMatchDetail({ match }: { match: any }) {
     // A verified phone is required before booking — venues must be able to
     // reach players if a game changes. Prompt now; abort if dismissed.
     if (!(await requirePhone())) return;
-    if (!user?.padelInitialSet) {
-      hapticImpact("light");
-      router.push(`/onboarding?next=/match/${id}`);
-      return;
-    }
-    if (hasRange && outOfRange) {
-      hapticImpact("medium");
-      setGate("blocked");
-      return;
+    // Skill-level gates (onboarding + level-range block) are hidden in
+    // SIMPLE_MODE, so a player can join straight after phone verification.
+    if (!SIMPLE_MODE) {
+      if (!user?.padelInitialSet) {
+        hapticImpact("light");
+        router.push(`/onboarding?next=/match/${id}`);
+        return;
+      }
+      if (hasRange && outOfRange) {
+        hapticImpact("medium");
+        setGate("blocked");
+        return;
+      }
     }
     setPendingSide(side);
     setGate("confirm");

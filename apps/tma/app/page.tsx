@@ -21,6 +21,7 @@ import { SlotSheet, slotFilterLabel, type SlotFilter } from "@/components/home/S
 import { FreeCourtCard } from "@/components/home/FreeCourtCard";
 import { deriveSections } from "@/components/home/matchHelpers";
 import { initialsOf } from "@/components/home/PhotoOrInitials";
+import { SIMPLE_MODE } from "@/lib/flags";
 
 export default function HomePage() {
   const router = useRouter();
@@ -230,7 +231,7 @@ export default function HomePage() {
             <span>{slotFilter ? slotFilterLabel(slotFilter, tSlots) : t("time")}</span>
             {slotFilter && <ChevronDown size={14} className="ml-0.5" />}
           </button>
-          {isPadel && (
+          {isPadel && !SIMPLE_MODE && (
             <>
               <button
                 className={`pill ${matchType === "COMPETITIVE" ? "pill-active" : ""}`}

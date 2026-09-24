@@ -18,17 +18,21 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useI18n, LANGS } from "@/lib/i18n";
 import { getPortalContext, type OrgRole } from "@/lib/api";
+import { SIMPLE_MODE } from "@/lib/flags";
 
 // Which org roles may see each nav item. STAFF is limited to schedule + check-in.
-const NAV_ITEMS: { href: string; key: string; Icon: LucideIcon; roles: OrgRole[] }[] = [
+// hideInSimple: dropped from the nav when SIMPLE_MODE is on (default). The core
+// loop keeps Today (dashboard), Schedule and Settings (pitches). The routes still
+// exist and return when NEXT_PUBLIC_SIMPLE_MODE=false.
+const NAV_ITEMS: { href: string; key: string; Icon: LucideIcon; roles: OrgRole[]; hideInSimple?: boolean }[] = [
   { href: "/", key: "nav.dashboard", Icon: LayoutDashboard, roles: ["OWNER", "MANAGER", "STAFF"] },
   { href: "/schedule", key: "nav.schedule", Icon: CalendarDays, roles: ["OWNER", "MANAGER", "STAFF"] },
   { href: "/pitches", key: "nav.pitches", Icon: Building2, roles: ["OWNER", "MANAGER"] },
-  { href: "/players", key: "nav.players", Icon: Users, roles: ["OWNER", "MANAGER"] },
-  { href: "/insights", key: "nav.insights", Icon: BarChart3, roles: ["OWNER", "MANAGER"] },
-  { href: "/broadcast", key: "nav.broadcast", Icon: Megaphone, roles: ["OWNER", "MANAGER"] },
-  { href: "/revenue", key: "nav.revenue", Icon: Wallet, roles: ["OWNER", "MANAGER"] },
-  { href: "/staff", key: "nav.staff", Icon: UserCog, roles: ["OWNER"] },
+  { href: "/players", key: "nav.players", Icon: Users, roles: ["OWNER", "MANAGER"], hideInSimple: true },
+  { href: "/insights", key: "nav.insights", Icon: BarChart3, roles: ["OWNER", "MANAGER"], hideInSimple: true },
+  { href: "/broadcast", key: "nav.broadcast", Icon: Megaphone, roles: ["OWNER", "MANAGER"], hideInSimple: true },
+  { href: "/revenue", key: "nav.revenue", Icon: Wallet, roles: ["OWNER", "MANAGER"], hideInSimple: true },
+  { href: "/staff", key: "nav.staff", Icon: UserCog, roles: ["OWNER"], hideInSimple: true },
 ];
 
 export function Sidebar() {
@@ -39,7 +43,9 @@ export function Sidebar() {
   // Org identity + role drive the panel branding and which nav items appear.
   const { data: ctx } = useQuery({ queryKey: ["portal-context"], queryFn: getPortalContext });
   const role: OrgRole = ctx?.role ?? "OWNER";
-  const items = NAV_ITEMS.filter((i) => i.roles.includes(role));
+  const items = NAV_ITEMS.filter(
+    (i) => i.roles.includes(role) && !(SIMPLE_MODE && i.hideInSimple),
+  );
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
